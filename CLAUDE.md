@@ -4,13 +4,14 @@
 **Blastwright** is a PvE Roblox game: plant charges in crystal caverns, detonate, and plan chain reactions for shards. Concept approved 2026-09-21. Design: `docs/GAME_DESIGN.md`. Architecture: `docs/TECHNICAL_ARCHITECTURE.md`.
 
 ## Status (update this section as work lands)
-- Done and unit-tested (46 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
+- Done and unit-tested (48 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
 - Runs in Studio (developer-confirmed) but has no automated tests and only a first smoke run: `Game`, `Data`, `World`, all Client modules.
 - Developer confirmed on 2026-09-21 that the game runs in Studio and shows the cavern and UI (after the lazy-DataStore fix). Developer reported it "feels very good" (2026-09-21); audio playback not explicitly confirmed.
 - Audio: 7 SFX cues wired from Creator Store results (`tools/asset-search`); **unheard, playback unconfirmed** until Output shows `[Audio] ... OK`.
 - Explorable mine (hub, 3 biomes, 12 blast pads, 17 geode caches, terrain, lighting) and the reworked HUD are written and compile-checked; **not yet seen in Studio**. Save schema is v2 (`Caches`).
 - Daily objectives (3 per UTC day, claim in Menu > Daily) and the monetization framework (`Purchases.luau`, `Receipts.luau`, `Config/Products.luau`, Shop tab) are written and unit-tested where pure; **unseen in Studio, no product IDs exist**. Save schema is v3 (`Daily`).
-- Not started: external visual assets (world look is terrain + Parts), music/ambience, mobile testing, cosmetics.
+- Real decor models (8, Creator Store, thumbnails viewed) load via `Server/Props.luau` with script-stripping and procedural fallbacks; a looping cave ambience bed is wired. **Both unseen/unheard in Studio: check Output for `[Props]` and `[Audio]` lines.** No music.
+- Not started: mobile testing, cosmetics, music.
 - Stratum 3 (Slowburn delayed-fuse crystal) added and unit-tested; its visuals, fuse flash and Codex entry are **not yet seen in Studio**.
 - Playtest 2026-09-21: world build died on an invalid `SurfaceGui` property (fixed; API checker added). Lighting/crystal glow retuned after "too dark / too bright" feedback; guide system (objective card, marker, trail, edge arrow, welcome panel) added. **Both unseen in Studio.**
 - Next: developer checks Menu > Daily and the Shop tab; creates products when ready (docs/MANUAL_ACTIONS.md); then asset pass and mobile.
@@ -21,6 +22,7 @@ Rojo 7.7.0 (`C:\Tools\Rojo`), Git, Node, Python. Asset search: `python tools/ass
 ## Commands
 - Tests: `tools/bin/luau.exe tools/tests/core.spec.luau`
 - Syntax check a file: `tools/bin/luau-compile.exe --text <file>`
+- Asset search: `tools/asset-search/audio_search.py` (`--min=`, `--allow-music`) and `model_search.py <out.png> <keywords>` (renders a thumbnail sheet to LOOK at before choosing).
 - **Roblox API name check (run before claiming Roblox-facing code is done):** `python tools/lint/roblox_api_check.py`. Needs `tools/bin/API-Dump.json` (git-ignored; see docs/TESTING.md).
 - Build: `rojo build -o "$env:TEMP\gamev1.rbxl"`
 - Live sync: `rojo serve`

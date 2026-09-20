@@ -1,12 +1,15 @@
 """Search the Roblox Creator Store for short, free, non-music audio and print vetted candidates.
 
-Usage: python tools/asset-search/audio_search.py <cue> <max_seconds> <keyword> [<keyword> ...]
+Usage: python tools/asset-search/audio_search.py <cue> <max_seconds> <keyword> [<keyword> ...] [--min=SECONDS] [--allow-music]
 Writes nothing; prints a table. Filters (all from API metadata, none guessed):
   - typeId 3 (audio), free, no scripts flag
   - duration <= max_seconds (SFX, not tracks)
-  - audioType == SoundEffect, no album, and artist is empty or the uploader themself (rules out music uploads)
+  - audioType SoundEffect or Unknown (uploader originals), no album, and artist is empty or the uploader themself.
+    Label/distributor music always has an album and a different artist name, so it is rejected by this rule.
   - asset hash approved and publicly visible
   - name does not contain a well-known copyrighted game/franchise word (heuristic; a human still reviews)
+  --allow-music also accepts audioType "Music" (long loops are all typed that way) but only when there is no album and
+  the artist is the uploader; provenance still cannot be audited from metadata, so review before use.
 Duplicates across keywords are merged. Selection and registry entry stay a human/Claude decision.
 """
 import json
@@ -31,7 +34,10 @@ def get(url):
 def main():
     if len(sys.argv) < 4:
         sys.exit(__doc__)
-    cue, max_secs, keywords = sys.argv[1], float(sys.argv[2]), sys.argv[3:]
+    allow_music = "--allow-music" in sys.argv
+    args = [a for a in sys.argv[1:] if not a.startswith("--min=") and a != "--allow-music"]
+    min_secs = next((float(a[6:]) for a in sys.argv[1:] if a.startswith("--min=")), 0.15)
+    cue, max_secs, keywords = args[0], float(args[1]), args[2:]
 
     ordered = []
     for kw in keywords:
@@ -48,13 +54,13 @@ def main():
             if a.get("typeId") != 3:
                 continue
             name_l = a.get("name", "").lower()
-            if ad.get("audioType") != "SoundEffect" or ad.get("musicAlbum") or ad.get("artist") not in ("", None, c["name"]):
+            if ad.get("audioType") not in (("SoundEffect", "Unknown", "Music") if allow_music else ("SoundEffect", "Unknown")) or ad.get("musicAlbum") or ad.get("artist") not in ("", None, c["name"]):
                 rejected["music/artist"] += 1
             elif not a.get("isAssetHashApproved") or a.get("visibilityStatus") != 0:
                 rejected["not approved"] += 1
             elif any(b in name_l for b in BLOCKLIST):
                 rejected["ip name"] += 1
-            elif not (0.15 <= a.get("duration", 0) <= max_secs):
+            elif not (min_secs <= a.get("duration", 0) <= max_secs):
                 rejected["too long/short"] += 1
             elif not d.get("fiatProduct", {}).get("isFree"):
                 rejected["not free"] += 1

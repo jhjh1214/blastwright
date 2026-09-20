@@ -1,6 +1,7 @@
 --!nonstrict
 -- Central audio playback with per-group volume. Missing/failed sounds never affect gameplay.
 local SoundService = game:GetService("SoundService")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Sounds = require(ReplicatedStorage.Shared.Config.Sounds)
@@ -8,6 +9,8 @@ local Sounds = require(ReplicatedStorage.Shared.Config.Sounds)
 local AudioManager = {}
 local groups = {}
 local pool = {}
+local loops = {} -- [cueName] = { Sound = Sound, Base = number }
+local duckFactor = 1
 
 local GROUP_VOLUME = { Music = 0.5, Ambient = 0.5, Ui = 0.7, Sfx = 0.8, Reward = 0.9 }
 
@@ -21,6 +24,37 @@ local function group(name)
 	g.Parent = SoundService
 	groups[name] = g
 	return g
+end
+
+-- Starts every looping cue (ambience) with a slow fade-in. Safe to call once at startup; skips cues without an Id.
+function AudioManager.StartLoops()
+	for name, cue in Sounds do
+		if cue.Loop and cue.Id and not loops[name] then
+			local ok = pcall(function()
+				local s = Instance.new("Sound")
+				s.Name = "Loop_" .. name
+				s.SoundId = cue.Id
+				s.Looped = true
+				s.Volume = 0
+				s.SoundGroup = group(cue.Group)
+				s.Parent = SoundService
+				s:Play()
+				loops[name] = { Sound = s, Base = cue.Volume }
+				TweenService:Create(s, TweenInfo.new(4), { Volume = cue.Volume * duckFactor }):Play()
+			end)
+			if not ok then
+				warn("[Audio] could not start loop " .. name)
+			end
+		end
+	end
+end
+
+-- Lower (or restore) the looping beds. factor 1 = normal, 0.4 = quieter. Used when entering/leaving blast mode.
+function AudioManager.Duck(factor)
+	duckFactor = factor
+	for _, loop in loops do
+		TweenService:Create(loop.Sound, TweenInfo.new(0.8), { Volume = loop.Base * factor }):Play()
+	end
 end
 
 -- opts: { Pitch = number?, Volume = number? }

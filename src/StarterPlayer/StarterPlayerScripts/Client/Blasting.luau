@@ -3,6 +3,7 @@
 -- Movement is locked on the client only as UX; the server separately requires you to stand at your station.
 local Players = game:GetService("Players")
 
+local AudioManager = require(script.Parent.AudioManager)
 local CameraFeedback = require(script.Parent.CameraFeedback)
 local CavernView = require(script.Parent.CavernView)
 local Geometry = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared").Geometry)
@@ -57,6 +58,7 @@ function Blasting.Engage(siteId)
 	lockMovement()
 	Blasting.Focus(view)
 	UI.SetEngaged(true)
+	AudioManager.Duck(0.45)
 	table.clear(State.Placed)
 	Preview.Refresh()
 	UI.Refresh()
@@ -71,6 +73,7 @@ function Blasting.Leave()
 	CameraFeedback.Clear()
 	table.clear(State.Placed)
 	UI.SetEngaged(false)
+	AudioManager.Duck(1)
 	Preview.Refresh()
 end
 

@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Geometry = require(Shared.Geometry)
+local Props = require(script.Parent.Props)
 
 local W = Config.World
 local Terrain = workspace.Terrain
@@ -201,8 +202,16 @@ end
 local function cluster(parent, pos, color, scale, rng, withLight)
 	local model = Instance.new("Model")
 	model.Name = "Crystals"
-	local count = rng:NextInteger(3, 5)
 	local first
+	local real = nil
+	if Props.Has("CrystalA") and rng:NextNumber() < 0.7 then
+		local key = (Props.Has("CrystalB") and rng:NextNumber() < 0.5) and "CrystalB" or "CrystalA"
+		real = Props.Place(key, pos, (3 + rng:NextNumber() * 4) * scale, rng:NextNumber() * math.pi * 2, color:Lerp(Color3.new(0, 0, 0), 0.3), model)
+		if real then
+			first = real:FindFirstChildWhichIsA("BasePart", true)
+		end
+	end
+	local count = real and 0 or rng:NextInteger(3, 5)
 	for i = 1, count do
 		local a = (i / count) * math.pi * 2 + rng:NextNumber() * 0.5
 		local h = (2 + rng:NextNumber() * 3.5) * scale
@@ -254,6 +263,46 @@ local function buildDecor(spires, rng)
 	end
 end
 
+---------------------------------------------------------------- flora and rock decor (real models)
+
+local function buildFlora()
+	local folder = Instance.new("Folder")
+	folder.Name = "Flora"
+	folder.Parent = root
+	local rng = Random.new(4242)
+
+	local function scatter(keys, attempts, minH, maxH, lightEvery)
+		local placed = 0
+		for _ = 1, attempts do
+			local x = rng:NextNumber(W.Bounds.MinX + 12, W.Bounds.MaxX - 12)
+			local z = rng:NextNumber(W.Bounds.MinZ + 12, W.Bounds.MaxZ - 12)
+			if not blocked(x, z, -6) then
+				local key = keys[rng:NextInteger(1, #keys)]
+				if Props.Has(key) then
+					local model = Props.Place(key, Vector3.new(x, 0, z), rng:NextNumber(minH, maxH), rng:NextNumber(0, math.pi * 2), nil, folder)
+					if model then
+						placed += 1
+						if lightEvery and placed % lightEvery == 0 then
+							local part = model:FindFirstChildWhichIsA("BasePart", true)
+							if part then
+								local light = Instance.new("PointLight")
+								light.Color = Color3.fromRGB(90, 220, 230)
+								light.Range = 12
+								light.Brightness = 0.6
+								light.Shadows = false
+								light.Parent = part
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	scatter({ "MushroomA", "MushroomB" }, 90, 2.5, 5.5, 4)
+	scatter({ "StalagmiteA", "StalagmiteB" }, 60, 7, 15, nil)
+end
+
 ---------------------------------------------------------------- roads and lanterns
 
 local function buildRoads()
@@ -276,8 +325,15 @@ local function buildRoads()
 			if dist2(pos.X, pos.Z, W.Hub.X, W.Hub.Z) > W.Hub.Radius + 4 then
 				for sgn = -1, 1, 2 do
 					local base = pos + side * (W.PathHalfWidth - 1) * sgn
-					decorPart(folder, Vector3.new(0.6, 7, 0.6), CFrame.new(base + Vector3.new(0, 3.5, 0)), Color3.fromRGB(30, 32, 44), Enum.Material.Metal)
-					local head = decorPart(folder, Vector3.new(1.5, 1.5, 1.5), CFrame.new(base + Vector3.new(0, 7.4, 0)), lamp, Enum.Material.Neon)
+					local head
+					if Props.Place("Lamp", base, 9.5, math.atan2(dir.X, dir.Z) + (sgn > 0 and math.pi or 0), nil, folder) then
+						-- Invisible emitter part carries the light; the model supplies the look.
+						head = decorPart(folder, Vector3.new(0.6, 0.6, 0.6), CFrame.new(base + Vector3.new(0, 7.6, 0)), lamp, Enum.Material.Neon)
+						head.Transparency = 1
+					else
+						decorPart(folder, Vector3.new(0.6, 7, 0.6), CFrame.new(base + Vector3.new(0, 3.5, 0)), Color3.fromRGB(30, 32, 44), Enum.Material.Metal)
+						head = decorPart(folder, Vector3.new(1.5, 1.5, 1.5), CFrame.new(base + Vector3.new(0, 7.4, 0)), lamp, Enum.Material.Neon)
+					end
 					if (i + (sgn + 1) / 2) % 2 == 0 then
 						local light = Instance.new("PointLight")
 						light.Color = lamp
@@ -352,6 +408,12 @@ local function buildHub()
 		label.Parent = gui
 	end
 
+	if Props.Has("Crate") then
+		for _, off in { { -14, 32 }, { -10, 35 }, { 17, 31 } } do
+			Props.Place("Crate", Vector3.new(W.Hub.X + off[1], 0, W.Hub.Z + off[2]), 3.4, off[1] * 0.1, nil, folder)
+		end
+	end
+
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "Spawn"
 	spawn.Anchored = true
@@ -401,6 +463,10 @@ local function buildSites()
 		mk(folder, Vector3.new(4.5, 0.6, 4.5), CFrame.new(stationPos + Vector3.new(0, 0.3, 0)), dark, Enum.Material.Metal)
 		mk(folder, Vector3.new(3, 1.4, 3), CFrame.new(stationPos + Vector3.new(0, 1.2, 0)), Color3.fromRGB(46, 52, 72), Enum.Material.Metal)
 		local plunger = mk(folder, Vector3.new(1.2, 2.2, 1.2), CFrame.new(stationPos + Vector3.new(0, 2.9, 0)), color, Enum.Material.Neon)
+		if Props.Has("Crate") then
+			Props.Place("Crate", stationPos + Vector3.new(6, 0, 1), 3.6, 0.3, nil, folder)
+			Props.Place("Crate", stationPos + Vector3.new(-6.5, 0, 0), 3.2, -0.4, nil, folder)
+		end
 		plunger.Name = "Station" .. site.Id
 		plunger:SetAttribute("SiteId", site.Id)
 		CollectionService:AddTag(plunger, "SiteStation")
@@ -514,7 +580,9 @@ function World.Build()
 
 	buildLighting()
 	local spires, rng = buildTerrain()
+	Props.Load() -- third-party decor models (sanitized); procedural fallbacks are used for any that fail
 	buildDecor(spires, rng)
+	buildFlora()
 	buildRoads()
 	buildHub()
 	buildSites()

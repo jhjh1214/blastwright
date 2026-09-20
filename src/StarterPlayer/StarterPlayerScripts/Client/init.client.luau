@@ -22,6 +22,7 @@ local State = require(script.State)
 local UI = require(script.UI)
 
 task.spawn(AudioManager.Verify)
+AudioManager.StartLoops()
 
 UI.Init()
 Preview.OnText = UI.SetPreview

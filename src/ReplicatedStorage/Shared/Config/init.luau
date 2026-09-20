@@ -13,6 +13,7 @@ return {
 	World = require(script.World),
 	Dailies = require(script.Dailies),
 	Products = require(script.Products),
+	Props = require(script.Props),
 	Tuning = Tuning,
 	Context = {
 		Crystals = Crystals.Defs,

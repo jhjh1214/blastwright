@@ -8,8 +8,8 @@
 - **UI:** dark navy panels, cyan accent, gold for shards, orange for the detonate action. Rounded corners, GothamBold/GothamBlack.
 - **Camera:** fixed high-angle over the cavern, auto-fit for any aspect ratio.
 
-## World look (built from code, no external assets)
-Roblox Terrain (slate ground, basalt cliffs, rock mounds and stacked-cylinder spires), cobblestone roads with warm lanterns, neon crystal clusters tinted per biome (cyan / gold / magenta), a pale-blue hub, strong dark atmosphere with bloom. Drifting motes follow the player.
+## World look (Terrain + Parts + vetted Creator Store models)
+Roblox Terrain (slate ground, basalt cliffs, rock mounds and stacked-cylinder spires), cobblestone roads with warm lanterns, neon crystal clusters tinted per biome (cyan / gold / magenta), a pale-blue hub, strong dark atmosphere with bloom. Drifting motes follow the player. Real models (see `ASSET_REGISTRY.md`) add tinted crystal clusters, lamp posts, glowing mushrooms, stalagmites and crates; each has a procedural fallback.
 
 ## Current state
 Crystals and floor are **procedural from Parts**. That is a deliberate slice placeholder and does not meet the final quality bar. Replacing or enhancing with verified assets is planned (see `DEVELOPMENT_PLAN.md`).

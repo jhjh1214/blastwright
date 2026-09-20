@@ -574,5 +574,35 @@ test("objectives: a finished daily objective is surfaced before anything else", 
 	eq(Objectives.Roam(fresh, 0, 0, ocfg).Id, "GoBlast", "brand-new player still starts at a pad")
 end)
 
+test("props: config ids are real-looking, unique and named", function()
+	local PropsCfg = require("../../src/ReplicatedStorage/Shared/Config/Props")
+	local seen, n = {}, 0
+	for key, def in PropsCfg.Defs do
+		n += 1
+		if type(def.Id) ~= "number" or def.Id <= 0 or def.Id % 1 ~= 0 then error(key .. " has a malformed id") end
+		if seen[def.Id] then error("duplicate prop id " .. def.Id) end
+		seen[def.Id] = true
+		if type(def.Name) ~= "string" or def.Name == "" then error(key .. " needs a name") end
+		if type(def.Creator) ~= "string" or def.Creator == "" then error(key .. " needs a creator credit") end
+	end
+	eq(n >= 6, true, "a useful number of props configured")
+	-- World.luau asks for these keys by name; a typo would silently fall back to procedural decor.
+	for _, required in { "CrystalA", "CrystalB", "Lamp", "MushroomA", "MushroomB", "StalagmiteA", "StalagmiteB", "Crate" } do
+		if PropsCfg.Defs[required] == nil then error("World.luau uses prop key " .. required .. " but it is not configured") end
+	end
+end)
+
+test("sounds: ids are well-formed asset uris, groups known, loops sane", function()
+	local Sounds = require("../../src/ReplicatedStorage/Shared/Config/Sounds")
+	local groups = { Music = true, Ambient = true, Ui = true, Sfx = true, Reward = true }
+	for name, cue in Sounds do
+		if cue.Id ~= nil and not string.match(cue.Id, "^rbxassetid://%d+$") then error(name .. " has a malformed sound id: " .. tostring(cue.Id)) end
+		if not groups[cue.Group] then error(name .. " uses unknown group " .. tostring(cue.Group)) end
+		if type(cue.Volume) ~= "number" or cue.Volume <= 0 or cue.Volume > 1 then error(name .. " volume out of range") end
+	end
+	eq(Sounds.Ambience.Loop, true, "ambience loops")
+	eq(Sounds.Pop.Loop, nil, "effects do not loop")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end
