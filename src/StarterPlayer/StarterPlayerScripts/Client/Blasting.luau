@@ -60,6 +60,7 @@ function Blasting.Engage(siteId)
 	UI.SetEngaged(true)
 	AudioManager.Duck(0.45)
 	table.clear(State.Placed)
+	Preview.SetHover(nil, nil, true)
 	Preview.Refresh()
 	UI.Refresh()
 end
@@ -74,6 +75,7 @@ function Blasting.Leave()
 	table.clear(State.Placed)
 	UI.SetEngaged(false)
 	AudioManager.Duck(1)
+	Preview.SetHover(nil, nil, true)
 	Preview.Refresh()
 end
 

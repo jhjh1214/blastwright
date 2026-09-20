@@ -642,5 +642,62 @@ test("world: round pad fits the grid, contains its station, and leaves room arou
 	eq(W.SiteClearRadius >= W.PadRadius + 8, true, "terrain features keep clear of the pad and its rock rim")
 end)
 
+local function findEvent(result, x, z)
+	for _, e in result.Events do
+		if e.X == x and e.Z == z then return e end
+	end
+	error("no event at " .. x .. "," .. z)
+end
+
+test("chain source: direct hits name the charge cell that hit them", function()
+	local g = grid(function(x, z) if x == 6 and z == 5 then return "Glimmerstone" end end)
+	local e = findEvent(ChainSim.Run(g, { cap(5, 5) }, ctx), 6, 5)
+	eq(e.Cause, "Charge", "cause")
+	eq(e.SX, 5, "source x")
+	eq(e.SZ, 5, "source z")
+end)
+
+test("chain source: a chained crystal names the crystal that set it off", function()
+	local g = grid(function(x, z) if z == 5 then return "Kindlequartz" end end)
+	local r = ChainSim.Run(g, { cap(1, 5) }, ctx)
+	local third = findEvent(r, 3, 5)
+	eq(third.Cause, "Chain", "cause")
+	eq(third.SX, 2, "set off by the volatile crystal next to it, not by the charge")
+	eq(third.SZ, 5, "source z")
+	local fifth = findEvent(r, 5, 5)
+	eq(fifth.SX, 4, "the chain hands off one crystal at a time")
+end)
+
+test("chain source: prism beams name the prism, delayed blasts name the delayed crystal", function()
+	local g = grid(function(x, z) if z == 5 and x == 5 then return "Lensglass" end if z == 5 and x == 8 then return "Glimmerstone" end end)
+	local beamHit = findEvent(ChainSim.Run(g, { cap(5, 5) }, ctx), 8, 5)
+	eq(beamHit.Cause, "Beam", "cause")
+	eq(beamHit.SX, 5, "beam source x")
+	local g2 = grid(function(x, z) if x == 5 and z == 5 then return "Slowburn" end if x == 7 and z == 5 then return "Glimmerstone" end end)
+	local delayedHit = findEvent(ChainSim.Run(g2, { cap(5, 5) }, ctx), 7, 5)
+	eq(delayedHit.Cause, "Chain", "cause")
+	eq(delayedHit.SX, 5, "delayed source x")
+	eq(delayedHit.SZ, 5, "delayed source z")
+end)
+
+test("chain source: every event has one, and it is always a cell inside the grid", function()
+	local g = Seam.Generate(Crystals, Tuning, 3, 4242)
+	local r = ChainSim.Run(g, { cap(3, 3), cap(7, 7), { X = 5, Z = 5, Kind = "Shaft" } }, ctx)
+	for _, e in r.Events do
+		if type(e.SX) ~= "number" or type(e.SZ) ~= "number" then error("event without a source") end
+		if e.SX < 1 or e.SX > N or e.SZ < 1 or e.SZ > N then error("source outside the grid") end
+	end
+end)
+
+test("chain source: a shaft charge names its own cell for every crystal in the column", function()
+	local g = grid(function(x, z) if x == 3 and (z == 2 or z == 8) then return "Glimmerstone" end end)
+	local r = ChainSim.Run(g, { { X = 3, Z = 5, Kind = "Shaft" } }, ctx)
+	for _, z in { 2, 8 } do
+		local e = findEvent(r, 3, z)
+		eq(e.SX, 3, "shaft source x for z=" .. z)
+		eq(e.SZ, 5, "shaft source z for z=" .. z)
+	end
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

@@ -41,6 +41,10 @@ local function popEvent(run, ev)
 
 	CavernView.Pop(view, key)
 	VFX.Burst(top, col, ev.Cause == "Charge" and 14 or 9, 22)
+	if ev.Cause == "Chain" and ev.SX then
+		-- A short line from the crystal that set this one off, so the chain is visible as it travels.
+		VFX.Beam(Geometry.CellPosition(view.Origin, ev.SX, ev.SZ) + Vector3.new(0, 2, 0), top, col, 0.3)
+	end
 
 	if behavior == "Prism" then
 		local range = Config.Crystals.Defs[ev.Kind].Params.Range

@@ -112,7 +112,7 @@ local function buildLighting()
 		return inst
 	end
 	local bloom = ensure("BloomEffect", "CaveBloom")
-	bloom.Intensity = 0.28
+	bloom.Intensity = 0.2
 	bloom.Size = 20
 	bloom.Threshold = 2.2
 	local cc = ensure("ColorCorrectionEffect", "CaveGrade")

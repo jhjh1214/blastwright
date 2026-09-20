@@ -11,6 +11,9 @@
 ## World look (Terrain + Parts + vetted Creator Store models)
 Roblox Terrain (slate ground, basalt cliffs, rock mounds and stacked-cylinder spires), cobblestone roads with warm lanterns, neon crystal clusters tinted per biome (cyan / gold / magenta), a pale-blue hub, strong dark atmosphere with bloom. Drifting motes follow the player. Real models (see `ASSET_REGISTRY.md`) add tinted crystal clusters, lamp posts, glowing mushrooms, stalagmites and crates; each has a procedural fallback.
 
+## Crystal glow
+Blast-grid crystals are matte (`SmoothPlastic`); only small cores, rings and tips use Neon, and those are darkened. Two switches in `Config/Tuning.luau`: `NeonShards` (true = the old fully glowing shards) and `AccentDarken` (0 to 1, higher = dimmer accents). World bloom intensity was also lowered (0.28 to 0.2).
+
 ## Blast grid look
 The game rules are a 9x9 grid, but it must not *look* like one. Each crystal sits on a lumpy half-buried rock (not a square slab), and gets a small random offset, turn and size, so rows and columns never line up. The pad is a round cavern floor with a soft glowing edge, ringed by terrain boulders and crystal clusters. Clicking still snaps to the invisible cells.
 

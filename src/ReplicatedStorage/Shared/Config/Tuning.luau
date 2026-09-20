@@ -17,6 +17,10 @@ return {
 	MutationChance = 0.04,
 	MutationValueMult = 3,
 
+	-- Look of the blast-grid crystals. Shards are matte by default; only small cores/tips glow.
+	NeonShards = false, -- true = the old fully glowing shards
+	AccentDarken = 0.35, -- 0..1, how much the glowing accents are darkened (higher = dimmer)
+
 	ClearBonusRate = 0.25,
 	ClearBonusMinFraction = 0.5, -- fraction of valuable crystals popped to earn a clear bonus
 	SeamRegenDelay = 3,

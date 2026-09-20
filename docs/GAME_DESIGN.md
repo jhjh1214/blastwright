@@ -46,7 +46,14 @@ Rumble (5 pops, +10%), Cascade (10, +25%), Avalanche (20, +50%), Cataclysm (35, 
 A volley of 10+ pops (Momentum Coil lowers this to 8 then 6) refunds one charge. Big chains keep the seam alive: this is the "one more volley" hook.
 
 ## Planning aid
-Base: charge markers and the count of direct hits. **Seismograph** upgrade: the full chain and estimated shards. This keeps early play about reading crystal types.
+In blast mode the floor explains itself (all flat, non-glowing shapes):
+- a faint dot at every cell shows where charges can go;
+- on PC, hovering a cell shows a ghost of the charge and the area it would blast (a circle for a Blasting Cap, a strip for a Shaft Charge); on touch, the last tapped cell acts as the hover cell;
+- planted charges show their blast area;
+- crystals it will hit are ringed and linked by lines back to whatever sets them off. **White** = hit directly by a charge, **gold** = chain reaction, **cyan** = prism beam;
+- a second line describes the crystal you are pointing at (name, what it does, Prismatic bonus).
+
+Base game: direct hits only, so early play is still about reading crystal types. **Seismograph** upgrade: the whole chain, estimated shards, tier bonus and whether it refunds a charge. While a volley plays, a short line shows which crystal set each chained crystal off.
 
 ## Server authority
 The client sends only cell coordinates and charge kinds. The server validates them (`Validate.luau`), runs the simulation itself, applies results and pays out.

@@ -14,6 +14,8 @@ export type Event = {
 	Mult: number,
 	Mutated: boolean,
 	Cause: string, -- Charge | Chain | Beam
+	SX: number, -- the cell that set this crystal off (the charge cell, or the crystal whose blast reached it)
+	SZ: number,
 	Lit: number?, -- Delayed crystals only: when the fuse was lit (T is when it actually pops)
 }
 export type Context = {
@@ -35,7 +37,7 @@ export type Result = {
 	Momentum: boolean,
 }
 
-type QueueItem = { T: number, Seq: number, X: number, Z: number, Cause: string, Lit: number? }
+type QueueItem = { T: number, Seq: number, X: number, Z: number, Cause: string, SX: number, SZ: number, Lit: number? }
 
 local ChainSim = {}
 
@@ -52,7 +54,7 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 	local seq = 0
 
 	-- Schedule a cell to pop at time t; keeps only the earliest pending time per cell.
-	local function schedule(x: number, z: number, t: number, cause: string)
+	local function schedule(x: number, z: number, t: number, cause: string, sx: number, sz: number)
 		if x < 1 or x > size or z < 1 or z > size then
 			return
 		end
@@ -84,7 +86,7 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 				hi = mid
 			end
 		end
-		table.insert(queue, lo, { T = t, Seq = seq, X = x, Z = z, Cause = cause, Lit = lit })
+		table.insert(queue, lo, { T = t, Seq = seq, X = x, Z = z, Cause = cause, SX = sx, SZ = sz, Lit = lit })
 	end
 
 	local function blast(ox: number, oz: number, t0: number, shape: string, radius: number, range: number, cause: string)
@@ -95,17 +97,17 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 				for dx = -reach, reach do
 					local d = math.sqrt(dx * dx + dz * dz)
 					if d <= radius then
-						schedule(ox + dx, oz + dz, t0 + d * step, cause)
+						schedule(ox + dx, oz + dz, t0 + d * step, cause, ox, oz)
 					end
 				end
 			end
 		elseif shape == "Column" then
 			for dz = -range, range do
-				schedule(ox, oz + dz, t0 + math.abs(dz) * step, cause)
+				schedule(ox, oz + dz, t0 + math.abs(dz) * step, cause, ox, oz)
 			end
 		elseif shape == "Row" then
 			for dx = -range, range do
-				schedule(ox + dx, oz, t0 + math.abs(dx) * step, cause)
+				schedule(ox + dx, oz, t0 + math.abs(dx) * step, cause, ox, oz)
 			end
 		end
 	end
@@ -161,6 +163,8 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 				Mult = mult,
 				Mutated = cell.Mutated == true,
 				Cause = item.Cause,
+				SX = item.SX,
+				SZ = item.SZ,
 				Lit = item.Lit,
 			})
 		end

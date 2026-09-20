@@ -27,6 +27,7 @@ AudioManager.StartMusic()
 
 UI.Init()
 Preview.OnText = UI.SetPreview
+Preview.OnInfo = UI.SetInfo
 CameraFeedback.Start()
 Input.Init()
 CacheView.Init()

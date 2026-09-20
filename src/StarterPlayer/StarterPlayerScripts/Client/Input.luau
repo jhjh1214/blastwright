@@ -1,6 +1,7 @@
 --!nonstrict
 -- Tap/click to plant charges on the cavern grid; buttons and keys to detonate or clear.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -25,6 +26,14 @@ end
 local function cellFromScreen(view, position)
 	local camera = workspace.CurrentCamera
 	local ray = camera:ScreenPointToRay(position.X, position.Y)
+	if ray.Direction.Y >= -1e-4 then
+		return nil, nil
+	end
+	local t = (view.Origin.Y - ray.Origin.Y) / ray.Direction.Y
+	return Geometry.WorldToCell(view.Origin, ray.Origin + ray.Direction * t)
+end
+
+local function cellFromRay(view, ray)
 	if ray.Direction.Y >= -1e-4 then
 		return nil, nil
 	end
@@ -58,6 +67,7 @@ local function onTap(position)
 		return
 	end
 	toggleCharge(x, z)
+	Preview.SetHover(x, z, true) -- on touch screens the last tapped cell acts as the hover cell
 	State.Changed:Fire("Placed")
 end
 
@@ -104,6 +114,23 @@ function Input.Init()
 			Blasting.Leave()
 		end
 	end)
+
+	-- Mouse hover: show where a charge would go and what it would cover (touch has no hover; taps set it instead).
+	if UserInputService.MouseEnabled then
+		RunService.RenderStepped:Connect(function()
+			if not State.Engaged or State.Busy or State.PanelOpen then
+				return
+			end
+			local view = CavernView.Get(State.UserId)
+			local camera = workspace.CurrentCamera
+			if not view or not camera then
+				return
+			end
+			local location = UserInputService:GetMouseLocation()
+			local x, z = cellFromRay(view, camera:ViewportPointToRay(location.X, location.Y))
+			Preview.SetHover(x, z)
+		end)
+	end
 
 	State.Changed.Event:Connect(function(what)
 		if what == "Placed" or what == "Charge" or what == "Data" then

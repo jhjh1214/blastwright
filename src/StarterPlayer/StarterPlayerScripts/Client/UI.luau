@@ -82,7 +82,7 @@ local function commas(n)
 	return (out:gsub("^,", ""))
 end
 
-local gui, shardLabel, locationLabel, cacheLabel, objectiveCard, objectiveText, blastHint, seamLabel, chainLabel, previewFrame, previewLabel
+local gui, shardLabel, locationLabel, cacheLabel, objectiveCard, objectiveText, blastHint, seamLabel, chainLabel, previewFrame, previewLabel, infoLabel
 local welcomeFrame, menuDot
 local settingButtons = {}
 local tabButtons = {}
@@ -161,16 +161,22 @@ function UI.Init()
 	blastGroup = fullGroup("Blast")
 	blastGroup.Visible = false
 
-	local leave = button(blastGroup, "< Leave", THEME.Panel, { Position = UDim2.new(0, 12, 0, 56), Size = UDim2.fromOffset(110, 40) })
+	local leave = button(blastGroup, "< Leave", THEME.Panel, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(110, 40) })
 	leave.Activated:Connect(function()
 		if UI.OnLeave then UI.OnLeave() end
 	end)
 
-	seamLabel = label(blastGroup, "", 17, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 8), Size = UDim2.fromOffset(340, 24) })
-	previewFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.35, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 34), Size = UDim2.fromOffset(340, 30) }, blastGroup)
+	seamLabel = label(blastGroup, "", 17, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 54), Size = UDim2.fromOffset(340, 24) })
+	previewFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.35, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 80), Size = UDim2.new(1, -24, 0, 30), Visible = false }, blastGroup)
 	corner(previewFrame, 10)
-	previewLabel = label(previewFrame, "", 17, THEME.Text, { Size = UDim2.fromScale(1, 1) })
-	chainLabel = label(blastGroup, "", 40, THEME.Hot, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 68), Size = UDim2.fromOffset(340, 52), Font = Enum.Font.GothamBlack })
+	mk("UISizeConstraint", { MaxSize = Vector2.new(440, 30) }, previewFrame)
+	previewLabel = label(previewFrame, "", 17, THEME.Text, { Size = UDim2.fromScale(1, 1), TextScaled = true })
+	mk("UITextSizeConstraint", { MaxTextSize = 17, MinTextSize = 11 }, previewLabel)
+	infoLabel = label(blastGroup, "", 14, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 114), Size = UDim2.new(1, -24, 0, 44), BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.45, TextWrapped = true, Visible = false, TextYAlignment = Enum.TextYAlignment.Center })
+	corner(infoLabel, 10)
+	mk("UISizeConstraint", { MaxSize = Vector2.new(440, 44) }, infoLabel)
+	mk("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 10 }, infoLabel)
+	chainLabel = label(blastGroup, "", 40, THEME.Hot, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 118), Size = UDim2.fromOffset(340, 52), Font = Enum.Font.GothamBlack })
 
 	chargeColumn = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -12), Size = UDim2.fromOffset(150, 180) }, blastGroup)
 	mk("UIListLayout", { VerticalAlignment = Enum.VerticalAlignment.Bottom, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, chargeColumn)
@@ -345,6 +351,14 @@ function UI.SetPreview(text)
 	if previewLabel then
 		previewLabel.Text = text
 		previewFrame.Visible = text ~= ""
+	end
+end
+
+-- Second preview line (crystal description, legend). "" hides it.
+function UI.SetInfo(text)
+	if infoLabel then
+		infoLabel.Text = text
+		infoLabel.Visible = text ~= nil and text ~= ""
 	end
 end
 

@@ -43,6 +43,12 @@ end
 
 local ROCK = Color3.fromRGB(38, 42, 56)
 
+-- Matte shards with small glowing accents: the crystals read clearly without radiating light.
+local SHARD = Config.Tuning.NeonShards and Enum.Material.Neon or Enum.Material.SmoothPlastic
+local function glow(c)
+	return c:Lerp(Color3.new(0, 0, 0), Config.Tuning.AccentDarken)
+end
+
 -- A lumpy half-buried rock instead of a square slab, so the grid does not read as a checkerboard.
 local function rockBase(model, pos, rng, color)
 	local w = 2.8 + rng:NextNumber() * 1.2
@@ -78,7 +84,7 @@ function builders.Inert(model, pos, col, rng)
 	for i, h in { 3.0, 2.1, 1.6 } do
 		local a = (i / 3) * math.pi * 2 + rng:NextNumber() * 0.6
 		local off = Vector3.new(math.cos(a), 0, math.sin(a)) * (i == 1 and 0 or 0.9)
-		part(model, Vector3.new(0.8, h, 0.8), CFrame.new(pos + off + Vector3.new(0, 0.6 + h / 2, 0)) * CFrame.Angles(math.rad((rng:NextNumber() - 0.5) * 30), a, math.rad((rng:NextNumber() - 0.5) * 30)), col, Enum.Material.Neon)
+		part(model, Vector3.new(0.8, h, 0.8), CFrame.new(pos + off + Vector3.new(0, 0.6 + h / 2, 0)) * CFrame.Angles(math.rad((rng:NextNumber() - 0.5) * 30), a, math.rad((rng:NextNumber() - 0.5) * 30)), col, SHARD)
 	end
 end
 
@@ -87,30 +93,30 @@ function builders.Volatile(model, pos, col, rng)
 	for i = 1, 4 do
 		local a = (i / 4) * math.pi * 2
 		local off = Vector3.new(math.cos(a), 0, math.sin(a)) * 0.8
-		part(model, Vector3.new(1.1, 1.7, 1.1), CFrame.new(pos + off + Vector3.new(0, 1.5, 0)) * CFrame.Angles(math.rad(20) * math.cos(a), a, math.rad(20) * math.sin(a)), col, Enum.Material.Neon)
+		part(model, Vector3.new(1.1, 1.7, 1.1), CFrame.new(pos + off + Vector3.new(0, 1.5, 0)) * CFrame.Angles(math.rad(20) * math.cos(a), a, math.rad(20) * math.sin(a)), col, SHARD)
 	end
-	part(model, Vector3.new(1.2, 1.2, 1.2), CFrame.new(pos + Vector3.new(0, 1.7, 0)) * CFrame.Angles(0.6, 0.6, 0), Color3.fromRGB(255, 230, 160), Enum.Material.Neon)
+	part(model, Vector3.new(1.2, 1.2, 1.2), CFrame.new(pos + Vector3.new(0, 1.7, 0)) * CFrame.Angles(0.6, 0.6, 0), glow(Color3.fromRGB(255, 230, 160)), Enum.Material.Neon)
 end
 
 function builders.Amplifier(model, pos, col, rng)
 	rockBase(model, pos, rng, ROCK)
-	part(model, Vector3.new(1, 4.4, 1), CFrame.new(pos + Vector3.new(0, 2.9, 0)), col, Enum.Material.Neon)
-	part(model, Vector3.new(0.25, 3, 3), CFrame.new(pos + Vector3.new(0, 2.6, 0)) * CFrame.Angles(0, 0, math.pi / 2), col:Lerp(Color3.new(1, 1, 1), 0.4), Enum.Material.Neon, Enum.PartType.Cylinder)
+	part(model, Vector3.new(1, 4.4, 1), CFrame.new(pos + Vector3.new(0, 2.9, 0)), col, SHARD)
+	part(model, Vector3.new(0.25, 3, 3), CFrame.new(pos + Vector3.new(0, 2.6, 0)) * CFrame.Angles(0, 0, math.pi / 2), glow(col:Lerp(Color3.new(1, 1, 1), 0.4)), Enum.Material.Neon, Enum.PartType.Cylinder)
 end
 
 function builders.Prism(model, pos, col, rng)
 	rockBase(model, pos, rng, ROCK)
 	local disc = part(model, Vector3.new(0.5, 3.4, 3.4), CFrame.new(pos + Vector3.new(0, 2.4, 0)), col, Enum.Material.Glass, Enum.PartType.Cylinder)
 	disc.Transparency = 0.15
-	part(model, Vector3.new(0.9, 0.9, 0.9), CFrame.new(pos + Vector3.new(0, 2.4, 0)) * CFrame.Angles(0.7, 0.7, 0), Color3.new(1, 1, 1), Enum.Material.Neon)
+	part(model, Vector3.new(0.9, 0.9, 0.9), CFrame.new(pos + Vector3.new(0, 2.4, 0)) * CFrame.Angles(0.7, 0.7, 0), glow(Color3.new(1, 1, 1)), Enum.Material.Neon)
 end
 
 -- Slowburn: dark egg-shaped body with a glowing fuse ring, so it reads as "a bomb waiting to go".
 function builders.Delayed(model, pos, col, rng)
 	rockBase(model, pos, rng, ROCK)
 	part(model, Vector3.new(2.6, 2.6, 2.6), CFrame.new(pos + Vector3.new(0, 1.9, 0)), Color3.fromRGB(34, 22, 38), Enum.Material.Slate, Enum.PartType.Ball)
-	part(model, Vector3.new(0.3, 3.0, 3.0), CFrame.new(pos + Vector3.new(0, 1.9, 0)) * CFrame.Angles(0, 0, math.pi / 2), col, Enum.Material.Neon, Enum.PartType.Cylinder)
-	part(model, Vector3.new(0.35, 1.0, 0.35), CFrame.new(pos + Vector3.new(0, 3.6, 0)), col, Enum.Material.Neon)
+	part(model, Vector3.new(0.3, 3.0, 3.0), CFrame.new(pos + Vector3.new(0, 1.9, 0)) * CFrame.Angles(0, 0, math.pi / 2), glow(col), Enum.Material.Neon, Enum.PartType.Cylinder)
+	part(model, Vector3.new(0.35, 1.0, 0.35), CFrame.new(pos + Vector3.new(0, 3.6, 0)), glow(col), Enum.Material.Neon)
 end
 
 function builders.Unstable(model, pos, col, rng)
@@ -120,7 +126,7 @@ function builders.Unstable(model, pos, col, rng)
 		local off = Vector3.new(math.cos(a), 0, math.sin(a)) * (i == 5 and 0 or 0.9)
 		local h = 1.6 + rng:NextNumber() * 1.6
 		part(model, Vector3.new(0.6, h, 0.6), CFrame.new(pos + off + Vector3.new(0, 0.6 + h / 2, 0)) * CFrame.Angles(math.rad((rng:NextNumber() - 0.5) * 50), a, math.rad((rng:NextNumber() - 0.5) * 50)), Color3.fromRGB(28, 20, 30), Enum.Material.Slate)
-		part(model, Vector3.new(0.35, 0.5, 0.35), CFrame.new(pos + off + Vector3.new(0, 0.6 + h, 0)), col, Enum.Material.Neon)
+		part(model, Vector3.new(0.35, 0.5, 0.35), CFrame.new(pos + off + Vector3.new(0, 0.6 + h, 0)), glow(col), Enum.Material.Neon)
 	end
 end
 
@@ -134,7 +140,7 @@ local function buildCrystal(parent, kind, mutated, pos, key)
 	local build = builders[def.Behavior] or builders.Inert
 	build(model, center, color(def), rng)
 	if mutated then
-		part(model, Vector3.new(0.9, 0.9, 0.9), CFrame.new(center + Vector3.new(0, 4.8, 0)), Color3.fromRGB(255, 150, 230), Enum.Material.Neon, Enum.PartType.Ball)
+		part(model, Vector3.new(0.9, 0.9, 0.9), CFrame.new(center + Vector3.new(0, 4.8, 0)), glow(Color3.fromRGB(255, 150, 230)), Enum.Material.Neon, Enum.PartType.Ball)
 	end
 	transformModel(model, center, rng:NextNumber() * math.pi * 2, 0.9 + rng:NextNumber() * 0.22)
 	model.Parent = parent
