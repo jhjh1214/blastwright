@@ -699,5 +699,38 @@ test("chain source: a shaft charge names its own cell for every crystal in the c
 	end
 end)
 
+local function cellSet(cells)
+	local set, n = {}, 0
+	for _, c in cells do
+		set[c.X .. "," .. c.Z] = c.D
+		n += 1
+	end
+	return set, n
+end
+
+test("blast cells: radius 1.5 covers the 3x3 block with distances, radius 2 adds the four tips", function()
+	local set, n = cellSet(ChainSim.BlastCells("Radius", 5, 5, 1.5, 0, N))
+	eq(n, 9, "3x3")
+	eq(set["5,5"], 0, "center distance")
+	eq(set["6,5"], 1, "edge distance")
+	eq(math.abs(set["6,6"] - math.sqrt(2)) < 1e-9, true, "diagonal distance")
+	local _, n2 = cellSet(ChainSim.BlastCells("Radius", 5, 5, 2, 0, N))
+	eq(n2, 13, "radius 2")
+end)
+
+test("blast cells: shapes are clipped to the grid", function()
+	local _, corner = cellSet(ChainSim.BlastCells("Radius", 1, 1, 1.5, 0, N))
+	eq(corner, 4, "corner keeps a 2x2")
+	local col, colN = cellSet(ChainSim.BlastCells("Column", 3, 2, 0, 4, N))
+	eq(colN, 6, "column from z=1 to z=6 (range 4 below z=2 is clipped)")
+	eq(col["3,1"], 1, "column distance")
+	eq(col["3,6"], 4, "column far end")
+	local row, rowN = cellSet(ChainSim.BlastCells("Row", 8, 5, 0, 5, N))
+	eq(rowN, 7, "row from x=3 to x=9 is 7 cells")
+	eq(row["9,5"], 1, "row distance")
+	local _, none = cellSet(ChainSim.BlastCells("Nonsense", 5, 5, 3, 3, N))
+	eq(none, 0, "unknown shape covers nothing")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

@@ -45,6 +45,37 @@ function ChainSim.Key(size: number, x: number, z: number): number
 	return (z - 1) * size + x
 end
 
+-- The cells a blast covers, clipped to the grid, with each cell's distance in cells from the origin (used for timing).
+-- Shapes: Radius (round), Column (up and down the z axis), Row (along the x axis). Shared by the sim and the preview.
+function ChainSim.BlastCells(shape: string, ox: number, oz: number, radius: number, range: number, size: number): { { X: number, Z: number, D: number } }
+	local cells = {}
+	local function add(x: number, z: number, d: number)
+		if x >= 1 and x <= size and z >= 1 and z <= size then
+			table.insert(cells, { X = x, Z = z, D = d })
+		end
+	end
+	if shape == "Radius" then
+		local reach = math.ceil(radius)
+		for dz = -reach, reach do
+			for dx = -reach, reach do
+				local d = math.sqrt(dx * dx + dz * dz)
+				if d <= radius then
+					add(ox + dx, oz + dz, d)
+				end
+			end
+		end
+	elseif shape == "Column" then
+		for dz = -range, range do
+			add(ox, oz + dz, math.abs(dz))
+		end
+	elseif shape == "Row" then
+		for dx = -range, range do
+			add(ox + dx, oz, math.abs(dx))
+		end
+	end
+	return cells
+end
+
 function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 	local size = grid.Size
 	local tuning = ctx.Tuning
@@ -91,24 +122,8 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 
 	local function blast(ox: number, oz: number, t0: number, shape: string, radius: number, range: number, cause: string)
 		local step = tuning.StepPerCell
-		if shape == "Radius" then
-			local reach = math.ceil(radius)
-			for dz = -reach, reach do
-				for dx = -reach, reach do
-					local d = math.sqrt(dx * dx + dz * dz)
-					if d <= radius then
-						schedule(ox + dx, oz + dz, t0 + d * step, cause, ox, oz)
-					end
-				end
-			end
-		elseif shape == "Column" then
-			for dz = -range, range do
-				schedule(ox, oz + dz, t0 + math.abs(dz) * step, cause, ox, oz)
-			end
-		elseif shape == "Row" then
-			for dx = -range, range do
-				schedule(ox + dx, oz, t0 + math.abs(dx) * step, cause, ox, oz)
-			end
+		for _, c in ChainSim.BlastCells(shape, ox, oz, radius, range, size) do
+			schedule(c.X, c.Z, t0 + c.D * step, cause, ox, oz)
 		end
 	end
 
