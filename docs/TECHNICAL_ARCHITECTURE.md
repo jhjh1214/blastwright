@@ -29,6 +29,13 @@ StarterPlayerScripts/Client  init.client (wiring), State, Blasting (enter/leave 
 - Cooldowns: 0.15s Detonate, 0.2s Buy. Only one volley in flight per player. Detonate requires the character within 45 studs of the site station; site and cache prompts re-check proximity (30 / 25 studs). Caches pay once per player, tracked in the save (`Caches`, schema v2).
 - Nothing purchases yet (Phase 10).
 
+## Performance notes (reasoned from the code; nothing profiled on a device)
+- **Grid level of detail:** every client keeps every player's grid *data*, but builds crystal models (about 400 parts per grid) only for your own grid and for grids within 190 studs of the camera (dropped beyond 240). At most one grid is built per second so walking into a biome does not hitch. Volley effects are skipped for unbuilt grids.
+- **Overlay:** the planning overlay reuses a pool of adornments (up to roughly 300 while planning) and only redraws when the hovered cell or plan changes.
+- **Effects:** particle emitters are pooled and capped at 24; bursts are 9-14 particles.
+- **World:** built once at server start (terrain fills, then decor). Real-model props are loaded once and cloned. If a low-end phone struggles, the first levers are fewer decor clusters and lights in `World.luau`, and enabling `Workspace.StreamingEnabled` (not enabled yet because it changes behaviour that has not been tested).
+- **Server:** one 5s idle loop, one 60s autosave loop; simulation runs only on Detonate.
+
 ## Known limits
 - Roblox-facing code (`Game`, `Data`, `World`, all Client modules) is **compile-checked only**, not run in Studio.
 - Volley playback is not broadcast-throttled for many players.

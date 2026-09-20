@@ -134,6 +134,11 @@ function Playback.Run(result)
 		view.Grid.Cells[ChainSim.Key(view.Size, ev.X, ev.Z)] = nil
 	end
 
+	-- Someone else's grid that is not built (out of range): the data is already updated, nothing to show.
+	if not own and not view.Built then
+		return
+	end
+
 	if own then
 		State.Busy = true
 		table.clear(State.Placed)

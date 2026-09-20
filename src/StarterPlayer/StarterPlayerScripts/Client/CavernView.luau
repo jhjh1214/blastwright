@@ -1,6 +1,8 @@
 --!nonstrict
 -- Client-side rendering of every player's cavern. The server only sends grid data; visuals are built here,
 -- which keeps hundreds of parts off the server and out of replication.
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -167,6 +169,29 @@ function CavernView.Remove(userId)
 	end
 end
 
+local function buildVisuals(view)
+	if view.Built then
+		return
+	end
+	view.Built = true
+	for key, cell in view.Grid.Cells do
+		local x = (key - 1) % view.Size + 1
+		local z = (key - 1) // view.Size + 1
+		view.Models[key] = buildCrystal(view.Folder, cell.Kind, cell.Mutated, Geometry.CellPosition(view.Origin, x, z), key)
+	end
+end
+
+local function dropVisuals(view)
+	if not view.Built then
+		return
+	end
+	view.Built = false
+	for _, model in view.Models do
+		model:Destroy()
+	end
+	table.clear(view.Models)
+end
+
 -- payload from the server's SeamStart remote.
 function CavernView.Build(payload)
 	CavernView.Remove(payload.UserId)
@@ -189,16 +214,51 @@ function CavernView.Build(payload)
 		Models = {},
 		Grid = { Size = size, Cells = {} },
 	}
+	view.Built = false
 	for _, cell in payload.Cells do
-		local key = cell.K
-		local x = (key - 1) % size + 1
-		local z = (key - 1) // size + 1
-		view.Grid.Cells[key] = { Kind = cell.Kind, Mutated = cell.M }
-		view.Models[key] = buildCrystal(folder, cell.Kind, cell.M, Geometry.CellPosition(origin, x, z), key)
+		view.Grid.Cells[cell.K] = { Kind = cell.Kind, Mutated = cell.M }
 	end
 	views[payload.UserId] = view
+	if payload.UserId == Players.LocalPlayer.UserId then
+		buildVisuals(view) -- your own grid is always built; other players' grids build only when you are near them
+	end
 	return view
 end
+
+-- Level of detail: building ~400 parts per grid for every player, including grids hundreds of studs away, would waste
+-- client memory and frame time. Far grids keep their data (so they are correct the moment you get close) but no models.
+local LOD_BUILD, LOD_DROP = 190, 240 -- studs; the gap stops grids flickering at the boundary
+
+local function updateLod()
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+	local ref = camera.CFrame.Position
+	local builtOne = false
+	for userId, view in views do
+		if userId == Players.LocalPlayer.UserId then
+			buildVisuals(view)
+		else
+			local dist = math.sqrt((view.Origin.X - ref.X) ^ 2 + (view.Origin.Z - ref.Z) ^ 2)
+			if dist > LOD_DROP then
+				dropVisuals(view)
+			elseif dist < LOD_BUILD and not view.Built and not builtOne then
+				buildVisuals(view) -- at most one grid per pass, so walking into a biome does not hitch
+				builtOne = true
+			end
+		end
+	end
+end
+
+local lodClock = 0
+RunService.Heartbeat:Connect(function(dt)
+	lodClock += dt
+	if lodClock >= 1 then
+		lodClock = 0
+		updateLod()
+	end
+end)
 
 -- Visual pop only; grid removal is handled by the caller (Playback).
 function CavernView.Pop(view, key)
