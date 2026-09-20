@@ -21,6 +21,9 @@ local Purchases = {}
 
 local owned = {} -- [Player] = { [passKey] = true }
 local productIndex = Receipts.ProductIndex(Products.DeveloperProducts)
+for id, key in Receipts.ProductIndex(Products.CosmeticProducts) do
+	productIndex[id] = key -- shard packs and cosmetic products share one receipt path
+end
 local passIndex = Receipts.ProductIndex(Products.Gamepasses)
 local hooks = {
 	Notify = function(player, text, kind) end,
@@ -55,6 +58,12 @@ function Purchases.Forget(player)
 end
 
 local function grant(player, data, key)
+	local cosmetic = Products.CosmeticProducts[key]
+	if cosmetic then
+		Receipts.GrantCosmetic(data, cosmetic.Cosmetic)
+		hooks.Notify(player, cosmetic.Name .. " unlocked!", "Reward")
+		return
+	end
 	local def = Products.DeveloperProducts[key]
 	local amount = Receipts.ShardAmount(def, data.Progress.StrataUnlocked)
 	data.Shards += amount

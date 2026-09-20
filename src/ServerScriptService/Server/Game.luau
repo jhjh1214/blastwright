@@ -11,6 +11,7 @@ local Geometry = require(Shared.Geometry)
 local Remotes = require(Shared.Remotes)
 
 local Achievements = require(Shared.Achievements)
+local Cosmetics = require(Shared.Cosmetics)
 local Dailies = require(Shared.Dailies)
 local Data = require(script.Parent.Data)
 local Purchases = require(script.Parent.Purchases)
@@ -26,6 +27,7 @@ local Strata = Config.Strata
 local WorldConfig = Config.World
 local DailiesConfig = Config.Dailies
 local AchievementsConfig = Config.Achievements
+local CosmeticsConfig = Config.Cosmetics
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -103,6 +105,8 @@ local function snapshot(player: Player): { [string]: any }?
 	return {
 		Passes = passes,
 		Goals = Achievements.View(data, AchievementsConfig),
+		Styles = Cosmetics.View(data, CosmeticsConfig, AchievementsConfig),
+		ActiveStyle = Cosmetics.Active(data, CosmeticsConfig).Id,
 		Settings = data.Settings,
 		Dailies = Dailies.View(data.Daily, todaysDefs(), data.Progress.StrataUnlocked),
 		DailyResetIn = Dailies.SecondsUntilReset(os.time()),
@@ -275,6 +279,7 @@ local function onDetonate(player: Player, payload: any)
 
 	Remotes.VolleyResult:FireAllClients({
 		UserId = player.UserId,
+		Style = Cosmetics.Active(data, CosmeticsConfig).Id,
 		Charges = volley,
 		Events = result.Events,
 		Pops = result.Pops,
@@ -367,6 +372,18 @@ local function onSetting(player: Player, name: any, value: any)
 		return
 	end
 	data.Settings[key] = enabled
+	sync(player)
+end
+
+local function onEquip(player: Player, id: any)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	if not Cosmetics.CanEquip(data, CosmeticsConfig, id) then
+		return notify(player, "You have not unlocked that style yet.", "Error")
+	end
+	data.Cosmetics.Equipped.BlastColor = id
 	sync(player)
 end
 
@@ -544,6 +561,7 @@ function Game.Init()
 	Remotes.Buy.OnServerEvent:Connect(onBuy)
 	Remotes.Claim.OnServerEvent:Connect(onClaim)
 	Remotes.ClaimGoal.OnServerEvent:Connect(onClaimGoal)
+	Remotes.Equip.OnServerEvent:Connect(onEquip)
 	Remotes.Setting.OnServerEvent:Connect(onSetting)
 	Purchases.Init({ Notify = notify, OnChanged = sync })
 

@@ -36,6 +36,18 @@ local COLORS = {
 	Lattice = Color3.fromRGB(170, 195, 235),
 }
 
+local BASE_PLANTED = COLORS.Planted
+
+-- The player's equipped blast color (cosmetic), used for planted charges and blast areas.
+local function activeColor()
+	for _, style in (State.Data and State.Data.Styles) or {} do
+		if style.Equipped then
+			return Color3.fromRGB(style.Color[1], style.Color[2], style.Color[3])
+		end
+	end
+	return BASE_PLANTED
+end
+
 -- Draw order among always-on-top adornments (higher = on top).
 local Z_LATTICE, Z_AREA, Z_MARK, Z_LINK, Z_HOVER, Z_PLANT = 1, 2, 3, 4, 5, 6
 local Y = 0.6 -- height of the overlay above the floor (only matters for the perspective of thin boxes)
@@ -195,6 +207,7 @@ local function refresh()
 	end
 	origin = view.Origin
 	anchor.CFrame = CFrame.new(origin)
+	COLORS.Planted = activeColor()
 
 	local available = State.Data.ChargesLeft or 0
 	local maxCharges = State.Data.ChargesMax or available

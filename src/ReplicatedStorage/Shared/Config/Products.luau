@@ -5,6 +5,7 @@
 -- Never invent an ID.
 export type DeveloperProduct = { Id: number?, Name: string, Description: string, Amount: number }
 export type Gamepass = { Id: number?, Name: string, Description: string }
+export type CosmeticProduct = { Id: number?, Name: string, Description: string, Cosmetic: string }
 
 return {
 	-- Consumables (Developer Products). Amount is shards per stratum unlocked, so a pack stays worth buying later.
@@ -15,6 +16,12 @@ return {
 		ShardVault = { Id = nil, Name = "Shard Vault", Description = "A whole vault of shards.", Amount = 30000 },
 	} :: { [string]: DeveloperProduct },
 	DeveloperProductOrder = { "ShardPouch", "ShardSatchel", "ShardChest", "ShardVault" },
+
+	-- One-off cosmetic unlocks (Developer Products that grant a Shop style from Config/Cosmetics.luau). The smallest tier.
+	CosmeticProducts = {
+		NeonPinkStyle = { Id = nil, Name = "Neon Pink Blasts", Description = "A hot pink blast color for your charges.", Cosmetic = "NeonPink" },
+	} :: { [string]: CosmeticProduct },
+	CosmeticProductOrder = { "NeonPinkStyle" },
 
 	-- Permanent perks (Gamepasses). Free players get the whole game; these speed things up.
 	Gamepasses = {

@@ -10,6 +10,7 @@
 ## What is for sale (all defined in `Config/Products.luau`)
 | Tier | Item | Type | What it does |
 |---|---|---|---|
+| Tiny | Neon Pink Blasts | Developer Product | Unlocks the Neon Pink blast color (cosmetic only) |
 | Tiny | Shard Pouch | Developer Product | +500 shards x areas unlocked |
 | Small | Shard Satchel | Developer Product | +2,500 x areas |
 | Medium | Shard Chest | Developer Product | +8,000 x areas |
@@ -19,7 +20,7 @@
 
 Shard amounts scale with areas unlocked so a pack stays worth buying later in the game.
 
-**Suggested Robux prices (my recommendation, not a fact about the platform; you decide):** Pouch 49, Satchel 199, Chest 599, Vault 1,999; 2x Shards 499, Prismatic Luck 299. Consider tuning after seeing real player behavior.
+**Suggested Robux prices (my recommendation, not a fact about the platform; you decide):** Neon Pink 49, Pouch 49, Satchel 199, Chest 599, Vault 1,999; 2x Shards 499, Prismatic Luck 299. Consider tuning after seeing real player behavior.
 
 ## How a purchase is processed (Server/Purchases.luau)
 1. Player buys through the Roblox prompt (opened from the Shop tab).
@@ -33,4 +34,4 @@ Shard amounts scale with areas unlocked so a pack stays worth buying later in th
 - **Not tested:** `ProcessReceipt` end to end, `UserOwnsGamePassAsync`, the purchase prompts, and the effect of 2x Shards in a live session. These need real product IDs in a published place.
 
 ## To turn it on
-See `docs/MANUAL_ACTIONS.md`. In short: publish the place, create 4 Developer Products and 2 Gamepasses in the Creator Dashboard, paste their IDs into `Config/Products.luau` (or send them to Claude to paste), test in a private server.
+See `docs/MANUAL_ACTIONS.md`. In short: publish the place, create 5 Developer Products and 2 Gamepasses in the Creator Dashboard, paste their IDs into `Config/Products.luau` (or send them to Claude to paste), test in a private server.

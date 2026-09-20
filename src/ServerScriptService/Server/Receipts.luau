@@ -43,6 +43,11 @@ function Receipts.ShardAmount(def: { Amount: number }, strataUnlocked: number): 
 	return def.Amount * math.max(1, math.floor(strataUnlocked))
 end
 
+-- A cosmetic product marks a style as owned. Idempotent by nature (setting a flag twice is harmless).
+function Receipts.GrantCosmetic(data: { [string]: any }, cosmeticId: string)
+	data.Cosmetics.Owned[cosmeticId] = true
+end
+
 -- Reverse lookup { [productId] = key } for configured (non-nil) ids only.
 function Receipts.ProductIndex(products: { [string]: { Id: number? } }): { [number]: string }
 	local index = {}

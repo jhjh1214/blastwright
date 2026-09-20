@@ -25,6 +25,16 @@ local connection = nil
 
 local CELL = Config.Tuning.CellSize
 
+-- Blast color of whoever fired the volley (cosmetic; the server only ever sends an id the player owns).
+local function styleColor(styleId)
+	for _, def in Config.Cosmetics.Defs do
+		if def.Id == styleId then
+			return Color3.fromRGB(def.Color[1], def.Color[2], def.Color[3])
+		end
+	end
+	return Color3.fromRGB(255, 170, 60)
+end
+
 local function crystalColor(kind)
 	local c = Config.Crystals.Defs[kind].Color
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -145,10 +155,11 @@ function Playback.Run(result)
 		Preview.Refresh()
 		CameraFeedback.Shake(0.5)
 	end
+	local blastColor = styleColor(result.Style)
 	for _, c in result.Charges or {} do
 		local p = Geometry.CellPosition(view.Origin, c.X, c.Z)
-		VFX.Ring(p + Vector3.new(0, 0.4, 0), Color3.fromRGB(255, 170, 60), CELL * 2.6, 0.35)
-		VFX.Burst(p + Vector3.new(0, 1.5, 0), Color3.fromRGB(255, 200, 120), 12, 26)
+		VFX.Ring(p + Vector3.new(0, 0.4, 0), blastColor, CELL * 2.6, 0.35)
+		VFX.Burst(p + Vector3.new(0, 1.5, 0), blastColor:Lerp(Color3.new(1, 1, 1), 0.35), 12, 26)
 	end
 	AudioManager.Play("Detonate")
 

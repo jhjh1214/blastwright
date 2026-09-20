@@ -11,6 +11,9 @@ The game is a walkable mine, not a single screen. Layout data and tests: `Config
 ## Daily objectives
 Menu > Daily shows three objectives that rotate each UTC day (same for everyone, deterministic from the day number). Targets and rewards rise by slot. Progress is recorded by the server as you blast. Claiming pays shards once. Unclaimed rewards are lost at reset, but a missed day costs nothing else (no streaks). A dot on the Menu button and a pulsing objective tell you when one is ready.
 
+## Blast colors (cosmetic)
+Menu > Codex > Blast colors. Styles recolor your planting markers and your detonation rings and bursts (other players see your color on your blasts). No gameplay effect. Classic is free; Frostfire, Rose Gold, Verdant, Royal and Solar unlock by claiming specific Goals (ownership is derived from claimed goals, so nothing extra is tracked); Neon Pink is a shop item. Equipping is validated by the server, and a bad or stale saved choice falls back to Classic.
+
 ## Goals
 Menu > Goals lists permanent milestones (pops, chain records, seams cleared, shards earned, geode caches, Codex, Prismatic finds, areas unlocked) in three or so rising tiers each, 23 in total. Progress is derived from stats the save already keeps, so nothing extra is tracked; only "claimed" is stored. Each pays shards once (about 46,700 in total across all goals). Ready goals are listed first, and a dot on the Menu button plus a pulsing objective say when one can be claimed. Adding a goal is one line in `Config/Achievements.luau`.
 

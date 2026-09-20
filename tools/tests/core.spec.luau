@@ -921,5 +921,123 @@ test("echo caverns: the fourth area exists, is gated, and its sites and caches f
 	eq(saw, true, "area 4 spawns echostones")
 end)
 
+local Cosmetics = require("../../src/ReplicatedStorage/Shared/Cosmetics")
+local CosCfg = require("../../src/ReplicatedStorage/Shared/Config/Cosmetics")
+
+test("cosmetics: config has one free default first, unique ids, valid colors and real unlock goals", function()
+	local seen, free = {}, 0
+	for i, def in CosCfg.Defs do
+		if seen[def.Id] then error("duplicate cosmetic " .. def.Id) end
+		seen[def.Id] = true
+		if type(def.Name) ~= "string" or def.Name == "" then error(def.Id .. " needs a name") end
+		if #def.Color ~= 3 then error(def.Id .. " color needs r,g,b") end
+		for _, c in def.Color do
+			if c < 0 or c > 255 or c % 1 ~= 0 then error(def.Id .. " has an invalid color channel") end
+		end
+		if def.UnlockGoal == nil and not def.Shop then
+			free += 1
+			eq(i, 1, "the free default must be first")
+		end
+		if def.UnlockGoal ~= nil and Achievements.Find(AchCfg, def.UnlockGoal) == nil then
+			error(def.Id .. " unlocks from a goal that does not exist: " .. def.UnlockGoal)
+		end
+	end
+	eq(free, 1, "exactly one free default")
+	eq(CosCfg.Defs[1].Id, CosCfg.DefaultId, "DefaultId names the first entry")
+end)
+
+test("cosmetics: ownership comes from claimed goals or purchases; the default is always owned", function()
+	local d = Schema.Default()
+	local unlockable = nil
+	for _, def in CosCfg.Defs do if def.UnlockGoal then unlockable = def break end end
+	local shopItem = nil
+	for _, def in CosCfg.Defs do if def.Shop then shopItem = def break end end
+	eq(Cosmetics.IsOwned(d, CosCfg, CosCfg.DefaultId), true, "default owned from the start")
+	eq(Cosmetics.IsOwned(d, CosCfg, unlockable.Id), false, "goal-gated style locked")
+	d.Achievements.Claimed[unlockable.UnlockGoal] = true
+	eq(Cosmetics.IsOwned(d, CosCfg, unlockable.Id), true, "claiming the goal unlocks it")
+	eq(Cosmetics.IsOwned(d, CosCfg, shopItem.Id), false, "shop item locked until purchased")
+	d.Cosmetics.Owned[shopItem.Id] = true
+	eq(Cosmetics.IsOwned(d, CosCfg, shopItem.Id), true, "purchase unlocks it")
+	eq(Cosmetics.IsOwned(d, CosCfg, "Nonexistent"), false, "unknown id")
+	eq(Cosmetics.IsOwned(d, CosCfg, "__index"), false, "junk id")
+end)
+
+test("cosmetics: only owned, real, string ids can be equipped; a bad saved choice falls back to the default", function()
+	local d = Schema.Default()
+	local locked = nil
+	for _, def in CosCfg.Defs do if def.UnlockGoal then locked = def break end end
+	eq(Cosmetics.CanEquip(d, CosCfg, CosCfg.DefaultId), true, "default")
+	eq(Cosmetics.CanEquip(d, CosCfg, locked.Id), false, "locked")
+	for _, bad in { 5, true, "", "nope", "__index" } do
+		eq(Cosmetics.CanEquip(d, CosCfg, bad), false, "bad id " .. tostring(bad))
+	end
+	eq(Cosmetics.CanEquip(d, CosCfg, nil), false, "nil")
+	d.Cosmetics.Equipped.BlastColor = locked.Id -- tampered or stale save: equipped but not owned
+	eq(Cosmetics.Active(d, CosCfg).Id, CosCfg.DefaultId, "falls back to the default")
+	d.Achievements.Claimed[locked.UnlockGoal] = true
+	eq(Cosmetics.Active(d, CosCfg).Id, locked.Id, "works once it is owned")
+end)
+
+test("cosmetics: the client view lists every style with owned/equipped flags and unlock hints", function()
+	local d = Schema.Default()
+	local view = Cosmetics.View(d, CosCfg, AchCfg)
+	eq(#view, #CosCfg.Defs, "one row per style")
+	eq(view[1].Owned, true, "default owned")
+	eq(view[1].Equipped, true, "default equipped")
+	for i = 2, #view do
+		eq(view[i].Equipped, false, "only one equipped")
+		if not view[i].Owned and (view[i].Unlock == nil or view[i].Unlock == "") then error(view[i].Id .. " locked style needs an unlock hint") end
+	end
+end)
+
+test("schema: v4 saves migrate to v5 with the default style equipped", function()
+	local d = Schema.Migrate({ SchemaVersion = 4, Shards = 12, Achievements = { Claimed = { Pops1 = true } } })
+	eq(d.SchemaVersion, Schema.CURRENT_VERSION, "version")
+	eq(Schema.CURRENT_VERSION >= 5, true, "v5 exists")
+	eq(d.Cosmetics.Equipped.BlastColor, "Classic", "default equipped")
+	eq(type(d.Cosmetics.Owned), "table", "owned map")
+	eq(d.Achievements.Claimed.Pops1, true, "goals kept")
+	eq(d.Shards, 12, "shards kept")
+end)
+
+test("products: cosmetic products point at real shop styles, and every shop style is buyable", function()
+	eq(type(Products.CosmeticProducts), "table", "cosmetic product table exists")
+	local styleByShop = {}
+	for _, def in CosCfg.Defs do
+		if def.Shop then styleByShop[def.Id] = false end
+	end
+	local seenIds = {}
+	for _, list in { Products.DeveloperProducts, Products.CosmeticProducts, Products.Gamepasses } do
+		for _, d in list do
+			if d.Id ~= nil then
+				if seenIds[d.Id] then error("product id " .. d.Id .. " is used twice across the catalogue") end
+				seenIds[d.Id] = true
+			end
+		end
+	end
+	for key, d in Products.CosmeticProducts do
+		if Products.DeveloperProducts[key] ~= nil then error(key .. " exists as both a shard pack and a cosmetic product") end
+		if type(d.Name) ~= "string" or type(d.Description) ~= "string" then error(key .. " needs a name and description") end
+		if styleByShop[d.Cosmetic] == nil then error(key .. " grants " .. tostring(d.Cosmetic) .. ", which is not a Shop style") end
+		styleByShop[d.Cosmetic] = true
+	end
+	for id, bought in styleByShop do
+		if not bought then error("shop style " .. id .. " has no product, so nobody could ever get it") end
+	end
+	eq(#Products.CosmeticProductOrder, (function() local n = 0 for _ in Products.CosmeticProducts do n += 1 end return n end)(), "order lists every cosmetic product")
+end)
+
+test("receipts: granting a cosmetic marks it owned, once, and never touches shards", function()
+	local d = Schema.Default()
+	local shardsBefore = d.Shards
+	Receipts.GrantCosmetic(d, "NeonPink")
+	eq(d.Cosmetics.Owned.NeonPink, true, "owned")
+	eq(Cosmetics.IsOwned(d, CosCfg, "NeonPink"), true, "ownership rules agree")
+	eq(d.Shards, shardsBefore, "no shards granted")
+	Receipts.GrantCosmetic(d, "NeonPink")
+	eq(d.Cosmetics.Owned.NeonPink, true, "granting twice is harmless")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

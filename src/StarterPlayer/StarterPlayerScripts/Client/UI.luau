@@ -516,6 +516,19 @@ local function rebuildPanel()
 			end)
 		end
 		order += 1
+		header(order, "Blast colors")
+		for _, key in Products.CosmeticProductOrder do
+			order += 1
+			local def = Products.CosmeticProducts[key]
+			local owned = false
+			for _, style in d.Styles or {} do
+				if style.Id == def.Cosmetic and style.Owned then owned = true end
+			end
+			row(order, def.Name, def.Description, owned and "Owned" or (def.Id and "Buy" or "Not for sale yet"), (not owned) and def.Id ~= nil, function()
+				if def.Id and not owned then MarketplaceService:PromptProductPurchase(Players.LocalPlayer, def.Id) end
+			end)
+		end
+		order += 1
 		header(order, "Shard packs (amount x areas unlocked)")
 		for _, key in Products.DeveloperProductOrder do
 			order += 1
@@ -536,6 +549,17 @@ local function rebuildPanel()
 			local rc = Config.Rarities.Info[def.Rarity].Color
 			local mut = d.Codex.Mutated[id] and "   Prismatic found" or ""
 			row(index, known and (def.Name .. "  (" .. def.Rarity .. ")" .. mut) or "???", known and def.Description or ("Found in stratum " .. def.Stratum), nil, false, nil, known and Color3.fromRGB(rc[1], rc[2], rc[3]) or THEME.Dim)
+		end
+		-- Blast colors: owned styles can be equipped; locked ones say how to get them.
+		local order = #Config.Crystals.Order + 1
+		header(order, "Blast colors")
+		for _, style in d.Styles or {} do
+			order += 1
+			local c = style.Color
+			local btnText = style.Equipped and "Equipped" or (style.Owned and "Equip" or "Locked")
+			row(order, style.Name, style.Owned and "Owned" or style.Unlock, btnText, style.Owned and not style.Equipped, function()
+				if style.Owned and not style.Equipped then Remotes.Equip:FireServer(style.Id) end
+			end, Color3.fromRGB(c[1], c[2], c[3]))
 		end
 		titleLabel.Text = ("Codex  %d/%d"):format(found, #Config.Crystals.Order)
 	end

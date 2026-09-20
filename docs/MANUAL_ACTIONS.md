@@ -30,7 +30,7 @@ Return to Claude and say "Done: playtest" and paste any Output errors or notes o
 MANUAL ACTION REQUIRED (when you want to sell things)
 ========================================
 ACTION:
-Publish the experience, then create 4 Developer Products and 2 Gamepasses.
+Publish the experience, then create 5 Developer Products and 2 Gamepasses.
 
 WHY:
 Only your Roblox account can create products. Until then the Shop shows "Not for sale yet" and everything else works.
@@ -38,8 +38,8 @@ Only your Roblox account can create products. Until then the Shop shows "Not for
 EXACT STEPS:
 1. Studio > File > Publish to Roblox (also enables DataStore saving and the Studio API access toggle below).
 2. Studio > Game Settings > Security > turn on "Enable Studio Access to API Services" (lets you test saving in Studio).
-3. create.roblox.com > Creations > your experience > Monetization > Developer Products > Create. Make four:
-   Shard Pouch, Shard Satchel, Shard Chest, Shard Vault (see docs/MONETIZATION.md for suggested prices).
+3. create.roblox.com > Creations > your experience > Monetization > Developer Products > Create. Make five:
+   Shard Pouch, Shard Satchel, Shard Chest, Shard Vault, and "Neon Pink Blasts" (a cosmetic) (see docs/MONETIZATION.md for suggested prices).
 4. Same area > Passes > Create. Make two: "2x Shards" and "Prismatic Luck".
 5. Copy each product's numeric ID.
 6. Paste the IDs into src/ReplicatedStorage/Shared/Config/Products.luau (replace each `Id = nil`), or send them to Claude to do it.
