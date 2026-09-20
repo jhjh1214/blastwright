@@ -29,6 +29,8 @@ task.spawn(function()
 	end
 end)
 
+task.spawn(AudioManager.Verify)
+
 UI.Init()
 Preview.OnText = UI.SetPreview
 CameraFeedback.Start()

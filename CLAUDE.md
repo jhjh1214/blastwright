@@ -6,11 +6,13 @@
 ## Status (update this section as work lands)
 - Done and unit-tested (17 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
 - Written, **compile-checked only, never run in Studio**: `Game`, `Data`, `World`, all Client modules.
-- Not started: monetization, audio assets, external visual assets, mobile testing, world/hub, daily retention.
-- Next: developer playtest (`docs/MANUAL_ACTIONS.md`), then asset workflow (audio first).
+- Developer confirmed on 2026-09-21 that the game runs in Studio and shows the cavern and UI (after the lazy-DataStore fix). Feel/fun feedback not yet given.
+- Audio: 7 SFX cues wired from Creator Store results (`tools/asset-search`); **unheard, playback unconfirmed** until Output shows `[Audio] ... OK`.
+- Not started: monetization, external visual assets, music/ambience, mobile testing, world/hub, daily retention.
+- Next: confirm audio in Studio, collect feel feedback, then visual assets.
 
 ## Environment (Windows, PowerShell)
-Rojo 7.7.0 (`C:\Tools\Rojo`), Git, Node, Python. Luau CLI/analyzer/compiler are in `tools/bin` (git-ignored; re-download from the luau-lang GitHub release if missing). Roblox Studio is installed but cannot be driven by Claude.
+Rojo 7.7.0 (`C:\Tools\Rojo`), Git, Node, Python. Asset search: `python tools/asset-search/audio_search.py <cue> <max_secs> <keywords...>`. Luau CLI/analyzer/compiler are in `tools/bin` (git-ignored; re-download from the luau-lang GitHub release if missing). Roblox Studio is installed but cannot be driven by Claude.
 
 ## Commands
 - Tests: `tools/bin/luau.exe tools/tests/core.spec.luau`
@@ -41,5 +43,5 @@ Purchases only via `ProcessReceipt` (not built). Product IDs stay `nil` in confi
 - Untested in Studio (see Status). Expect first-run bugs in client modules.
 - Fun is unproven: the risk is "click and wait". Fix gameplay before adding content.
 - Preview may make planning too easy; Seismograph gating is a first mitigation.
-- Game is silent (no audio IDs). Visuals are procedural Parts placeholder quality.
+- Audio picks are metadata-only guesses. Visuals are procedural Parts placeholder quality.
 - Economy numbers are paper math.

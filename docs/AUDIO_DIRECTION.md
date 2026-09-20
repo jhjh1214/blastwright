@@ -9,4 +9,4 @@ Groups: Music, Ambient, Ui, Sfx, Reward (`AudioManager`). Cues are named in `Con
 - **Music:** low ambient cave pad with a pulse that intensifies during chains (planned).
 
 ## Status
-Hooks are in place. **No audio assets are set:** every `Id` is `nil`, so the game is currently silent. Sounds must be found via the Creator Store API, verified as usable in-experience, and recorded in `ASSET_REGISTRY.md`. No copyrighted music.
+Seven placeholder-grade SFX cues are wired from Creator Store results (see `ASSET_REGISTRY.md`). They were chosen from metadata only: **not yet listened to, in-experience playback not yet confirmed** (`AudioManager.Verify` logs OK/FAILED to Output). No music or ambience yet; no copyrighted music.

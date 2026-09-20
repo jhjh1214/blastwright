@@ -5,7 +5,7 @@
 | 0 Concept | Done |
 | 1 Approval | Done: Concept 1 (Blastwright), 2026-09-21 |
 | 2 Architecture | Done (`TECHNICAL_ARCHITECTURE.md`) |
-| 3-4 Prototype / vertical slice | **Code written; needs first Studio playtest** |
+| 3-4 Prototype / vertical slice | Runs in Studio (developer-confirmed); feel/fun feedback pending |
 | 5 Game feel | Hooks exist (VFX, shake, tiers); tuning needs playtest |
 | 6 Progression | Basic (upgrades, charges, strata, Codex) |
 | 7 World/content | Not started: single procedural cavern only |
@@ -13,7 +13,7 @@
 | 9 Economy | Paper math only |
 | 10 Monetization | Not started |
 | 11 UI polish | Not started (functional UI only) |
-| 12 Audio/VFX polish | Audio not started (no assets set) |
+| 12 Audio/VFX polish | SFX wired (unheard); no music/ambience |
 | 13 Mobile | Not tested |
 | 14 Security | Remote validation done and tested; full audit later |
 | 15-16 QA / Launch | Not started |
