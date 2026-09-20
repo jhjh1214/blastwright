@@ -56,7 +56,7 @@ In blast mode an overlay drawn ON TOP of the world (so rocks and crystals cannot
 Base game: direct hits only, so early play is still about reading crystal types. **Seismograph** upgrade: the whole chain, estimated shards, tier bonus and whether it refunds a charge. While a volley plays, a short line shows which crystal set each chained crystal off.
 
 ## HUD layout
-All planning text is one compact block under the top row (shard counter left, Leave button right). The camera reserves screen space for it and for the bottom buttons and fits the grid into the free band, so the HUD never covers the grid. The "press Detonate" hint is a pulsing gold outline on the Detonate button, not floating text. Charges remaining are part of the preview line.
+All planning text is one compact block under the top row (shard counter left, Leave button right). The camera reserves screen space for it and for the bottom buttons and fits the grid into the free band, so the HUD never covers the grid. It sits low (55 degree tilt, 60 degree field of view), roughly half as high as the first version. Proximity prompts such as "Start blasting" are switched off while you are at a grid. The "press Detonate" hint is a pulsing gold outline on the Detonate button, not floating text. Charges remaining are part of the preview line.
 
 ## Server authority
 The client sends only cell coordinates and charge kinds. The server validates them (`Validate.luau`), runs the simulation itself, applies results and pays out.

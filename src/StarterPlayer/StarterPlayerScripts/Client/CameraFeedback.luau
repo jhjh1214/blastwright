@@ -6,12 +6,12 @@ local RunService = game:GetService("RunService")
 
 local CameraFeedback = {}
 
-local BASE_FOV = 55
+local BASE_FOV = 60
 -- Screen space (pixels) kept free of the grid: the top holds the shard counter and the planning text, the bottom
 -- the charge and Detonate buttons. The grid is fitted into what is left, so the HUD never covers it.
-local TOP_RESERVE = 140
-local BOTTOM_RESERVE = 92
-local PITCH = math.rad(62)
+local TOP_RESERVE = 124
+local BOTTOM_RESERVE = 80
+local PITCH = math.rad(55) -- lower tilt = camera nearer the floor and crystals look more three-dimensional
 local focus = nil -- { Center = Vector3, Extent = number }
 local shake = 0
 local punch = 0
@@ -57,11 +57,12 @@ function CameraFeedback.Start()
 		local view = camera.ViewportSize
 		local aspect = view.X / math.max(view.Y, 1)
 		local tanV = math.tan(math.rad(camera.FieldOfView) / 2)
-		local half = focus.Extent * 0.62
+		local half = focus.Extent * 0.56 -- half the grid plus a little for the crystals
 		local top = GuiService:GetGuiInset().Y + TOP_RESERVE
 		local usableH = math.max(view.Y - top - BOTTOM_RESERVE, view.Y * 0.35)
 		local usableW = math.max(view.X - 24, 100)
-		local dist = math.max(half / (tanV * usableH / view.Y), half / (tanV * aspect * usableW / view.X)) * 1.05
+		-- Vertically the tilted grid looks shorter (by sin(pitch)); horizontally it is full width.
+		local dist = math.max(half * math.sin(PITCH) / (tanV * usableH / view.Y), half / (tanV * aspect * usableW / view.X))
 
 		local dir = Vector3.new(0, math.sin(PITCH), -math.cos(PITCH))
 		local cf = CFrame.lookAt(focus.Center + dir * dist, focus.Center)

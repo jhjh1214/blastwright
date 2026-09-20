@@ -2,6 +2,7 @@
 -- Enter and leave "blast mode": fixed camera over the site's grid, movement locked, blast HUD shown.
 -- Movement is locked on the client only as UX; the server separately requires you to stand at your station.
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local AudioManager = require(script.Parent.AudioManager)
 local CameraFeedback = require(script.Parent.CameraFeedback)
@@ -55,6 +56,7 @@ function Blasting.Engage(siteId)
 		return
 	end
 	State.Engaged = true
+	ProximityPromptService.Enabled = false -- hide "Start blasting" and other prompts while at the grid
 	lockMovement()
 	Blasting.Focus(view)
 	UI.SetEngaged(true)
@@ -70,6 +72,7 @@ function Blasting.Leave()
 		return
 	end
 	State.Engaged = false
+	ProximityPromptService.Enabled = true
 	unlockMovement()
 	CameraFeedback.Clear()
 	table.clear(State.Placed)
