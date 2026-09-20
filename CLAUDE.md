@@ -1,4 +1,4 @@
-﻿# CLAUDE.md
+# CLAUDE.md
 
 ## Status
 Phase 0/1: repo scaffolded; concept proposal awaiting user approval. No game code yet.
