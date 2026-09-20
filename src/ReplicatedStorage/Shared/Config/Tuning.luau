@@ -12,6 +12,7 @@ return {
 	StepPerCell = 0.07,
 	VolatileDelay = 0.10,
 	PrismDelay = 0.06,
+	RelayDelay = 0.12, -- an Echostone sets off every other Echostone this long after it pops
 
 	MomentumPops = 10, -- chain length that refunds a charge (Momentum Coil lowers this)
 	MutationChance = 0.04,

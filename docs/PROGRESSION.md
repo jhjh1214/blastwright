@@ -11,6 +11,7 @@ Every tier introduces a change in how you play, not only a bigger number.
 | Seismograph | 900 | Full-chain preview |
 | Stratum 2: Prism Veins | 1200 | Lensglass beams and Dreadgeode hazards |
 | Stratum 3: Ember Hollows | 4000 | Slowburn delayed-fuse crystals (timing becomes part of planning) |
+| Stratum 4: Echo Caverns | 12000 | Echostone relays: chains can jump across the grid |
 
 ## Planned (not built)
 Strata 4+ (e.g. magnetic crystals), more charge shapes, rare Legendary/Mythic crystals, Codex milestone rewards, Prestige ("Collapse and re-seed") with mastery bonuses.

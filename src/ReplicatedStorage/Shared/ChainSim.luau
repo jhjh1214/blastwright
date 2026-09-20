@@ -163,6 +163,16 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 
 			if behavior == "Volatile" or behavior == "Delayed" then
 				blast(item.X, item.Z, item.T + tuning.VolatileDelay, "Radius", def.Params.Radius, 0, "Chain")
+			elseif behavior == "Relay" then
+				blast(item.X, item.Z, item.T + tuning.VolatileDelay, "Radius", def.Params.Radius, 0, "Chain")
+				-- Set off every other crystal of the same kind. Scanned by numeric key (not pairs) so the result never
+				-- depends on how the grid table happens to be laid out in memory.
+				for k = 1, size * size do
+					local other = grid.Cells[k]
+					if other ~= nil and other.Kind == cell.Kind and k ~= key and not dead[k] then
+						schedule((k - 1) % size + 1, (k - 1) // size + 1, item.T + tuning.RelayDelay, "Chain", item.X, item.Z)
+					end
+				end
 			elseif behavior == "Prism" then
 				blast(item.X, item.Z, item.T + tuning.PrismDelay, "Row", 0, def.Params.Range, "Beam")
 			end

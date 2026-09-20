@@ -32,5 +32,5 @@ StarterPlayerScripts/Client  init.client (wiring), State, Blasting (enter/leave 
 ## Known limits
 - Roblox-facing code (`Game`, `Data`, `World`, all Client modules) is **compile-checked only**, not run in Studio.
 - Volley playback is not broadcast-throttled for many players.
-- 12 blast pads total: set the experience max players to 12 or fewer (dashboard setting) or extra players will find every pad taken.
+- 16 blast pads total: set the experience max players to 16 or fewer (dashboard setting) or extra players will find every pad taken.
 - The world is generated at server start (a few seconds of terrain fills); nothing has measured this on a real server.

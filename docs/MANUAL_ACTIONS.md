@@ -18,7 +18,7 @@ EXACT STEPS:
 4. Follow the checklist in docs/TESTING.md.
 
 WHAT YOU SHOULD SEE:
-A dark crystal mine: hub plaza, roads, three biomes, blast pads. Using a pad station opens the top-down grid; tapping plants charges; Detonate triggers a cascade; shards count up. Geode caches are hidden off the roads.
+A dark crystal mine: hub plaza, roads, four biomes, blast pads. Using a pad station opens the top-down grid; tapping plants charges; Detonate triggers a cascade; shards count up. Geode caches are hidden off the roads.
 
 THEN:
 Return to Claude and say "Done: playtest" and paste any Output errors or notes on how it felt.
@@ -53,4 +53,4 @@ Return to Claude and say "Done: products created" with the IDs.
 ========================================
 ```
 
-Also set the experience's max players to 12 or fewer (Game Settings > Basic Info) because there are 12 blast pads.
+Also set the experience's max players to 16 or fewer (Game Settings > Basic Info) because there are 16 blast pads.

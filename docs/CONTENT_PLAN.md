@@ -10,7 +10,7 @@ Adding content is a data change:
 ## Backlog (ordered)
 1. Slice playtest and fixes.
 2. Verified audio and visual assets.
-3. Stratum 4 with another new mechanic (e.g. magnet crystals). Stratum 3 (Slowburn) is done.
+3. Stratum 5 with another new mechanic. Strata 3 (Slowburn) and 4 (Echostone relay) are done.
 4. (Daily objectives done.) Weekly challenges and events.
 5. Co-op linked seams. Leaderboard for longest chain.
 6. (Monetization framework done; needs product IDs.) Cosmetic blast colors as a tiny-tier product.

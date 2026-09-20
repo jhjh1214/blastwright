@@ -424,7 +424,7 @@ local function buildHub()
 	end
 
 	if Props.Has("Crate") then
-		for _, off in { { -14, 32 }, { -10, 35 }, { 17, 31 } } do
+		for _, off in { { -24, 28 }, { -28, 31 }, { 24, 27 } } do
 			Props.Place("Crate", Vector3.new(W.Hub.X + off[1], 0, W.Hub.Z + off[2]), 3.4, off[1] * 0.1, nil, folder)
 		end
 	end

@@ -1,5 +1,5 @@
 --!strict
--- World layout: hub, three biomes with four blast sites each, hidden geode caches, and the paths between them.
+-- World layout: hub, four biomes with four blast sites each, hidden geode caches, and the paths between them.
 -- Pure data and math (no Roblox types) so the Luau CLI tests can check the layout.
 -- Coordinates are {x, z} studs on flat ground (y = 0). X east, Z south.
 
@@ -15,6 +15,7 @@ local Biomes: { Biome } = {
 	{ Id = "Shallows", Name = "Glimmer Shallows", Stratum = 1, X = -190, Z = 0, Color = { 90, 200, 255 } },
 	{ Id = "Prism", Name = "Prism Veins", Stratum = 2, X = 190, Z = 0, Color = { 255, 220, 120 } },
 	{ Id = "Ember", Name = "Ember Hollows", Stratum = 3, X = 0, Z = -230, Color = { 255, 80, 170 } },
+	{ Id = "Echo", Name = "Echo Caverns", Stratum = 4, X = 0, Z = 230, Color = { 120, 255, 190 } },
 }
 
 local Sites: { Site } = {}
@@ -58,6 +59,11 @@ local Caches: { Cache } = {
 	cache("E3", "Ember", -90, -330, 400),
 	cache("E4", "Ember", 90, -335, 400),
 	cache("E5", "Ember", 0, -345, 400),
+	cache("C1", "Echo", -140, 230, 800),
+	cache("C2", "Echo", 140, 250, 800),
+	cache("C3", "Echo", -90, 330, 800),
+	cache("C4", "Echo", 90, 335, 800),
+	cache("C5", "Echo", 0, 345, 800),
 }
 
 -- Straight paths from the hub to each biome center. Used to keep terrain features and caches off the roads.
@@ -73,7 +79,7 @@ local World = {
 	Caches = Caches,
 	Paths = Paths,
 	Spawn = { X = 0, Z = 24 },
-	Bounds = { MinX = -340, MaxX = 340, MinZ = -350, MaxZ = 130 }, -- playable area; walls sit outside
+	Bounds = { MinX = -340, MaxX = 340, MinZ = -350, MaxZ = 350 }, -- playable area; walls sit outside
 	PadRadius = 34, -- blast pads are round; the 9x9 grid corners sit ~28 studs from the center
 	SiteClearRadius = 44,
 	PathHalfWidth = 12,

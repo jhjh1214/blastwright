@@ -5,7 +5,7 @@ export type CrystalDef = {
 	Rarity: string,
 	Description: string,
 	Value: number,
-	Behavior: string, -- Inert | Volatile | Amplifier | Prism | Unstable | Delayed
+	Behavior: string, -- Inert | Volatile | Amplifier | Prism | Unstable | Delayed | Relay
 	Params: { [string]: number },
 	Color: { number },
 	Stratum: number, -- first stratum this can appear in
@@ -79,9 +79,20 @@ local Defs: { [string]: CrystalDef } = {
 		Stratum = 3,
 		Weight = 8,
 	},
+	Echostone = {
+		Name = "Echostone",
+		Rarity = "Legendary",
+		Description = "Relay. When it pops it sets off every other Echostone on the grid, however far away, and blasts its own neighbours.",
+		Value = 12,
+		Behavior = "Relay",
+		Params = { Radius = 1 },
+		Color = { 120, 255, 190 },
+		Stratum = 4,
+		Weight = 6,
+	},
 }
 
 return {
 	Defs = Defs,
-	Order = { "Glimmerstone", "Kindlequartz", "Resonite", "Lensglass", "Dreadgeode", "Slowburn" },
+	Order = { "Glimmerstone", "Kindlequartz", "Resonite", "Lensglass", "Dreadgeode", "Slowburn", "Echostone" },
 }

@@ -28,10 +28,10 @@ return {
 
 		goal("Cache1", "Treasure Spotter", "Crack open 5 geode caches.", "Caches", 5, 300),
 		goal("Cache2", "Treasure Hunter", "Crack open 10 geode caches.", "Caches", 10, 800),
-		goal("Cache3", "Geode Completionist", "Crack open all 17 geode caches.", "Caches", 17, 2000),
+		goal("Cache3", "Geode Completionist", "Crack open all 22 geode caches.", "Caches", 22, 2500),
 
 		goal("Codex1", "Curious Miner", "Discover 3 kinds of crystal.", "Codex", 3, 150),
-		goal("Codex2", "Crystal Scholar", "Discover every kind of crystal.", "Codex", 6, 1000),
+		goal("Codex2", "Crystal Scholar", "Discover every kind of crystal.", "Codex", 7, 1000),
 
 		goal("Prism1", "Lucky Find", "Find a Prismatic crystal.", "Prismatic", 1, 300),
 		goal("Prism2", "Prismatic Collector", "Find Prismatic versions of 3 kinds.", "Prismatic", 3, 900),
@@ -39,5 +39,6 @@ return {
 
 		goal("Area1", "Going Deeper", "Unlock the second mine area.", "Strata", 2, 500),
 		goal("Area2", "Into the Embers", "Unlock the third mine area.", "Strata", 3, 2000),
+		goal("Area3", "Echoes Below", "Unlock the fourth mine area.", "Strata", 4, 3500),
 	} :: { Def },
 }

@@ -3,9 +3,9 @@
 ## The world (explorable mine)
 The game is a walkable mine, not a single screen. Layout data and tests: `Config/World.luau`.
 - **Blastwright Depot (hub):** spawn plaza with a beacon and signposts to each biome.
-- **Three biomes,** each with 4 blast pads and a landmark beacon, linked to the hub by lantern-lit roads: Glimmer Shallows (west, stratum 1), Prism Veins (east, stratum 2), Ember Hollows (north, stratum 3). You can walk into any biome at any time; you can only *blast* there once its stratum is unlocked in the Forge. Seeing where you are heading is part of the pull.
+- **Four biomes,** each with 4 blast pads and a landmark beacon, linked to the hub by lantern-lit roads: Glimmer Shallows (west, stratum 1), Prism Veins (east, stratum 2), Ember Hollows (north, stratum 3), Echo Caverns (south, stratum 4). You can walk into any biome at any time; you can only *blast* there once its stratum is unlocked in the Forge. Seeing where you are heading is part of the pull.
 - **Blast pads:** round cavern floors (34-stud radius) ringed by rocks and crystal clusters, open on the station side. Walk to a pad's station and use its prompt. The camera lifts to the fixed top-down view of that pad's grid and your movement locks; "Leave" (or X) returns to free roaming. A pad is reserved for you until you take another pad, leave the game, or wander more than 130 studs away for 60s.
-- **Geode caches:** 17 hidden caches (5 per biome, 2 near the hub) reward shards once per player (100 hub / 60 Shallows / 150 Prism / 400 Ember). They sit off the roads, so exploring pays.
+- **Geode caches:** 22 hidden caches (5 per biome, 2 near the hub) reward shards once per player (100 hub / 60 Shallows / 150 Prism / 400 Ember / 800 Echo). They sit off the roads, so exploring pays.
 - **Terrain and look:** Roblox Terrain rock, cliffs, spires and mounds, glowing crystal clusters, lanterns, and drifting motes tinted by area.
 
 ## Daily objectives
@@ -32,6 +32,7 @@ Menu > Goals lists permanent milestones (pops, chain records, seams cleared, sha
 | Resonite | Rare | Amplifier: +0.5 to the volley's multiplier | 1 |
 | Lensglass | Epic | Prism: beams along its row (range 5) | 2 |
 | Dreadgeode | Uncommon | Unstable: worth 0, halves the multiplier (min 1) | 2 |
+| Echostone | Legendary | Relay: when it pops it sets off every other Echostone on the grid however far away (0.12s later), and blasts its own neighbours (radius 1). Value 12 | 4 |
 | Slowburn | Rare | Delayed: lights a fuse when hit, pops 1s later (after the rest of the chain, so it cashes in the peak multiplier), then blasts radius 2. Value 20 | 3 |
 
 Any crystal with value has a 4% chance to be **Prismatic** (3x value).

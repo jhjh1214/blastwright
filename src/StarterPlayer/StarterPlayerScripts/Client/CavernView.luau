@@ -119,6 +119,14 @@ function builders.Delayed(model, pos, col, rng)
 	part(model, Vector3.new(0.35, 1.0, 0.35), CFrame.new(pos + Vector3.new(0, 3.6, 0)), glow(col), Enum.Material.Neon)
 end
 
+-- Echostone: a slim obelisk with a floating ring and a bright tip, so relays read as a matching set across the grid.
+function builders.Relay(model, pos, col, rng)
+	rockBase(model, pos, rng, ROCK)
+	part(model, Vector3.new(1.1, 4.2, 1.1), CFrame.new(pos + Vector3.new(0, 2.7, 0)), col, SHARD)
+	part(model, Vector3.new(0.25, 3.2, 3.2), CFrame.new(pos + Vector3.new(0, 2.6, 0)) * CFrame.Angles(0, 0, math.pi / 2), glow(col), Enum.Material.Neon, Enum.PartType.Cylinder)
+	part(model, Vector3.new(0.9, 0.9, 0.9), CFrame.new(pos + Vector3.new(0, 5.1, 0)) * CFrame.Angles(0.7, 0.7, 0), glow(Color3.new(1, 1, 1)), Enum.Material.Neon)
+end
+
 function builders.Unstable(model, pos, col, rng)
 	rockBase(model, pos, rng, Color3.fromRGB(20, 16, 22))
 	for i = 1, 5 do

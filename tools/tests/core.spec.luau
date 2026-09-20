@@ -259,7 +259,7 @@ end)
 
 test("world: sites are unique, in bounds, and clear of each other, hub and paths", function()
 	local W = require("../../src/ReplicatedStorage/Shared/Config/World")
-	eq(#W.Sites, 12, "3 biomes x 4 sites")
+	eq(#W.Sites, 16, "4 biomes x 4 sites")
 	local half = W.PadRadius -- pads are round
 	for i, a in W.Sites do
 		eq(a.Id, i, "sequential id")
@@ -310,7 +310,8 @@ test("world: area names and segment distance", function()
 	eq(W.AreaName(-190, 0), "Glimmer Shallows", "shallows")
 	eq(W.AreaName(190, 10), "Prism Veins", "prism")
 	eq(W.AreaName(0, -230), "Ember Hollows", "ember")
-	eq(W.AreaName(-95, 300), "The Deep Roads", "between")
+	eq(W.AreaName(0, 230), "Echo Caverns", "echo")
+	eq(W.AreaName(-190, -190), "The Deep Roads", "between")
 	eq(W.DistToSegment(5, 5, 0, 0, 10, 0), 5, "perpendicular")
 	eq(W.DistToSegment(-3, 4, 0, 0, 10, 0), 5, "clamped to endpoint")
 end)
@@ -372,9 +373,9 @@ test("objectives: enough shards to unlock the next area highlights the Forge", f
 end)
 
 test("objectives: everything unlocked falls back to exploring for caches", function()
-	local o = Objectives.Roam(snap({ Shards = 9999, Upgrades = { ExtraCharge = 3 }, StrataUnlocked = 3, Caches = { S1 = true, P2 = true }, Stats = { TotalPops = 999 } }), 0, 0, ocfg)
+	local o = Objectives.Roam(snap({ Shards = 9999, Upgrades = { ExtraCharge = 3 }, StrataUnlocked = #Strata, Caches = { S1 = true, P2 = true }, Stats = { TotalPops = 999 } }), 0, 0, ocfg)
 	eq(o.Id, "Explore", "id")
-	eq(o.Text:find("2/17", 1, true) ~= nil, true, "cache progress")
+	eq(o.Text:find(("2/%d"):format(#WorldCfg.Caches), 1, true) ~= nil, true, "cache progress")
 	eq(o.Target, nil, "no arrow: caches are meant to be found")
 end)
 
@@ -836,6 +837,88 @@ test("objectives: a finished goal is surfaced (after dailies), and never for a b
 	eq(Objectives.Roam(fresh, 0, 0, ocfg).Id, "GoBlast", "brand-new player still starts at a pad")
 	local both = snap({ Stats = { TotalPops = 20 }, Dailies = { { Slot = 1, Progress = 5, Target = 5, Claimed = false } }, Goals = { { Id = "x", Progress = 1, Target = 1, Claimed = false, Complete = true } } })
 	eq(Objectives.Roam(both, 0, 0, ocfg).Id, "ClaimDaily", "dailies come first")
+end)
+
+test("relay: popping an echostone sets off every other echostone, however far away", function()
+	local g = grid(function(x, z)
+		if x == 1 and z == 1 then return "Echostone" end
+		if x == 9 and z == 9 then return "Echostone" end
+		if x == 9 and z == 8 then return "Glimmerstone" end -- next to the far relay
+		if x == 5 and z == 5 then return "Glimmerstone" end -- far from both: must NOT pop
+	end)
+	local r = ChainSim.Run(g, { cap(1, 1) }, ctx)
+	eq(r.Pops, 3, "near relay, far relay, and the crystal beside the far relay")
+	local far = findEvent(r, 9, 9)
+	eq(far.Cause, "Chain", "the far relay is a chain reaction")
+	eq(far.SX, 1, "set off by the near relay")
+	eq(far.SZ, 1, "set off by the near relay")
+	local near = findEvent(r, 1, 1)
+	if math.abs((far.T - near.T) - Tuning.RelayDelay) > 1e-9 then error("the far relay must pop RelayDelay after the near one, got " .. (far.T - near.T)) end
+	local beside = findEvent(r, 9, 8)
+	eq(beside.SX, 9, "the far relay blasts its own neighbours")
+	eq(beside.SZ, 9, "the far relay blasts its own neighbours")
+	for _, e in r.Events do
+		if e.X == 5 and e.Z == 5 then error("a crystal nowhere near a relay popped") end
+	end
+end)
+
+test("relay: three relays all fire and the outcome does not depend on how the grid table was built", function()
+	local function build(reverse)
+		local cells = {}
+		local keys = {}
+		for z = 1, N do for x = 1, N do keys[#keys + 1] = { x, z } end end
+		if reverse then
+			for i = 1, #keys // 2 do keys[i], keys[#keys + 1 - i] = keys[#keys + 1 - i], keys[i] end
+		end
+		for _, k in keys do
+			local x, z = k[1], k[2]
+			local kind = nil
+			if (x == 1 and z == 1) or (x == 9 and z == 1) or (x == 5 and z == 9) then kind = "Echostone"
+			elseif (x + z) % 3 == 0 then kind = "Glimmerstone" end
+			if kind then cells[ChainSim.Key(N, x, z)] = { Kind = kind } end
+		end
+		return { Size = N, Cells = cells }
+	end
+	local a = ChainSim.Run(build(false), { cap(1, 1) }, ctx)
+	local b = ChainSim.Run(build(true), { cap(1, 1) }, ctx)
+	local relays = 0
+	for _, e in a.Events do if e.Kind == "Echostone" then relays += 1 end end
+	eq(relays, 3, "all three relays popped")
+	eq(#a.Events, #b.Events, "same number of events")
+	for i = 1, #a.Events do
+		local x, y = a.Events[i], b.Events[i]
+		if x.X ~= y.X or x.Z ~= y.Z or x.Kind ~= y.Kind or x.Cause ~= y.Cause or x.SX ~= y.SX or math.abs(x.T - y.T) > 1e-9 then
+			error("event " .. i .. " differs between construction orders")
+		end
+	end
+	eq(a.Total, b.Total, "same payout")
+end)
+
+test("relay: a lone echostone just blasts its neighbours like a small volatile crystal", function()
+	local g = grid(function(x, z) if x == 5 and z == 5 then return "Echostone" end if x == 6 and z == 5 then return "Glimmerstone" end if x == 7 and z == 5 then return "Glimmerstone" end end)
+	local r = ChainSim.Run(g, { cap(5, 5) }, ctx)
+	eq(r.Pops >= 2, true, "the neighbour pops")
+	for _, e in r.Events do
+		if e.X == 7 and e.Z == 5 and e.Cause == "Chain" and e.SX == 5 then error("radius 1 must not reach two cells away from the relay") end
+	end
+end)
+
+test("echo caverns: the fourth area exists, is gated, and its sites and caches fit the map", function()
+	eq(#Strata, 4, "four areas")
+	eq(#WorldCfg.Biomes, 4, "four biomes")
+	eq(#WorldCfg.Sites, 16, "4 biomes x 4 sites")
+	eq(Crystals.Defs.Echostone.Stratum, 4, "echostone appears from area 4")
+	eq(Crystals.Defs.Echostone.Behavior, "Relay", "behavior")
+	for s = 1, 30 do
+		for _, c in Seam.Generate(Crystals, Tuning, 3, s).Cells do
+			if c.Kind == "Echostone" then error("echostone in area 3") end
+		end
+	end
+	local saw = false
+	for s = 1, 20 do
+		for _, c in Seam.Generate(Crystals, Tuning, 4, s).Cells do if c.Kind == "Echostone" then saw = true end end
+	end
+	eq(saw, true, "area 4 spawns echostones")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))
