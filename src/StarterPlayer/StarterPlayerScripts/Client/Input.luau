@@ -9,6 +9,7 @@ local Geometry = require(Shared.Geometry)
 local Remotes = require(Shared.Remotes)
 
 local AudioManager = require(script.Parent.AudioManager)
+local Blasting = require(script.Parent.Blasting)
 local CavernView = require(script.Parent.CavernView)
 local Preview = require(script.Parent.Preview)
 local State = require(script.Parent.State)
@@ -49,7 +50,7 @@ end
 
 local function onTap(position)
 	local view = CavernView.Get(State.UserId)
-	if not view or State.Busy or State.PanelOpen or not State.Data then
+	if not view or not State.Engaged or State.Busy or State.PanelOpen or not State.Data then
 		return
 	end
 	local x, z = cellFromScreen(view, position)
@@ -86,6 +87,7 @@ end
 function Input.Init()
 	UI.OnDetonate = detonate
 	UI.OnClear = clear
+	UI.OnLeave = Blasting.Leave
 
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then
@@ -94,10 +96,12 @@ function Input.Init()
 		local t = input.UserInputType
 		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
 			onTap(Vector2.new(input.Position.X, input.Position.Y))
-		elseif input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.Return then
+		elseif State.Engaged and (input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.Return) then
 			detonate()
-		elseif input.KeyCode == Enum.KeyCode.Backspace then
+		elseif State.Engaged and input.KeyCode == Enum.KeyCode.Backspace then
 			clear()
+		elseif State.Engaged and input.KeyCode == Enum.KeyCode.X then
+			Blasting.Leave()
 		end
 	end)
 

@@ -10,6 +10,7 @@ return {
 	Upgrades = require(script.Upgrades),
 	Strata = require(script.Strata),
 	Rarities = require(script.Rarities),
+	World = require(script.World),
 	Tuning = Tuning,
 	Context = {
 		Crystals = Crystals.Defs,

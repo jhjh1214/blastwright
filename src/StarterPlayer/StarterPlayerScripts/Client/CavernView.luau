@@ -126,7 +126,7 @@ end
 function CavernView.Build(payload)
 	CavernView.Remove(payload.UserId)
 
-	local origin = Geometry.Origin(payload.Slot)
+	local origin = Geometry.Origin(payload.SiteId)
 	local size = payload.Size
 	local extent = size * CellSize
 
@@ -134,15 +134,9 @@ function CavernView.Build(payload)
 	folder.Name = "Cavern_" .. payload.UserId
 	folder.Parent = root
 
-	part(folder, Vector3.new(extent + 6, 1, extent + 6), CFrame.new(origin + Vector3.new(0, -0.5, 0)), Color3.fromRGB(30, 34, 46), Enum.Material.Slate)
-	for _, side in { -1, 1 } do
-		local edge = Color3.fromRGB(60, 90, 160)
-		part(folder, Vector3.new(extent + 6, 0.2, 0.3), CFrame.new(origin + Vector3.new(0, 0.05, side * (extent + 6) / 2)), edge, Enum.Material.Neon)
-		part(folder, Vector3.new(0.3, 0.2, extent + 6), CFrame.new(origin + Vector3.new(side * (extent + 6) / 2, 0.05, 0)), edge, Enum.Material.Neon)
-	end
-
 	local view = {
 		UserId = payload.UserId,
+		SiteId = payload.SiteId,
 		Origin = origin,
 		Size = size,
 		Extent = extent,

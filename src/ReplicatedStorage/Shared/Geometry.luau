@@ -1,15 +1,24 @@
 --!strict
--- World-space layout of per-player caverns. Server and client must agree, so it lives in Shared.
-local Tuning = require(script.Parent.Config.Tuning)
+-- World-space layout of blast sites and their cavern grids. Server and client must agree, so it lives in Shared.
+local Config = script.Parent.Config
+local Tuning = require(Config.Tuning)
+local WorldConfig = require(Config.World)
 
 local Geometry = {}
 
-function Geometry.Origin(slot: number): Vector3
-	return Vector3.new(slot * Tuning.SlotSpacing, 0, 0)
-end
-
 function Geometry.Extent(): number
 	return Tuning.GridSize * Tuning.CellSize
+end
+
+-- Center of a site's cavern grid.
+function Geometry.Origin(siteId: number): Vector3
+	local site = WorldConfig.Sites[siteId]
+	return Vector3.new(site.X, 0, site.Z)
+end
+
+-- Where the player stands (and the blast prompt lives) for a site: just off the pad's south edge.
+function Geometry.Station(siteId: number): Vector3
+	return Geometry.Origin(siteId) + Vector3.new(0, 0, -(Geometry.Extent() / 2) - 7)
 end
 
 function Geometry.CellPosition(origin: Vector3, x: number, z: number): Vector3

@@ -1,5 +1,6 @@
 --!nonstrict
 -- Fixed top-down camera over the player's cavern, plus shake and FOV punch for impact.
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local CameraFeedback = {}
@@ -14,8 +15,20 @@ function CameraFeedback.Focus(center, extent)
 	focus = { Center = center, Extent = extent }
 end
 
+-- Return control to Roblox's default follow camera.
 function CameraFeedback.Clear()
 	focus = nil
+	shake, punch = 0, 0
+	local camera = workspace.CurrentCamera
+	if camera then
+		camera.CameraType = Enum.CameraType.Custom
+		camera.FieldOfView = 70
+		local character = Players.LocalPlayer.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			camera.CameraSubject = humanoid
+		end
+	end
 end
 
 function CameraFeedback.Shake(amount)
@@ -40,7 +53,7 @@ function CameraFeedback.Start()
 		local aspect = view.X / math.max(view.Y, 1)
 		local tanV = math.tan(math.rad(camera.FieldOfView) / 2)
 		local half = focus.Extent * 0.62
-		local dist = math.max(half / tanV, half / (tanV * aspect)) * 1.08
+		local dist = math.max(half / tanV, half / (tanV * aspect)) * 1.22
 
 		local dir = Vector3.new(0, math.sin(PITCH), -math.cos(PITCH))
 		local cf = CFrame.lookAt(focus.Center + dir * dist, focus.Center)

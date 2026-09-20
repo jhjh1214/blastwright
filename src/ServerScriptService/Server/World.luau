@@ -1,63 +1,520 @@
---!strict
--- Builds the static world shell (ground, lighting, spawn) from code so Rojo remains the source of truth.
+--!nonstrict
+-- Builds the explorable mine from code (Rojo stays the source of truth): terrain, lighting, hub, biomes,
+-- blast pads with stations, geode caches. Layout data lives in Shared/Config/World.luau (tested).
+-- Everything here is deterministic (fixed seed) so every server builds the identical world.
+local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local World = {}
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Geometry = require(Shared.Geometry)
 
-local function ensure(class: string, name: string, parent: Instance): Instance
-	local existing = parent:FindFirstChild(name)
-	if existing and existing.ClassName == class then
-		return existing
-	end
-	local inst = Instance.new(class)
-	inst.Name = name
-	inst.Parent = parent
-	return inst
+local W = Config.World
+local Terrain = workspace.Terrain
+
+local World = {
+	-- Filled by Build(): live instances the Game module needs.
+	Registry = { Sites = {}, Caches = {} },
+}
+
+local root
+
+local function c3(t)
+	return Color3.fromRGB(t[1], t[2], t[3])
 end
 
-function World.Init()
-	-- Cave lighting: dark, cool ambient so crystals carry the color.
+local function mk(parent, size, cf, color, material, shape)
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = true
+	p.CanQuery = true
+	p.CastShadow = false
+	p.Size = size
+	p.CFrame = cf
+	p.Color = color
+	p.Material = material
+	if shape then
+		p.Shape = shape
+	end
+	p.Parent = parent
+	return p
+end
+
+local function decorPart(parent, size, cf, color, material, shape)
+	local p = mk(parent, size, cf, color, material, shape)
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	return p
+end
+
+local function dist2(ax, az, bx, bz)
+	return math.sqrt((ax - bx) ^ 2 + (az - bz) ^ 2)
+end
+
+-- Keep terrain features and decor off pads, roads, hub, landmarks and caches.
+local function blocked(x, z, margin)
+	margin = margin or 0
+	if dist2(x, z, W.Hub.X, W.Hub.Z) < W.Hub.Radius + 20 + margin then
+		return true
+	end
+	for _, s in W.Sites do
+		if dist2(x, z, s.X, s.Z) < W.SiteClearRadius + margin then
+			return true
+		end
+	end
+	for _, b in W.Biomes do
+		if dist2(x, z, b.X, b.Z) < 32 + margin then
+			return true
+		end
+	end
+	for _, c in W.Caches do
+		if dist2(x, z, c.X, c.Z) < 14 + margin then
+			return true
+		end
+	end
+	return W.DistToPath(x, z) < W.PathHalfWidth + 12 + margin
+end
+
+local function areaColor(x, z)
+	local best, bestD = nil, 190
+	for _, b in W.Biomes do
+		local d = dist2(x, z, b.X, b.Z)
+		if d < bestD then
+			best, bestD = b, d
+		end
+	end
+	return best and c3(best.Color) or Color3.fromRGB(120, 170, 255)
+end
+
+---------------------------------------------------------------- lighting
+
+local function buildLighting()
 	Lighting.ClockTime = 0
-	Lighting.Brightness = 1
-	Lighting.Ambient = Color3.fromRGB(28, 32, 48)
-	Lighting.OutdoorAmbient = Color3.fromRGB(28, 32, 48)
-	Lighting.EnvironmentDiffuseScale = 0.3
-	Lighting.EnvironmentSpecularScale = 0.3
+	Lighting.Brightness = 0.6
+	Lighting.Ambient = Color3.fromRGB(44, 50, 78)
+	Lighting.OutdoorAmbient = Color3.fromRGB(44, 50, 78)
+	Lighting.EnvironmentDiffuseScale = 0.4
+	Lighting.EnvironmentSpecularScale = 0.4
+	Lighting.ExposureCompensation = 0.25
 	Lighting.GlobalShadows = false
 
-	local bloom = ensure("BloomEffect", "CaveBloom", Lighting) :: BloomEffect
-	bloom.Intensity = 0.7
-	bloom.Size = 28
-	bloom.Threshold = 1.6
+	local function ensure(class, name)
+		local inst = Lighting:FindFirstChild(name)
+		if not inst or inst.ClassName ~= class then
+			inst = Instance.new(class)
+			inst.Name = name
+			inst.Parent = Lighting
+		end
+		return inst
+	end
+	local bloom = ensure("BloomEffect", "CaveBloom")
+	bloom.Intensity = 0.8
+	bloom.Size = 30
+	bloom.Threshold = 1.5
+	local cc = ensure("ColorCorrectionEffect", "CaveGrade")
+	cc.Saturation = 0.2
+	cc.Contrast = 0.12
+	cc.TintColor = Color3.fromRGB(232, 238, 255)
+	local atmo = ensure("Atmosphere", "CaveAtmosphere")
+	atmo.Density = 0.36
+	atmo.Offset = 0.2
+	atmo.Color = Color3.fromRGB(38, 44, 78)
+	atmo.Decay = Color3.fromRGB(20, 24, 46)
+	atmo.Glare = 0
+	atmo.Haze = 1.6
+end
 
-	local cc = ensure("ColorCorrectionEffect", "CaveGrade", Lighting) :: ColorCorrectionEffect
-	cc.Saturation = 0.15
-	cc.Contrast = 0.1
-	cc.TintColor = Color3.fromRGB(235, 240, 255)
+---------------------------------------------------------------- terrain
 
-	local atmo = ensure("Atmosphere", "CaveAtmosphere", Lighting) :: Atmosphere
-	atmo.Density = 0.25
-	atmo.Color = Color3.fromRGB(35, 40, 70)
-	atmo.Decay = Color3.fromRGB(20, 22, 40)
+local function buildTerrain()
+	Terrain:Clear()
+	Terrain:SetMaterialColor(Enum.Material.Slate, Color3.fromRGB(44, 50, 68))
+	Terrain:SetMaterialColor(Enum.Material.Basalt, Color3.fromRGB(30, 32, 46))
+	Terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(60, 66, 88))
 
-	-- Ground plane so nothing falls into the void.
-	local ground = ensure("Part", "Ground", workspace) :: Part
-	ground.Anchored = true
-	ground.Size = Vector3.new(4000, 2, 600)
-	ground.Position = Vector3.new(0, -1.5, 0)
-	ground.Material = Enum.Material.Slate
-	ground.Color = Color3.fromRGB(24, 27, 36)
+	local rng = Random.new(20260921)
+	local b = W.Bounds
+	local pad = 20
+	local x0, x1, z0, z1 = b.MinX - pad, b.MaxX + pad, b.MinZ - pad, b.MaxZ + pad
 
-	local spawn = ensure("SpawnLocation", "Spawn", workspace) :: SpawnLocation
+	Terrain:FillBlock(CFrame.new((x0 + x1) / 2, -6, (z0 + z1) / 2), Vector3.new(x1 - x0, 12, z1 - z0), Enum.Material.Slate)
+
+	-- Perimeter cliffs: slabs plus ragged boulders so the boundary reads as cave wall, not a fence.
+	local wallH = 90
+	Terrain:FillBlock(CFrame.new((x0 + x1) / 2, wallH / 2 - 6, z0 - 25), Vector3.new(x1 - x0 + 100, wallH, 50), Enum.Material.Basalt)
+	Terrain:FillBlock(CFrame.new((x0 + x1) / 2, wallH / 2 - 6, z1 + 25), Vector3.new(x1 - x0 + 100, wallH, 50), Enum.Material.Basalt)
+	Terrain:FillBlock(CFrame.new(x0 - 25, wallH / 2 - 6, (z0 + z1) / 2), Vector3.new(50, wallH, z1 - z0 + 100), Enum.Material.Basalt)
+	Terrain:FillBlock(CFrame.new(x1 + 25, wallH / 2 - 6, (z0 + z1) / 2), Vector3.new(50, wallH, z1 - z0 + 100), Enum.Material.Basalt)
+
+	local n = 0
+	local function boulder(x, y, z, r)
+		Terrain:FillBall(Vector3.new(x, y, z), r, Enum.Material.Basalt)
+		n += 1
+		if n % 15 == 0 then
+			task.wait()
+		end
+	end
+	for x = x0, x1, 28 do
+		boulder(x + rng:NextNumber(-8, 8), rng:NextNumber(4, 38), z0 + rng:NextNumber(0, 12), rng:NextNumber(14, 30))
+		boulder(x + rng:NextNumber(-8, 8), rng:NextNumber(4, 38), z1 - rng:NextNumber(0, 12), rng:NextNumber(14, 30))
+	end
+	for z = z0, z1, 28 do
+		boulder(x0 + rng:NextNumber(0, 12), rng:NextNumber(4, 38), z + rng:NextNumber(-8, 8), rng:NextNumber(14, 30))
+		boulder(x1 - rng:NextNumber(0, 12), rng:NextNumber(4, 38), z + rng:NextNumber(-8, 8), rng:NextNumber(14, 30))
+	end
+
+	-- Interior rocks: mounds and stacked-cylinder spires, kept off pads, roads, hub and caches.
+	local spires = {}
+	for _ = 1, 420 do
+		local x = rng:NextNumber(b.MinX + 10, b.MaxX - 10)
+		local z = rng:NextNumber(b.MinZ + 10, b.MaxZ - 10)
+		if not blocked(x, z, 0) then
+			if rng:NextNumber() < 0.5 then
+				local r = rng:NextNumber(7, 20)
+				Terrain:FillBall(Vector3.new(x, r * 0.1, z), r, Enum.Material.Rock)
+			else
+				local r = rng:NextNumber(3.5, 8)
+				local h = rng:NextNumber(16, 46)
+				local y = 0
+				for _, seg in { { 0.5, 1 }, { 0.3, 0.62 }, { 0.2, 0.3 } } do
+					local hh, rr = h * seg[1], r * seg[2]
+					Terrain:FillCylinder(CFrame.new(x, y + hh / 2, z), hh, rr, Enum.Material.Basalt)
+					y += hh
+				end
+				table.insert(spires, { x = x, z = z, r = r })
+			end
+			n += 1
+			if n % 12 == 0 then
+				task.wait()
+			end
+		end
+	end
+	return spires, rng
+end
+
+---------------------------------------------------------------- crystal decor
+
+local function cluster(parent, pos, color, scale, rng, withLight)
+	local model = Instance.new("Model")
+	model.Name = "Crystals"
+	local count = rng:NextInteger(3, 5)
+	local first
+	for i = 1, count do
+		local a = (i / count) * math.pi * 2 + rng:NextNumber() * 0.5
+		local h = (2 + rng:NextNumber() * 3.5) * scale
+		local off = Vector3.new(math.cos(a), 0, math.sin(a)) * (i == 1 and 0 or 0.8 * scale)
+		local tilt = math.rad(rng:NextNumber(8, 26))
+		local col = color:Lerp(Color3.new(1, 1, 1), rng:NextNumber() * 0.25)
+		local p = decorPart(model, Vector3.new(0.9 * scale, h, 0.9 * scale), CFrame.new(pos + off + Vector3.new(0, h / 2, 0)) * CFrame.Angles(math.sin(a) * tilt, a, -math.cos(a) * tilt), col, Enum.Material.Neon)
+		first = first or p
+	end
+	if withLight and first then
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 8 + 6 * scale
+		light.Brightness = 1.4
+		light.Shadows = false
+		light.Parent = first
+	end
+	model.Parent = parent
+	return model
+end
+
+local function buildDecor(spires, rng)
+	local decor = Instance.new("Folder")
+	decor.Name = "Decor"
+	decor.Parent = root
+
+	local placed = 0
+	local function place(x, z, scale)
+		if blocked(x, z, -8) then
+			return
+		end
+		placed += 1
+		cluster(decor, Vector3.new(x, 0, z), areaColor(x, z), scale, rng, placed % 6 == 0)
+	end
+
+	for _, s in spires do
+		local a = rng:NextNumber(0, math.pi * 2)
+		place(s.x + math.cos(a) * (s.r + 3), s.z + math.sin(a) * (s.r + 3), rng:NextNumber(0.9, 1.7))
+	end
+	local b = W.Bounds
+	for x = b.MinX, b.MaxX, 26 do
+		place(x + rng:NextNumber(-6, 6), b.MinZ + rng:NextNumber(4, 14), rng:NextNumber(1.4, 2.6))
+		place(x + rng:NextNumber(-6, 6), b.MaxZ - rng:NextNumber(4, 14), rng:NextNumber(1.4, 2.6))
+	end
+	for z = b.MinZ, b.MaxZ, 26 do
+		place(b.MinX + rng:NextNumber(4, 14), z + rng:NextNumber(-6, 6), rng:NextNumber(1.4, 2.6))
+		place(b.MaxX - rng:NextNumber(4, 14), z + rng:NextNumber(-6, 6), rng:NextNumber(1.4, 2.6))
+	end
+end
+
+---------------------------------------------------------------- roads and lanterns
+
+local function buildRoads()
+	local folder = Instance.new("Folder")
+	folder.Name = "Roads"
+	folder.Parent = root
+	local lamp = Color3.fromRGB(255, 200, 120)
+	for _, p in W.Paths do
+		local a, b = Vector3.new(p.AX, 0, p.AZ), Vector3.new(p.BX, 0, p.BZ)
+		local len = (b - a).Magnitude
+		local mid = (a + b) / 2
+		local road = decorPart(folder, Vector3.new(W.PathHalfWidth * 2 - 4, 0.5, len), CFrame.lookAt(mid + Vector3.new(0, 0.1, 0), b + Vector3.new(0, 0.1, 0)), Color3.fromRGB(64, 70, 92), Enum.Material.Cobblestone)
+		road.CanCollide = true
+		local dir = (b - a).Unit
+		local side = Vector3.new(-dir.Z, 0, dir.X)
+		local step = 34
+		local count = math.floor(len / step)
+		for i = 1, count do
+			local pos = a + dir * (i * step)
+			if dist2(pos.X, pos.Z, W.Hub.X, W.Hub.Z) > W.Hub.Radius + 4 then
+				for sgn = -1, 1, 2 do
+					local base = pos + side * (W.PathHalfWidth - 1) * sgn
+					decorPart(folder, Vector3.new(0.6, 7, 0.6), CFrame.new(base + Vector3.new(0, 3.5, 0)), Color3.fromRGB(30, 32, 44), Enum.Material.Metal)
+					local head = decorPart(folder, Vector3.new(1.5, 1.5, 1.5), CFrame.new(base + Vector3.new(0, 7.4, 0)), lamp, Enum.Material.Neon)
+					if (i + (sgn + 1) / 2) % 2 == 0 then
+						local light = Instance.new("PointLight")
+						light.Color = lamp
+						light.Range = 26
+						light.Brightness = 1.2
+						light.Shadows = false
+						light.Parent = head
+					end
+				end
+			end
+		end
+	end
+end
+
+---------------------------------------------------------------- hub and landmarks
+
+local function beacon(parent, x, z, color, scale, name)
+	local rng = Random.new(x * 31 + z)
+	local group = Instance.new("Model")
+	group.Name = name
+	group.Parent = parent
+	local plat = decorPart(group, Vector3.new(0.6, 44, 44), CFrame.new(x, 0.15, z) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(46, 52, 72), Enum.Material.Slate, Enum.PartType.Cylinder)
+	plat.CanCollide = true
+	decorPart(group, Vector3.new(0.2, 47, 47), CFrame.new(x, 0.05, z) * CFrame.Angles(0, 0, math.pi / 2), color, Enum.Material.Neon, Enum.PartType.Cylinder)
+	for i = 1, 7 do
+		local a = (i / 7) * math.pi * 2
+		cluster(group, Vector3.new(x + math.cos(a) * 7, 0.4, z + math.sin(a) * 7), color, scale * 0.7, rng, false)
+	end
+	local core = cluster(group, Vector3.new(x, 0.4, z), color, scale, rng, true)
+	local light = core:FindFirstChildWhichIsA("PointLight", true)
+	if light then
+		light.Range = 70
+		light.Brightness = 2
+	end
+end
+
+local function buildHub()
+	local folder = Instance.new("Folder")
+	folder.Name = "Hub"
+	folder.Parent = root
+
+	local r = W.Hub.Radius
+	local plaza = decorPart(folder, Vector3.new(0.6, r * 2, r * 2), CFrame.new(W.Hub.X, 0.15, W.Hub.Z) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(58, 64, 88), Enum.Material.Cobblestone, Enum.PartType.Cylinder)
+	plaza.CanCollide = true
+	decorPart(folder, Vector3.new(0.2, r * 2 + 3, r * 2 + 3), CFrame.new(W.Hub.X, 0.05, W.Hub.Z) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(150, 190, 255), Enum.Material.Neon, Enum.PartType.Cylinder)
+	beacon(folder, W.Hub.X, W.Hub.Z - 4, Color3.fromRGB(150, 190, 255), 4.5, "DepotBeacon")
+
+	for _, biome in W.Biomes do
+		local dx, dz = biome.X - W.Hub.X, biome.Z - W.Hub.Z
+		local len = math.sqrt(dx * dx + dz * dz)
+		local dir = Vector3.new(dx / len, 0, dz / len)
+		local side = Vector3.new(-dir.Z, 0, dir.X)
+		local pos = Vector3.new(W.Hub.X, 0, W.Hub.Z) + dir * (r - 9) + side * 11
+		local face = Vector3.new(W.Hub.X, 0, W.Hub.Z) + dir * 6
+		decorPart(folder, Vector3.new(0.7, 6, 0.7), CFrame.new(pos + Vector3.new(0, 3, 0)), Color3.fromRGB(30, 32, 44), Enum.Material.Metal)
+		local sign = decorPart(folder, Vector3.new(13, 3.4, 0.5), CFrame.lookAt(pos + Vector3.new(0, 6.6, 0), Vector3.new(face.X, 6.6, face.Z)), Color3.fromRGB(24, 28, 42), Enum.Material.Metal)
+		local compass = math.abs(dx) > math.abs(dz) and (dx < 0 and "West" or "East") or (dz < 0 and "North" or "South")
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = Enum.NormalId.Front
+		gui.SizeStudsPerPixel = 0.035
+		gui.LightInfluence = 0
+		gui.Brightness = 2
+		gui.Parent = sign
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.GothamBlack
+		label.TextScaled = true
+		label.TextColor3 = c3(biome.Color)
+		label.Text = ("%s\n%s"):format(biome.Name:upper(), compass:upper())
+		label.Parent = gui
+	end
+
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "Spawn"
 	spawn.Anchored = true
+	spawn.Neutral = true
 	spawn.Transparency = 1
 	spawn.CanCollide = false
-	spawn.Size = Vector3.new(6, 1, 6)
-	spawn.Position = Vector3.new(0, 0.5, -90)
+	spawn.Size = Vector3.new(8, 1, 8)
+	spawn.Position = Vector3.new(W.Spawn.X, 0.6, W.Spawn.Z)
 	local decal = spawn:FindFirstChildOfClass("Decal")
 	if decal then
 		decal:Destroy()
 	end
+	spawn.Parent = folder
+end
+
+---------------------------------------------------------------- blast sites
+
+local function buildSites()
+	local folder = Instance.new("Folder")
+	folder.Name = "Sites"
+	folder.Parent = root
+	local half = (Geometry.Extent() + 6) / 2
+	local dark = Color3.fromRGB(30, 34, 46)
+
+	for _, biome in W.Biomes do
+		beacon(folder, biome.X, biome.Z, c3(biome.Color), 5, biome.Id .. "Beacon")
+	end
+
+	for _, site in W.Sites do
+		local biome
+		for _, b in W.Biomes do
+			if b.Id == site.Biome then
+				biome = b
+			end
+		end
+		local color = c3(biome.Color)
+		local origin = Geometry.Origin(site.Id)
+
+		local padPart = mk(folder, Vector3.new(half * 2, 1, half * 2), CFrame.new(origin + Vector3.new(0, -0.3, 0)), Color3.fromRGB(34, 38, 52), Enum.Material.Slate)
+		padPart.Name = "Pad" .. site.Id
+		for _, sgn in { -1, 1 } do
+			decorPart(folder, Vector3.new(half * 2, 0.2, 0.4), CFrame.new(origin + Vector3.new(0, 0.25, sgn * half)), color, Enum.Material.Neon)
+			decorPart(folder, Vector3.new(0.4, 0.2, half * 2), CFrame.new(origin + Vector3.new(sgn * half, 0.25, 0)), color, Enum.Material.Neon)
+		end
+
+		local stationPos = Geometry.Station(site.Id)
+		mk(folder, Vector3.new(4.5, 0.6, 4.5), CFrame.new(stationPos + Vector3.new(0, 0.3, 0)), dark, Enum.Material.Metal)
+		mk(folder, Vector3.new(3, 1.4, 3), CFrame.new(stationPos + Vector3.new(0, 1.2, 0)), Color3.fromRGB(46, 52, 72), Enum.Material.Metal)
+		local plunger = mk(folder, Vector3.new(1.2, 2.2, 1.2), CFrame.new(stationPos + Vector3.new(0, 2.9, 0)), color, Enum.Material.Neon)
+		plunger.Name = "Station" .. site.Id
+		plunger:SetAttribute("SiteId", site.Id)
+		CollectionService:AddTag(plunger, "SiteStation")
+
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.ActionText = "Start blasting"
+		prompt.ObjectText = site.Name
+		prompt.HoldDuration = 0
+		prompt.MaxActivationDistance = 12
+		prompt.RequiresLineOfSight = false
+		prompt.Parent = plunger
+
+		local gui = Instance.new("BillboardGui")
+		gui.Size = UDim2.fromOffset(260, 56)
+		gui.StudsOffsetWorldSpace = Vector3.new(0, 4.5, 0)
+		gui.MaxDistance = 120
+		gui.LightInfluence = 0
+		gui.Adornee = plunger
+		gui.Parent = plunger
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.GothamBold
+		label.TextSize = 17
+		label.TextColor3 = color
+		label.TextStrokeTransparency = 0.4
+		label.Text = site.Name .. "\nFree"
+		label.Parent = gui
+
+		World.Registry.Sites[site.Id] = { Station = plunger, Prompt = prompt, Label = label, Name = site.Name }
+	end
+end
+
+function World.SetSiteStatus(siteId, status)
+	local entry = World.Registry.Sites[siteId]
+	if entry then
+		entry.Label.Text = entry.Name .. "\n" .. status
+	end
+end
+
+---------------------------------------------------------------- caches
+
+local function buildCaches()
+	local folder = Instance.new("Folder")
+	folder.Name = "Caches"
+	folder.Parent = root
+	local rng = Random.new(777)
+
+	for _, cache in W.Caches do
+		local color = areaColor(cache.X, cache.Z)
+		local model = Instance.new("Model")
+		model.Name = "Cache_" .. cache.Id
+		local pos = Vector3.new(cache.X, 0, cache.Z)
+		local shell = decorPart(model, Vector3.new(4, 3.2, 4), CFrame.new(pos + Vector3.new(0, 1, 0)), Color3.fromRGB(40, 44, 60), Enum.Material.Slate, Enum.PartType.Ball)
+		for i = 1, 4 do
+			local a = (i / 4) * math.pi * 2
+			local h = 2.2 + rng:NextNumber() * 1.6
+			decorPart(model, Vector3.new(0.8, h, 0.8), CFrame.new(pos + Vector3.new(math.cos(a) * 0.9, 1.6 + h / 2, math.sin(a) * 0.9)) * CFrame.Angles(math.sin(a) * 0.35, a, -math.cos(a) * 0.35), color, Enum.Material.Neon)
+		end
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 14
+		light.Brightness = 1.2
+		light.Shadows = false
+		light.Parent = shell
+
+		local sparkle = Instance.new("ParticleEmitter")
+		sparkle.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		sparkle.Rate = 5
+		sparkle.Lifetime = NumberRange.new(1.5, 2.5)
+		sparkle.Speed = NumberRange.new(1, 2)
+		sparkle.Size = NumberSequence.new(0.5, 0)
+		sparkle.LightEmission = 1
+		sparkle.Color = ColorSequence.new(color)
+		sparkle.Parent = shell
+
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.ActionText = "Crack open"
+		prompt.ObjectText = "Geode cache"
+		prompt.HoldDuration = 0.6
+		prompt.MaxActivationDistance = 10
+		prompt.RequiresLineOfSight = false
+		prompt.Parent = shell
+
+		model:SetAttribute("CacheId", cache.Id)
+		CollectionService:AddTag(model, "Cache")
+		model.Parent = folder
+		World.Registry.Caches[cache.Id] = { Model = model, Prompt = prompt }
+	end
+end
+
+---------------------------------------------------------------- entry point
+
+function World.Build()
+	root = workspace:FindFirstChild("World")
+	if root then
+		root:Destroy()
+	end
+	root = Instance.new("Folder")
+	root.Name = "World"
+	root.Parent = workspace
+
+	local old = workspace:FindFirstChild("Ground")
+	if old then
+		old:Destroy()
+	end
+	local oldSpawn = workspace:FindFirstChild("Spawn")
+	if oldSpawn then
+		oldSpawn:Destroy()
+	end
+
+	buildLighting()
+	local spires, rng = buildTerrain()
+	buildDecor(spires, rng)
+	buildRoads()
+	buildHub()
+	buildSites()
+	buildCaches()
 end
 
 return World

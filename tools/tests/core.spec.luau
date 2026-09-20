@@ -158,7 +158,7 @@ end)
 
 test("schema: default, reconcile, migrate and sanitize", function()
 	local d = Schema.Migrate(nil)
-	eq(d.SchemaVersion, 1, "version")
+	eq(d.SchemaVersion, Schema.CURRENT_VERSION, "version")
 	local partial = Schema.Migrate({ Shards = 50.7, Stats = { BestChain = 12 } })
 	eq(partial.Shards, 50, "floored")
 	eq(partial.Stats.BestChain, 12, "kept")
@@ -255,6 +255,74 @@ test("slowburn only appears from stratum 3", function()
 		end
 	end
 	eq(saw, true, "stratum 3 spawns slowburn")
+end)
+
+test("world: sites are unique, in bounds, and clear of each other, hub and paths", function()
+	local W = require("../../src/ReplicatedStorage/Shared/Config/World")
+	eq(#W.Sites, 12, "3 biomes x 4 sites")
+	local half = (Tuning.GridSize * Tuning.CellSize + 6) / 2
+	for i, a in W.Sites do
+		eq(a.Id, i, "sequential id")
+		if a.X - half < W.Bounds.MinX or a.X + half > W.Bounds.MaxX or a.Z - half < W.Bounds.MinZ or a.Z + half > W.Bounds.MaxZ then
+			error("site out of bounds: " .. a.Name)
+		end
+		if math.sqrt((a.X - W.Hub.X) ^ 2 + (a.Z - W.Hub.Z) ^ 2) < W.Hub.Radius + half then error("site overlaps hub: " .. a.Name) end
+		if W.DistToPath(a.X, a.Z) < half + W.PathHalfWidth then error("site blocks a path: " .. a.Name) end
+		for j = i + 1, #W.Sites do
+			local b = W.Sites[j]
+			if math.abs(a.X - b.X) < half * 2 + 4 and math.abs(a.Z - b.Z) < half * 2 + 4 then error("sites overlap: " .. a.Name .. " / " .. b.Name) end
+		end
+	end
+end)
+
+test("world: every site stratum has a matching config and a crystal unlocked by it", function()
+	local W = require("../../src/ReplicatedStorage/Shared/Config/World")
+	local Strata = require("../../src/ReplicatedStorage/Shared/Config/Strata")
+	for _, s in W.Sites do
+		if Strata[s.Stratum] == nil then error("no stratum config for " .. s.Name) end
+	end
+	for n = 1, #Strata do
+		local found = false
+		for _, def in Crystals.Defs do if def.Stratum == n then found = true end end
+		if not found then error("stratum " .. n .. " introduces no crystal") end
+	end
+end)
+
+test("world: caches are unique, in bounds, and off sites and paths", function()
+	local W = require("../../src/ReplicatedStorage/Shared/Config/World")
+	local seen = {}
+	for _, c in W.Caches do
+		if seen[c.Id] then error("duplicate cache id " .. c.Id) end
+		seen[c.Id] = true
+		if c.Reward <= 0 then error("bad reward " .. c.Id) end
+		if c.X < W.Bounds.MinX or c.X > W.Bounds.MaxX or c.Z < W.Bounds.MinZ or c.Z > W.Bounds.MaxZ then error("cache out of bounds " .. c.Id) end
+		if W.DistToPath(c.X, c.Z) < W.PathHalfWidth + 4 then error("cache on a path " .. c.Id) end
+		for _, s in W.Sites do
+			if math.sqrt((c.X - s.X) ^ 2 + (c.Z - s.Z) ^ 2) < W.SiteClearRadius then error("cache inside site clearance " .. c.Id .. " / " .. s.Name) end
+		end
+		if math.sqrt((c.X - W.Hub.X) ^ 2 + (c.Z - W.Hub.Z) ^ 2) < W.Hub.Radius + 10 and c.Biome ~= "Hub" then error("biome cache in hub " .. c.Id) end
+	end
+end)
+
+test("world: area names and segment distance", function()
+	local W = require("../../src/ReplicatedStorage/Shared/Config/World")
+	eq(W.AreaName(0, 0), "Blastwright Depot", "hub")
+	eq(W.AreaName(-190, 0), "Glimmer Shallows", "shallows")
+	eq(W.AreaName(190, 10), "Prism Veins", "prism")
+	eq(W.AreaName(0, -230), "Ember Hollows", "ember")
+	eq(W.AreaName(-95, 300), "The Deep Roads", "between")
+	eq(W.DistToSegment(5, 5, 0, 0, 10, 0), 5, "perpendicular")
+	eq(W.DistToSegment(-3, 4, 0, 0, 10, 0), 5, "clamped to endpoint")
+end)
+
+test("schema: v1 saves migrate to v2 with caches and keep progress", function()
+	local v1 = { SchemaVersion = 1, Shards = 321, Upgrades = { ExtraCharge = 2 } }
+	local d = Schema.Migrate(v1)
+	eq(d.SchemaVersion, Schema.CURRENT_VERSION, "version")
+	eq(Schema.CURRENT_VERSION >= 2, true, "v2 exists")
+	eq(d.Shards, 321, "shards kept")
+	eq(d.Upgrades.ExtraCharge, 2, "upgrades kept")
+	eq(type(d.Caches), "table", "caches added")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

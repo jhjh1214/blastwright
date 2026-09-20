@@ -1,5 +1,6 @@
 --!nonstrict
--- All HUD and menus, built in code. Touch-first: every button is at least 48px tall.
+-- All HUD and menus, built in code. Touch-first (buttons >= 40px tall) and kept to the screen edges so the
+-- middle of the view stays clear: the blast HUD sits in the corners, the roaming HUD along the top.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -62,7 +63,7 @@ local function button(parent, text, color, props)
 		BackgroundColor3 = color,
 		Font = FONT,
 		Text = text,
-		TextSize = 20,
+		TextSize = 18,
 		TextColor3 = THEME.Text,
 	}
 	for k, v in props or {} do
@@ -79,35 +80,38 @@ local function commas(n)
 	return (out:gsub("^,", ""))
 end
 
-local gui, shardLabel, seamLabel, chainLabel, previewLabel, toastHolder, tierLabel
-local chargeRow, panel, panelScroll, detonateButton
+local gui, shardLabel, locationLabel, cacheLabel, hintLabel, seamLabel, chainLabel, previewFrame, previewLabel
+local toastHolder, tierLabel, chargeColumn, panel, panelScroll, detonateButton
+local roamGroup, blastGroup
 local activeTab = "Forge"
 local displayShards = 0
 local chargeButtons = {}
+local everEngaged = false
 
 -- Callbacks provided by Input
 UI.OnDetonate = nil
 UI.OnClear = nil
+UI.OnLeave = nil
+
+local function fullGroup(name)
+	return mk("Frame", { Name = name, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, gui)
+end
 
 function UI.Init()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 	gui = mk("ScreenGui", { Name = "BlastwrightUI", ResetOnSpawn = false, IgnoreGuiInset = false, DisplayOrder = 5 }, playerGui)
 
-	-- Shards (top left)
-	local shardFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.15, Position = UDim2.new(0, 12, 0, 8), Size = UDim2.fromOffset(190, 46) }, gui)
+	-- Always visible: shards (top-left) and toasts / tier banner
+	local shardFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.2, Position = UDim2.new(0, 12, 0, 8), Size = UDim2.fromOffset(170, 40) }, gui)
 	corner(shardFrame, 12)
-	shardLabel = label(shardFrame, "◆ 0", 26, THEME.Gold, { Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center })
+	shardLabel = label(shardFrame, "◆ 0", 24, THEME.Gold, { Size = UDim2.fromScale(1, 1) })
 
-	-- Seam info (top center)
-	seamLabel = label(gui, "", 18, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(300, 28) })
+	toastHolder = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 96), Size = UDim2.fromOffset(440, 120) }, gui)
+	mk("UIListLayout", { HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 4) }, toastHolder)
 
-	-- Live chain readout
-	chainLabel = label(gui, "", 44, THEME.Hot, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 44), Size = UDim2.fromOffset(340, 60), Font = Enum.Font.GothamBlack })
-
-	-- Tier banner
 	tierLabel = label(gui, "", 64, THEME.Gold, {
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.42),
+		Position = UDim2.fromScale(0.5, 0.36),
 		Size = UDim2.fromOffset(560, 90),
 		Font = Enum.Font.GothamBlack,
 		TextTransparency = 1,
@@ -116,32 +120,21 @@ function UI.Init()
 	})
 	mk("UISizeConstraint", { MaxSize = Vector2.new(700, 110) }, tierLabel)
 
-	-- Toasts
-	toastHolder = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 112), Size = UDim2.fromOffset(420, 120) }, gui)
-	mk("UIListLayout", { HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 4) }, toastHolder)
+	----------------------------------------------------------- roaming HUD
+	roamGroup = fullGroup("Roam")
+	locationLabel = label(roamGroup, "", 20, THEME.Text, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(320, 28) })
+	cacheLabel = label(roamGroup, "", 16, THEME.Dim, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.fromOffset(170, 22), TextXAlignment = Enum.TextXAlignment.Left })
+	hintLabel = label(roamGroup, "Explore the mine. Find a glowing blast pad and use its station to start blasting.", 17, THEME.Text, {
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -16),
+		Size = UDim2.fromOffset(460, 44),
+		TextWrapped = true,
+	})
 
-	-- Bottom controls
-	previewLabel = label(gui, "", 20, THEME.Text, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -128), Size = UDim2.fromOffset(420, 30) })
-
-	chargeRow = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -76), Size = UDim2.fromOffset(420, 44) }, gui)
-	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 8) }, chargeRow)
-
-	local bottom = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.fromOffset(420, 58) }, gui)
-	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 10) }, bottom)
-	local clear = button(bottom, "Clear", THEME.Row, { Size = UDim2.fromOffset(100, 54), LayoutOrder = 1 })
-	detonateButton = button(bottom, "DETONATE", THEME.Hot, { Size = UDim2.fromOffset(220, 58), TextSize = 26, LayoutOrder = 2, Font = Enum.Font.GothamBlack })
-	clear.Activated:Connect(function()
-		if UI.OnClear then UI.OnClear() end
-	end)
-	detonateButton.Activated:Connect(function()
-		if UI.OnDetonate then UI.OnDetonate() end
-	end)
-
-	-- Right-side menu buttons
-	local side = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(110, 110) }, gui)
-	mk("UIListLayout", { Padding = UDim.new(0, 8) }, side)
+	local menu = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(200, 40) }, roamGroup)
+	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right, Padding = UDim.new(0, 8) }, menu)
 	for _, name in { "Forge", "Codex" } do
-		local b = button(side, name, THEME.Panel, { Size = UDim2.fromOffset(110, 48) })
+		local b = button(menu, name, THEME.Panel, { Size = UDim2.fromOffset(94, 40) })
 		b.Activated:Connect(function()
 			AudioManager.Play("Click")
 			local sameTabOpen = State.PanelOpen and activeTab == name
@@ -149,7 +142,34 @@ function UI.Init()
 		end)
 	end
 
-	-- Forge / Codex panel
+	----------------------------------------------------------- blast HUD (corners only)
+	blastGroup = fullGroup("Blast")
+	blastGroup.Visible = false
+
+	local leave = button(blastGroup, "< Leave", THEME.Panel, { Position = UDim2.new(0, 12, 0, 56), Size = UDim2.fromOffset(110, 40) })
+	leave.Activated:Connect(function()
+		if UI.OnLeave then UI.OnLeave() end
+	end)
+
+	seamLabel = label(blastGroup, "", 17, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 8), Size = UDim2.fromOffset(340, 24) })
+	previewFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.35, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 34), Size = UDim2.fromOffset(340, 30) }, blastGroup)
+	corner(previewFrame, 10)
+	previewLabel = label(previewFrame, "", 17, THEME.Text, { Size = UDim2.fromScale(1, 1) })
+	chainLabel = label(blastGroup, "", 40, THEME.Hot, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 68), Size = UDim2.fromOffset(340, 52), Font = Enum.Font.GothamBlack })
+
+	chargeColumn = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -12), Size = UDim2.fromOffset(150, 180) }, blastGroup)
+	mk("UIListLayout", { VerticalAlignment = Enum.VerticalAlignment.Bottom, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, chargeColumn)
+	local clear = button(chargeColumn, "Clear", THEME.Row, { Size = UDim2.fromOffset(150, 42), LayoutOrder = 100 })
+	clear.Activated:Connect(function()
+		if UI.OnClear then UI.OnClear() end
+	end)
+
+	detonateButton = button(blastGroup, "DETONATE", THEME.Hot, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -12), Size = UDim2.fromOffset(190, 62), TextSize = 26, Font = Enum.Font.GothamBlack })
+	detonateButton.Activated:Connect(function()
+		if UI.OnDetonate then UI.OnDetonate() end
+	end)
+
+	----------------------------------------------------------- Forge / Codex panel
 	panel = mk("Frame", { BackgroundColor3 = THEME.Bg, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.92, 0, 0.78, 0), Visible = false, ZIndex = 10 }, gui)
 	corner(panel, 16)
 	mk("UISizeConstraint", { MaxSize = Vector2.new(560, 460) }, panel)
@@ -183,9 +203,27 @@ function UI.Init()
 	end)
 end
 
+function UI.SetEngaged(engaged)
+	if not gui then return end
+	blastGroup.Visible = engaged
+	roamGroup.Visible = not engaged
+	if engaged then
+		everEngaged = true
+		UI.SetPanel(false)
+	end
+	hintLabel.Visible = not everEngaged
+end
+
+function UI.SetLocation(text)
+	if locationLabel then
+		locationLabel.Text = text
+	end
+end
+
 function UI.SetPreview(text)
 	if previewLabel then
 		previewLabel.Text = text
+		previewFrame.Visible = text ~= ""
 	end
 end
 
@@ -196,8 +234,8 @@ function UI.SetChain(pops, mult)
 		return
 	end
 	chainLabel.Text = ("CHAIN %d   x%.1f"):format(pops, mult)
-	chainLabel.TextSize = 40
-	TweenService:Create(chainLabel, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextSize = 46 }):Play()
+	chainLabel.TextSize = 36
+	TweenService:Create(chainLabel, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextSize = 42 }):Play()
 end
 
 function UI.ShowTier(name, bonus, total)
@@ -206,8 +244,8 @@ function UI.ShowTier(name, bonus, total)
 	tierLabel.TextTransparency = 0
 	tierLabel.TextStrokeTransparency = 0.3
 	tierLabel.Rotation = -4
-	tierLabel.Position = UDim2.fromScale(0.5, 0.46)
-	TweenService:Create(tierLabel, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0.4), Rotation = 0 }):Play()
+	tierLabel.Position = UDim2.fromScale(0.5, 0.4)
+	TweenService:Create(tierLabel, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0.34), Rotation = 0 }):Play()
 	task.delay(1.4, function()
 		TweenService:Create(tierLabel, TweenInfo.new(0.5), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
 	end)
@@ -216,10 +254,10 @@ end
 function UI.Toast(text, kind)
 	if not toastHolder then return end
 	local color = kind == "Reward" and THEME.Gold or (kind == "Error" and THEME.Bad or THEME.Text)
-	local t = label(toastHolder, text, 20, color, { Size = UDim2.new(1, 0, 0, 28), TextTransparency = 1 })
+	local t = label(toastHolder, text, 19, color, { Size = UDim2.new(1, 0, 0, 26), TextTransparency = 1 })
 	TweenService:Create(t, TweenInfo.new(0.2), { TextTransparency = 0 }):Play()
 	AudioManager.Play(kind == "Error" and "Error" or "Reward")
-	task.delay(2.6, function()
+	task.delay(2.8, function()
 		TweenService:Create(t, TweenInfo.new(0.4), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
 		task.delay(0.45, function() t:Destroy() end)
 	end)
@@ -228,10 +266,10 @@ end
 local function row(order, titleText, desc, buttonText, enabled, onClick, titleColor)
 	local f = mk("Frame", { BackgroundColor3 = THEME.Row, Size = UDim2.new(1, -8, 0, 76), LayoutOrder = order, ZIndex = 11 }, panelScroll)
 	corner(f, 12)
-	label(f, titleText, 20, titleColor or THEME.Text, { Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -150, 0, 26), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
+	label(f, titleText, 19, titleColor or THEME.Text, { Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -150, 0, 26), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
 	label(f, desc, 15, THEME.Dim, { Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -150, 0, 38), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 12 })
 	if buttonText then
-		local b = button(f, buttonText, enabled and THEME.Accent or THEME.Panel, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(120, 52), TextSize = 17, ZIndex = 12, TextColor3 = enabled and THEME.Bg or THEME.Dim })
+		local b = button(f, buttonText, enabled and THEME.Accent or THEME.Panel, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(120, 52), TextSize = 16, ZIndex = 12, TextColor3 = enabled and THEME.Bg or THEME.Dim })
 		b.Activated:Connect(function()
 			if onClick then onClick() end
 		end)
@@ -277,14 +315,13 @@ local function rebuildPanel()
 			end
 		end
 		order += 1
-		header(order, "Strata")
+		header(order, "Mine areas (unlock to blast there)")
 		for n, s in Config.Strata do
 			order += 1
 			local unlocked = n <= d.StrataUnlocked
-			local text = unlocked and (d.ActiveStratum == n and "Active" or "Select") or ("Unlock  ◆ " .. commas(s.Cost))
-			local can = (unlocked and d.ActiveStratum ~= n) or (n == d.StrataUnlocked + 1 and d.Shards >= s.Cost)
-			row(order, ("%d. %s"):format(n, s.Name), s.Description, text, can, function()
-				Remotes.Buy:FireServer("Stratum", tostring(n))
+			local can = n == d.StrataUnlocked + 1 and d.Shards >= s.Cost
+			row(order, ("%d. %s"):format(n, s.Name), s.Description, unlocked and "Open" or ("Unlock  ◆ " .. commas(s.Cost)), can, function()
+				if not unlocked then Remotes.Buy:FireServer("Stratum", tostring(n)) end
 			end)
 		end
 	else
@@ -317,7 +354,7 @@ local function rebuildCharges()
 		if State.Data.UnlockedCharges[id] then
 			local def = Config.Charges.Defs[id]
 			local selected = State.SelectedCharge == id
-			local b = button(chargeRow, def.Name, selected and THEME.Accent or THEME.Panel, { Size = UDim2.fromOffset(150, 44), TextSize = 16, LayoutOrder = i, TextColor3 = selected and THEME.Bg or THEME.Text })
+			local b = button(chargeColumn, def.Name, selected and THEME.Accent or THEME.Panel, { Size = UDim2.fromOffset(150, 42), TextSize = 15, LayoutOrder = i, TextColor3 = selected and THEME.Bg or THEME.Text })
 			b.Activated:Connect(function()
 				AudioManager.Play("Click")
 				State.SelectedCharge = id
@@ -331,8 +368,14 @@ end
 function UI.Refresh()
 	if not gui or not State.Data then return end
 	local d = State.Data
-	local stratumName = Config.Strata[d.ActiveStratum] and Config.Strata[d.ActiveStratum].Name or ""
-	seamLabel.Text = ("%s   |   Charges %d/%d"):format(stratumName, d.ChargesLeft - #State.Placed, d.ChargesMax)
+	seamLabel.Text = ("Charges %d / %d"):format(d.ChargesLeft - #State.Placed, d.ChargesMax)
+
+	local found, total = 0, #Config.World.Caches
+	for _ in d.Caches or {} do
+		found += 1
+	end
+	cacheLabel.Text = ("Geode caches %d/%d"):format(found, total)
+
 	rebuildCharges()
 	rebuildPanel()
 end

@@ -8,6 +8,7 @@ local State = {
 	Placed = {}, -- { {X=, Z=, Kind=} } charges the player has planted but not yet detonated
 	SelectedCharge = "Basic",
 	Busy = false, -- true while our own volley is playing back
+	Engaged = false, -- true while at a blast site (fixed camera, blast HUD)
 	PanelOpen = false,
 }
 

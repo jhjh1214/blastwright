@@ -4,13 +4,14 @@
 **Blastwright** is a PvE Roblox game: plant charges in crystal caverns, detonate, and plan chain reactions for shards. Concept approved 2026-09-21. Design: `docs/GAME_DESIGN.md`. Architecture: `docs/TECHNICAL_ARCHITECTURE.md`.
 
 ## Status (update this section as work lands)
-- Done and unit-tested (21 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
+- Done and unit-tested (26 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
 - Runs in Studio (developer-confirmed) but has no automated tests and only a first smoke run: `Game`, `Data`, `World`, all Client modules.
 - Developer confirmed on 2026-09-21 that the game runs in Studio and shows the cavern and UI (after the lazy-DataStore fix). Developer reported it "feels very good" (2026-09-21); audio playback not explicitly confirmed.
 - Audio: 7 SFX cues wired from Creator Store results (`tools/asset-search`); **unheard, playback unconfirmed** until Output shows `[Audio] ... OK`.
-- Not started: monetization, external visual assets, music/ambience, mobile testing, world/hub, daily retention.
+- Explorable mine (hub, 3 biomes, 12 blast pads, 17 geode caches, terrain, lighting) and the reworked HUD are written and compile-checked; **not yet seen in Studio**. Save schema is v2 (`Caches`).
+- Not started: monetization, external visual assets (world look is terrain + Parts), music/ambience, mobile testing, daily retention.
 - Stratum 3 (Slowburn delayed-fuse crystal) added and unit-tested; its visuals, fuse flash and Codex entry are **not yet seen in Studio**.
-- Next: developer checks stratum 3 in Studio (needs 4000 shards, or temporarily lower `Strata[3].Cost`), then visual assets.
+- Next: developer playtests the new world (see `docs/TESTING.md`); fix what breaks; then daily objectives, monetization, asset pass.
 
 ## Environment (Windows, PowerShell)
 Rojo 7.7.0 (`C:\Tools\Rojo`), Git, Node, Python. Asset search: `python tools/asset-search/audio_search.py <cue> <max_secs> <keywords...>`. Luau CLI/analyzer/compiler are in `tools/bin` (git-ignored; re-download from the luau-lang GitHub release if missing). Roblox Studio is installed but cannot be driven by Claude.
@@ -41,7 +42,7 @@ Never invent an asset or product ID. Use the Creator Store / Marketplace APIs, i
 Purchases only via `ProcessReceipt` (not built). Product IDs stay `nil` in config until supplied. Save data: `Schema.luau` versioned; bump `CURRENT_VERSION` and add a migration for any schema change.
 
 ## Known issues / risks
-- Only smoke-tested in Studio: multi-player, mobile layout, seam end/regen, purchases in Forge and persistence are unverified.
+- The whole roaming world and new UI are unrun. Older systems were only smoke-tested in Studio: multi-player, mobile layout, seam end/regen, purchases in Forge and persistence are unverified.
 - Fun is unproven: the risk is "click and wait". Fix gameplay before adding content.
 - Preview may make planning too easy; Seismograph gating is a first mitigation.
 - Audio picks are metadata-only guesses. Visuals are procedural Parts placeholder quality.

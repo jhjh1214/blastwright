@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 1
+Schema.CURRENT_VERSION = 2
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -14,12 +14,20 @@ function Schema.Default(): { [string]: any }
 		Codex = { Discovered = {}, Mutated = {} }, -- [crystalId] = true
 		Stats = { SeamsCleared = 0, BestChain = 0, TotalPops = 0, TotalShards = 0 },
 		Settings = { Music = true, Sfx = true },
+		Caches = {}, -- [cacheId] = true for geode caches this player has looted
 		Purchases = {}, -- receipt ids, reserved for monetization
 	}
 end
 
 -- Migration steps: Migrations[n] upgrades data from version n-1 to n.
-local Migrations: { [number]: (data: { [string]: any }) -> () } = {}
+local Migrations: { [number]: (data: { [string]: any }) -> () } = {
+	-- v2: exploration world. Adds looted geode caches. (Progress.ActiveStratum is now unused: stratum comes from the site.)
+	[2] = function(data)
+		if type(data.Caches) ~= "table" then
+			data.Caches = {}
+		end
+	end,
+}
 
 -- Fill missing keys from defaults and fix wrong-typed values. Extra keys are kept.
 local function reconcile(data: { [string]: any }, default: { [string]: any })
