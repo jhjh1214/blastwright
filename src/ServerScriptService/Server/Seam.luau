@@ -12,10 +12,12 @@ local function makeRng(seed: number)
 end
 
 -- crystals: Config.Crystals (Defs + Order), tuning: Config.Tuning
-function Seam.Generate(crystals: any, tuning: any, stratum: number, seed: number)
+-- mutationChance overrides tuning.MutationChance (used by the Prismatic Luck gamepass).
+function Seam.Generate(crystals: any, tuning: any, stratum: number, seed: number, mutationChance: number?)
 	local rng = makeRng(seed)
 	local size = tuning.GridSize
 	local emptyWeight = 12
+	local chance = mutationChance or tuning.MutationChance
 
 	local pool: { { Id: string, Weight: number } } = {}
 	local total = emptyWeight
@@ -35,7 +37,7 @@ function Seam.Generate(crystals: any, tuning: any, stratum: number, seed: number
 				roll -= entry.Weight
 				if roll < 0 then
 					local def = crystals.Defs[entry.Id]
-					local mutated = def.Value > 0 and rng() < tuning.MutationChance
+					local mutated = def.Value > 0 and rng() < chance
 					cells[(z - 1) * size + x] = { Kind = entry.Id, Mutated = mutated or nil }
 					break
 				end

@@ -11,7 +11,7 @@
 | 7 World/content | Explorable mine built (hub, 3 biomes, 12 pads, 17 caches, terrain); **unseen in Studio** |
 | 8 Collection | Minimal Codex |
 | 9 Economy | Paper math only |
-| 10 Monetization | Not started |
+| 10 Monetization | Framework built (products, ProcessReceipt, shop tab); **no IDs, never tested live** |
 | 11 UI polish | Blast HUD moved to screen corners; roam HUD separate; further polish pending |
 | 12 Audio/VFX polish | SFX wired (unheard); no music/ambience |
 | 13 Mobile | Not tested |

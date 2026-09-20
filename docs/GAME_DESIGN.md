@@ -8,6 +8,9 @@ The game is a walkable mine, not a single screen. Layout data and tests: `Config
 - **Geode caches:** 17 hidden caches (5 per biome, 2 near the hub) reward shards once per player (100 hub / 60 Shallows / 150 Prism / 400 Ember). They sit off the roads, so exploring pays.
 - **Terrain and look:** Roblox Terrain rock, cliffs, spires and mounds, glowing crystal clusters, lanterns, and drifting motes tinted by area.
 
+## Daily objectives
+Menu > Daily shows three objectives that rotate each UTC day (same for everyone, deterministic from the day number). Targets and rewards rise by slot. Progress is recorded by the server as you blast. Claiming pays shards once. Unclaimed rewards are lost at reset, but a missed day costs nothing else (no streaks). A dot on the Menu button and a pulsing objective tell you when one is ready.
+
 ## Guidance
 `Shared/Objectives.luau` (pure, tested) decides the next step: go to a blast pad, open the Forge for a first upgrade, earn shards for the next area, unlock it, then hunt caches. The client `Guide` shows it as an objective card, a gold floating marker with distance, a glowing dot trail on the ground, an edge-of-screen arrow when the target is off-view, and a pulsing Forge button. In blast mode a short hint says "Tap the grid to plant a charge" then "Press DETONATE" until the player has popped 40 crystals. New players get a welcome panel; the "?" button reopens it. Caches deliberately get no arrow.
 

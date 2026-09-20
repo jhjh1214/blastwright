@@ -7,6 +7,10 @@
 - Volley payout: sum of (crystal value x multiplier) x (1 + tier bonus).
 - Seam clear bonus: 25% of seam earnings x cleared fraction, if at least 50% cleared.
 
+- Daily objectives: 3 per day, 120 / 250 / 450 shards by slot, times (1 + 0.5 x extra areas unlocked).
+- Geode caches: one-time 60-400 shards each (17 total).
+- Shard packs (real money): see `MONETIZATION.md`.
+
 ## Sinks
 Upgrades, charge unlocks, stratum unlocks (see `PROGRESSION.md`).
 

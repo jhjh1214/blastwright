@@ -25,4 +25,32 @@ Return to Claude and say "Done: playtest" and paste any Output errors or notes o
 ========================================
 ```
 
-Later (not needed yet): publish the experience; create Developer Products and Gamepasses (see `MONETIZATION.md`); enable Studio access to API Services if you want to test persistence.
+```
+========================================
+MANUAL ACTION REQUIRED (when you want to sell things)
+========================================
+ACTION:
+Publish the experience, then create 4 Developer Products and 2 Gamepasses.
+
+WHY:
+Only your Roblox account can create products. Until then the Shop shows "Not for sale yet" and everything else works.
+
+EXACT STEPS:
+1. Studio > File > Publish to Roblox (also enables DataStore saving and the Studio API access toggle below).
+2. Studio > Game Settings > Security > turn on "Enable Studio Access to API Services" (lets you test saving in Studio).
+3. create.roblox.com > Creations > your experience > Monetization > Developer Products > Create. Make four:
+   Shard Pouch, Shard Satchel, Shard Chest, Shard Vault (see docs/MONETIZATION.md for suggested prices).
+4. Same area > Passes > Create. Make two: "2x Shards" and "Prismatic Luck".
+5. Copy each product's numeric ID.
+6. Paste the IDs into src/ReplicatedStorage/Shared/Config/Products.luau (replace each `Id = nil`), or send them to Claude to do it.
+7. Test in a published Private Server (Studio test purchases cannot prove the live flow).
+
+WHAT YOU SHOULD SEE:
+The Shop tab shows "Buy" instead of "Not for sale yet". After buying a shard pack the shard total rises and it stays after rejoining.
+
+THEN:
+Return to Claude and say "Done: products created" with the IDs.
+========================================
+```
+
+Also set the experience's max players to 12 or fewer (Game Settings > Basic Info) because there are 12 blast pads.

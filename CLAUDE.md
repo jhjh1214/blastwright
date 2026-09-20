@@ -4,15 +4,16 @@
 **Blastwright** is a PvE Roblox game: plant charges in crystal caverns, detonate, and plan chain reactions for shards. Concept approved 2026-09-21. Design: `docs/GAME_DESIGN.md`. Architecture: `docs/TECHNICAL_ARCHITECTURE.md`.
 
 ## Status (update this section as work lands)
-- Done and unit-tested (33 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
+- Done and unit-tested (46 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
 - Runs in Studio (developer-confirmed) but has no automated tests and only a first smoke run: `Game`, `Data`, `World`, all Client modules.
 - Developer confirmed on 2026-09-21 that the game runs in Studio and shows the cavern and UI (after the lazy-DataStore fix). Developer reported it "feels very good" (2026-09-21); audio playback not explicitly confirmed.
 - Audio: 7 SFX cues wired from Creator Store results (`tools/asset-search`); **unheard, playback unconfirmed** until Output shows `[Audio] ... OK`.
 - Explorable mine (hub, 3 biomes, 12 blast pads, 17 geode caches, terrain, lighting) and the reworked HUD are written and compile-checked; **not yet seen in Studio**. Save schema is v2 (`Caches`).
-- Not started: monetization, external visual assets (world look is terrain + Parts), music/ambience, mobile testing, daily retention.
+- Daily objectives (3 per UTC day, claim in Menu > Daily) and the monetization framework (`Purchases.luau`, `Receipts.luau`, `Config/Products.luau`, Shop tab) are written and unit-tested where pure; **unseen in Studio, no product IDs exist**. Save schema is v3 (`Daily`).
+- Not started: external visual assets (world look is terrain + Parts), music/ambience, mobile testing, cosmetics.
 - Stratum 3 (Slowburn delayed-fuse crystal) added and unit-tested; its visuals, fuse flash and Codex entry are **not yet seen in Studio**.
 - Playtest 2026-09-21: world build died on an invalid `SurfaceGui` property (fixed; API checker added). Lighting/crystal glow retuned after "too dark / too bright" feedback; guide system (objective card, marker, trail, edge arrow, welcome panel) added. **Both unseen in Studio.**
-- Next: developer replays; then daily objectives, monetization, asset pass.
+- Next: developer checks Menu > Daily and the Shop tab; creates products when ready (docs/MANUAL_ACTIONS.md); then asset pass and mobile.
 
 ## Environment (Windows, PowerShell)
 Rojo 7.7.0 (`C:\Tools\Rojo`), Git, Node, Python. Asset search: `python tools/asset-search/audio_search.py <cue> <max_secs> <keywords...>`. Luau CLI/analyzer/compiler are in `tools/bin` (git-ignored; re-download from the luau-lang GitHub release if missing). Roblox Studio is installed but cannot be driven by Claude.
@@ -41,7 +42,7 @@ Rojo 7.7.0 (`C:\Tools\Rojo`), Git, Node, Python. Asset search: `python tools/ass
 Never invent an asset or product ID. Use the Creator Store / Marketplace APIs, inspect and strip scripts, record in `docs/ASSET_REGISTRY.md`. If unverifiable, build procedural.
 
 ## Monetization / DataStore
-Purchases only via `ProcessReceipt` (not built). Product IDs stay `nil` in config until supplied. Save data: `Schema.luau` versioned; bump `CURRENT_VERSION` and add a migration for any schema change.
+Purchases only via `ProcessReceipt` (`Server/Purchases.luau`, idempotent via `Receipts.Apply`). Product IDs stay `nil` in `Config/Products.luau` until the developer supplies them; never invent one. Save data: `Schema.luau` versioned; bump `CURRENT_VERSION` and add a migration for any schema change.
 
 ## Known issues / risks
 - The whole roaming world and new UI are unrun. Older systems were only smoke-tested in Studio: multi-player, mobile layout, seam end/regen, purchases in Forge and persistence are unverified.

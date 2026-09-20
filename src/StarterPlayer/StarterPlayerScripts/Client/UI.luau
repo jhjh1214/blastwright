@@ -5,10 +5,12 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
+local Products = Config.Products
 
 local AudioManager = require(script.Parent.AudioManager)
 local State = require(script.Parent.State)
@@ -81,7 +83,8 @@ local function commas(n)
 end
 
 local gui, shardLabel, locationLabel, cacheLabel, objectiveCard, objectiveText, blastHint, seamLabel, chainLabel, previewFrame, previewLabel
-local welcomeFrame
+local welcomeFrame, menuDot
+local tabButtons = {}
 local toastHolder, tierLabel, chargeColumn, panel, panelScroll, detonateButton
 local roamGroup, blastGroup
 local activeTab = "Forge"
@@ -137,16 +140,16 @@ function UI.Init()
 
 	local menu = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(200, 40) }, roamGroup)
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right, Padding = UDim.new(0, 8) }, menu)
-	for _, name in { "Forge", "Codex" } do
-		local b = button(menu, name, THEME.Panel, { Size = UDim2.fromOffset(70, 40), TextSize = 16 })
-		menuButtons[name] = b
-		menuStrokes[name] = mk("UIStroke", { Color = THEME.Gold, Thickness = 3, Enabled = false }, b)
-		b.Activated:Connect(function()
-			AudioManager.Play("Click")
-			local sameTabOpen = State.PanelOpen and activeTab == name
-			UI.SetPanel(not sameTabOpen, name)
-		end)
-	end
+	-- One Menu button (Forge / Daily / Shop / Codex tabs inside). Objectives pulse it under the name "Forge".
+	local menuButton = button(menu, "Menu", THEME.Panel, { Size = UDim2.fromOffset(84, 40), TextSize = 16 })
+	menuButtons.Forge = menuButton
+	menuStrokes.Forge = mk("UIStroke", { Color = THEME.Gold, Thickness = 3, Enabled = false }, menuButton)
+	menuDot = mk("Frame", { BackgroundColor3 = THEME.Bad, Size = UDim2.fromOffset(14, 14), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 4, 0, -4), Visible = false, ZIndex = 3 }, menuButton)
+	corner(menuDot, 7)
+	menuButton.Activated:Connect(function()
+		AudioManager.Play("Click")
+		UI.SetPanel(not State.PanelOpen)
+	end)
 	local help = button(menu, "?", THEME.Panel, { Size = UDim2.fromOffset(36, 40), LayoutOrder = 10 })
 	help.Activated:Connect(function()
 		AudioManager.Play("Click")
@@ -194,10 +197,20 @@ function UI.Init()
 	close.Activated:Connect(function()
 		UI.SetPanel(false)
 	end)
+	local tabBar = mk("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 42), ZIndex = 11 }, panel)
+	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, tabBar)
+	for i, name in { "Forge", "Daily", "Shop", "Codex" } do
+		local tab = button(tabBar, name, THEME.Row, { Size = UDim2.new(0.25, -5, 1, 0), TextSize = 16, LayoutOrder = i, ZIndex = 12 })
+		tabButtons[name] = tab
+		tab.Activated:Connect(function()
+			AudioManager.Play("Click")
+			UI.SetPanel(true, name)
+		end)
+	end
 	panelScroll = mk("ScrollingFrame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(12, 60),
-		Size = UDim2.new(1, -24, 1, -72),
+		Position = UDim2.fromOffset(12, 108),
+		Size = UDim2.new(1, -24, 1, -120),
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 6,
@@ -366,6 +379,11 @@ local function rebuildPanel()
 	end
 	local d = State.Data
 	local titleLabel = panel:FindFirstChild("Title")
+	for name, tab in tabButtons do
+		local selected = name == activeTab
+		tab.BackgroundColor3 = selected and THEME.Accent or THEME.Row
+		tab.TextColor3 = selected and THEME.Bg or THEME.Text
+	end
 
 	if activeTab == "Forge" then
 		titleLabel.Text = "Forge"
@@ -402,6 +420,41 @@ local function rebuildPanel()
 				if not unlocked then Remotes.Buy:FireServer("Stratum", tostring(n)) end
 			end)
 		end
+	elseif activeTab == "Daily" then
+		titleLabel.Text = "Daily objectives"
+		local secs = math.max(0, math.floor((State.DailyResetAt or 0) - os.clock()))
+		header(0, ("Resets in %dh %02dm (unclaimed rewards are lost)"):format(secs // 3600, (secs % 3600) // 60))
+		for _, item in d.Dailies or {} do
+			local done = item.Progress >= item.Target
+			local btnText = item.Claimed and "Claimed" or (done and ("Claim  ◆ " .. commas(item.Reward)) or ("%d / %d"):format(item.Progress, item.Target))
+			row(item.Slot, item.Text, ("Reward: ◆ %s"):format(commas(item.Reward)), btnText, done and not item.Claimed, function()
+				if done and not item.Claimed then Remotes.Claim:FireServer(item.Slot) end
+			end)
+		end
+	elseif activeTab == "Shop" then
+		titleLabel.Text = "Shop"
+		local order = 0
+		header(order, "Permanent perks")
+		for _, key in Products.GamepassOrder do
+			order += 1
+			local def = Products.Gamepasses[key]
+			local owned = d.Passes and d.Passes[key]
+			local btnText = owned and "Owned" or (def.Id and "Buy" or "Not for sale yet")
+			row(order, def.Name, def.Description, btnText, (not owned) and def.Id ~= nil, function()
+				if def.Id and not owned then MarketplaceService:PromptGamePassPurchase(Players.LocalPlayer, def.Id) end
+			end)
+		end
+		order += 1
+		header(order, "Shard packs (amount x areas unlocked)")
+		for _, key in Products.DeveloperProductOrder do
+			order += 1
+			local def = Products.DeveloperProducts[key]
+			row(order, ("%s  +%s"):format(def.Name, commas(def.Amount * math.max(1, d.StrataUnlocked))), def.Description, def.Id and "Buy" or "Not for sale yet", def.Id ~= nil, function()
+				if def.Id then MarketplaceService:PromptProductPurchase(Players.LocalPlayer, def.Id) end
+			end)
+		end
+		order += 1
+		header(order, "Everything is earnable by playing. The shop only saves time.")
 	else
 		titleLabel.Text = "Codex"
 		local found = 0
@@ -453,6 +506,14 @@ function UI.Refresh()
 		found += 1
 	end
 	cacheLabel.Text = ("Geode caches %d/%d"):format(found, total)
+
+	local claimable = false
+	for _, item in d.Dailies or {} do
+		if item.Progress >= item.Target and not item.Claimed then
+			claimable = true
+		end
+	end
+	menuDot.Visible = claimable
 
 	rebuildCharges()
 	rebuildPanel()

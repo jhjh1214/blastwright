@@ -397,5 +397,182 @@ test("objectives: nearest pad is really the nearest, and the station offset is p
 	eq(o.Target.Z, -55 - (Tuning.GridSize * Tuning.CellSize) / 2 - 7, "station sits 7 studs past the pad's north edge")
 end)
 
+local Dailies = require("../../src/ReplicatedStorage/Shared/Dailies")
+local DailiesCfg = require("../../src/ReplicatedStorage/Shared/Config/Dailies")
+local Products = require("../../src/ReplicatedStorage/Shared/Config/Products")
+local Receipts = require("../../src/ServerScriptService/Server/Receipts")
+
+test("dailies: same day gives the same three distinct objectives, different days differ", function()
+	local a, b = Dailies.ForDay(20000, DailiesCfg), Dailies.ForDay(20000, DailiesCfg)
+	eq(#a, 3, "three objectives")
+	for i = 1, 3 do
+		eq(a[i].Id, b[i].Id, "deterministic id")
+		eq(a[i].Target, b[i].Target, "deterministic target")
+	end
+	eq(a[1].Id ~= a[2].Id and a[2].Id ~= a[3].Id and a[1].Id ~= a[3].Id, true, "distinct templates")
+	local differs = false
+	for d = 20001, 20030 do
+		if Dailies.ForDay(d, DailiesCfg)[1].Id ~= a[1].Id then differs = true end
+	end
+	eq(differs, true, "days rotate")
+end)
+
+test("dailies: slots get rising rewards and readable text", function()
+	for d = 20000, 20040 do
+		local defs = Dailies.ForDay(d, DailiesCfg)
+		for slot, def in defs do
+			eq(def.Slot, slot, "slot index")
+			if def.Text:find("%d") == nil then error("text has no number") end
+		end
+		if not (defs[1].RewardBase < defs[2].RewardBase and defs[2].RewardBase < defs[3].RewardBase) then
+			error("rewards do not rise on day " .. d)
+		end
+	end
+end)
+
+test("dailies: record accumulates, chain takes the max, progress caps at target", function()
+	local defs = {
+		{ Slot = 1, Id = "P", Kind = "Pops", Target = 50, Text = "", RewardBase = 100 },
+		{ Slot = 2, Id = "C", Kind = "Chain", Target = 20, Text = "", RewardBase = 100 },
+	}
+	local daily = { Day = 5, Progress = {}, Claimed = {} }
+	Dailies.Record(daily, defs, "Pops", 30)
+	Dailies.Record(daily, defs, "Pops", 30)
+	eq(daily.Progress["1"], 50, "capped at target")
+	Dailies.Record(daily, defs, "Chain", 12)
+	Dailies.Record(daily, defs, "Chain", 7)
+	eq(daily.Progress["2"], 12, "max not sum")
+	Dailies.Record(daily, defs, "Chain", 99)
+	eq(daily.Progress["2"], 20, "capped")
+	Dailies.Record(daily, defs, "Pops", 0)
+	Dailies.Record(daily, defs, "Nothing", 5)
+	eq(daily.Progress["1"], 50, "ignored")
+end)
+
+test("dailies: claim only when complete, once, and only for a real slot", function()
+	local defs = Dailies.ForDay(20100, DailiesCfg)
+	local daily = { Day = 20100, Progress = {}, Claimed = {} }
+	eq(Dailies.CanClaim(daily, defs, 1), false, "not complete")
+	daily.Progress["1"] = defs[1].Target
+	eq(Dailies.CanClaim(daily, defs, 1), true, "complete")
+	daily.Claimed["1"] = true
+	eq(Dailies.CanClaim(daily, defs, 1), false, "already claimed")
+	daily.Progress["2"] = defs[2].Target
+	eq(Dailies.CanClaim(daily, defs, 2.5), false, "fractional slot")
+	eq(Dailies.CanClaim(daily, defs, 0), false, "slot 0")
+	eq(Dailies.CanClaim(daily, defs, 4), false, "slot 4")
+	eq(Dailies.CanClaim(daily, defs, "2"), false, "string slot")
+	eq(Dailies.CanClaim(daily, defs, nil), false, "nil slot")
+	eq(Dailies.CanClaim(daily, defs, 2), true, "slot 2 ok")
+end)
+
+test("dailies: a new day resets progress and claims; the same day does not", function()
+	local daily = { Day = 7, Progress = { ["1"] = 5 }, Claimed = { ["1"] = true } }
+	eq(Dailies.Refresh(daily, 7), false, "same day")
+	eq(daily.Progress["1"], 5, "kept")
+	eq(Dailies.Refresh(daily, 8), true, "new day")
+	eq(next(daily.Progress), nil, "progress cleared")
+	eq(next(daily.Claimed), nil, "claims cleared")
+	eq(daily.Day, 8, "day set")
+	eq(Dailies.DayNumber(86400 * 3 + 5), 3, "day number")
+	eq(Dailies.SecondsUntilReset(86400 * 3 + 86300), 100, "seconds to reset")
+end)
+
+test("dailies: reward scales with unlocked strata", function()
+	local def = { Slot = 1, Id = "x", Kind = "Pops", Target = 1, Text = "", RewardBase = 100 }
+	eq(Dailies.Reward(def, 1), 100, "stratum 1")
+	eq(Dailies.Reward(def, 3), 200, "stratum 3")
+	eq(Dailies.Reward(def, 0), 100, "never below stratum 1")
+end)
+
+test("receipts: a purchase id grants once, retries are duplicates", function()
+	local purchases = {}
+	eq(Receipts.Apply(purchases, "abc", 100), true, "first time")
+	eq(Receipts.Apply(purchases, "abc", 200), false, "retry")
+	eq(purchases["abc"], 100, "original time kept")
+	Receipts.Revert(purchases, "abc")
+	eq(Receipts.Apply(purchases, "abc", 300), true, "after revert it can grant properly")
+end)
+
+test("receipts: history is bounded and never drops the newest purchase", function()
+	local purchases = {}
+	for i = 1, 400 do Receipts.Apply(purchases, "p" .. i, i) end
+	local n = 0
+	for _ in purchases do n += 1 end
+	eq(n, 300, "capped")
+	eq(purchases["p400"], 400, "newest kept")
+	eq(purchases["p1"], nil, "oldest dropped")
+end)
+
+test("receipts: shard packs scale with strata and only configured ids are indexed", function()
+	eq(Receipts.ShardAmount({ Amount = 500 }, 1), 500, "stratum 1")
+	eq(Receipts.ShardAmount({ Amount = 500 }, 3), 1500, "stratum 3")
+	eq(Receipts.ShardAmount({ Amount = 500 }, 0), 500, "floor at 1")
+	local index = Receipts.ProductIndex({ A = { Id = 111 }, B = { Id = nil }, C = { Id = 333 } })
+	eq(index[111], "A", "A")
+	eq(index[333], "C", "C")
+	eq(index[0], nil, "unconfigured is absent")
+end)
+
+test("products: config is valid and never contains invented ids", function()
+	local seen = {}
+	local function size(t) local n = 0 for _ in t do n += 1 end return n end
+	local function check(defs, order, what)
+		eq(#order, size(defs), what .. " order lists every entry")
+		for _, key in order do
+			local d = defs[key]
+			if d == nil then error(what .. " missing " .. key) end
+			if type(d.Name) ~= "string" or type(d.Description) ~= "string" then error(key .. " needs name and description") end
+			if d.Id ~= nil then
+				if type(d.Id) ~= "number" or d.Id <= 0 or d.Id % 1 ~= 0 then error(key .. " has a malformed id") end
+				if seen[d.Id] then error("duplicate id " .. d.Id) end
+				seen[d.Id] = true
+			end
+		end
+	end
+	check(Products.DeveloperProducts, Products.DeveloperProductOrder, "products")
+	check(Products.Gamepasses, Products.GamepassOrder, "passes")
+	for _, key in Products.DeveloperProductOrder do
+		if Products.DeveloperProducts[key].Amount <= 0 then error(key .. " grants nothing") end
+	end
+end)
+
+test("seam: mutation chance can be raised (Prismatic Luck)", function()
+	local function count(chance)
+		local n = 0
+		for s = 1, 60 do
+			for _, c in Seam.Generate(Crystals, Tuning, 1, s, chance).Cells do
+				if c.Mutated then n += 1 end
+			end
+		end
+		return n
+	end
+	local base, boosted, none = count(nil), count(Tuning.MutationChance * 2), count(0)
+	eq(none, 0, "zero chance means none")
+	eq(boosted > base, true, "doubling the chance yields more mutated crystals")
+	eq(base > 0, true, "default chance still mutates some")
+end)
+
+test("schema: v2 saves migrate to v3 with an empty daily record", function()
+	local d = Schema.Migrate({ SchemaVersion = 2, Shards = 40, Caches = { S1 = true } })
+	eq(d.SchemaVersion, Schema.CURRENT_VERSION, "version")
+	eq(Schema.CURRENT_VERSION >= 3, true, "v3 exists")
+	eq(d.Daily.Day, 0, "daily day")
+	eq(next(d.Daily.Progress), nil, "daily progress")
+	eq(d.Caches.S1, true, "caches kept")
+	eq(d.Shards, 40, "shards kept")
+end)
+
+test("objectives: a finished daily objective is surfaced before anything else", function()
+	local data = snap({ Shards = 50, Stats = { TotalPops = 20 }, Dailies = { { Slot = 1, Progress = 10, Target = 10, Claimed = false } } })
+	local o = Objectives.Roam(data, 0, 0, ocfg)
+	eq(o.Id, "ClaimDaily", "id")
+	eq(o.Highlight, "Forge", "menu pulses")
+	data.Dailies[1].Claimed = true
+	eq(Objectives.Roam(data, 0, 0, ocfg).Id ~= "ClaimDaily", true, "claimed one no longer nags")
+	local fresh = snap({ Dailies = { { Slot = 1, Progress = 10, Target = 10, Claimed = false } } })
+	eq(Objectives.Roam(fresh, 0, 0, ocfg).Id, "GoBlast", "brand-new player still starts at a pad")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

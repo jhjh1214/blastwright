@@ -5,6 +5,7 @@
 | Micro | 1-5s | Plant a charge; the preview shows what it hits. Detonate; crystals pop in an escalating cascade with rising pitch, numbers, beams and camera shake. |
 | Short | 10-30s | One volley: plan, detonate, see the chain tier banner and shard payout. |
 | Session | 1-5min | Clear a seam within its charge budget (Momentum refunds keep it going), get the clear bonus, walk off to hunt a geode cache or a new area, spend shards in the Forge. |
+| Daily | once per day | Three rotating objectives (pops, chains, seams, shards, volleys) with rising rewards. They reset at UTC midnight and never punish a missed day. |
 | Long | hours+ | Strata (new crystal mechanics), charge types, rig upgrades, Codex completion, Prismatic hunting. |
 
 ## First 10 minutes

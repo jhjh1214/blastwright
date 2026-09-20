@@ -10,7 +10,9 @@ local Config = require(Shared.Config)
 local Geometry = require(Shared.Geometry)
 local Remotes = require(Shared.Remotes)
 
+local Dailies = require(Shared.Dailies)
 local Data = require(script.Parent.Data)
+local Purchases = require(script.Parent.Purchases)
 local Seam = require(script.Parent.Seam)
 local Validate = require(script.Parent.Validate)
 local World = require(script.Parent.World)
@@ -21,6 +23,7 @@ local Upgrades = Config.Upgrades
 local Charges = Config.Charges
 local Strata = Config.Strata
 local WorldConfig = Config.World
+local DailiesConfig = Config.Dailies
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -60,6 +63,20 @@ local function upgradeLevel(data: any, id: string): number
 	return data.Upgrades[id] or 0
 end
 
+-- Today's objectives (same for everyone) and this player's record, reset if the UTC day rolled over.
+local function todaysDefs()
+	return Dailies.ForDay(Dailies.DayNumber(os.time()), DailiesConfig)
+end
+
+local function ensureDaily(data: any)
+	Dailies.Refresh(data.Daily, Dailies.DayNumber(os.time()))
+end
+
+local function recordDaily(data: any, kind: string, amount: number)
+	ensureDaily(data)
+	Dailies.Record(data.Daily, todaysDefs(), kind, amount)
+end
+
 local function notify(player: Player, text: string, kind: string)
 	Remotes.Notify:FireClient(player, text, kind)
 end
@@ -76,7 +93,15 @@ local function snapshot(player: Player): { [string]: any }?
 		return nil
 	end
 	local seam = seams[player]
+	ensureDaily(data)
+	local passes = {}
+	for key in Config.Products.Gamepasses do
+		passes[key] = Purchases.Owns(player, key)
+	end
 	return {
+		Passes = passes,
+		Dailies = Dailies.View(data.Daily, todaysDefs(), data.Progress.StrataUnlocked),
+		DailyResetIn = Dailies.SecondsUntilReset(os.time()),
 		Shards = data.Shards,
 		Upgrades = data.Upgrades,
 		UnlockedCharges = data.UnlockedCharges,
@@ -119,7 +144,8 @@ local function startSeam(player: Player)
 	end
 	seamCounter += 1
 	local stratum = WorldConfig.Sites[siteId].Stratum
-	local grid = Seam.Generate(Crystals, Tuning, stratum, seamCounter * 7919 + player.UserId % 100003 + os.time())
+	local chance = Tuning.MutationChance * (Purchases.Owns(player, "PrismaticLuck") and 2 or 1)
+	local grid = Seam.Generate(Crystals, Tuning, stratum, seamCounter * 7919 + player.UserId % 100003 + os.time(), chance)
 	local max = Tuning.BaseCharges + upgradeLevel(data, "ExtraCharge") * Upgrades.Defs.ExtraCharge.PerLevel
 	local seam: SeamState = {
 		Id = seamCounter,
@@ -172,6 +198,7 @@ local function endSeam(player: Player, seam: SeamState)
 		data.Shards += bonus
 		data.Stats.TotalShards += bonus
 		data.Stats.SeamsCleared += 1
+		recordDaily(data, "Seams", 1)
 		notify(player, ("Seam cleared! +%d bonus shards"):format(bonus), "Reward")
 	else
 		notify(player, "Seam spent. New seam incoming.", "Info")
@@ -223,11 +250,20 @@ local function onDetonate(player: Player, payload: any)
 			data.Codex.Mutated[ev.Kind] = true
 		end
 	end
+	local multiplier = Purchases.Owns(player, "DoubleShards") and 2 or 1
+	local payout = result.Total * multiplier
 	seam.Popped += valuablePops
-	seam.Earned += result.Total
-	data.Shards += result.Total
-	data.Stats.TotalShards += result.Total
+	seam.Earned += payout
+	data.Shards += payout
+	data.Stats.TotalShards += payout
 	data.Stats.TotalPops += result.Pops
+	recordDaily(data, "Pops", result.Pops)
+	recordDaily(data, "Chain", result.Pops)
+	recordDaily(data, "Volleys", 1)
+	recordDaily(data, "Shards", payout)
+	if result.Pops >= DailiesConfig.TierPops then
+		recordDaily(data, "Tiers", 1)
+	end
 	data.Stats.BestChain = math.max(data.Stats.BestChain, result.Pops)
 	if result.Momentum then
 		seam.Charges = math.min(seam.Charges + 1, seam.ChargesMax)
@@ -240,7 +276,8 @@ local function onDetonate(player: Player, payload: any)
 		Pops = result.Pops,
 		Raw = result.Raw,
 		Bonus = result.Bonus,
-		Total = result.Total,
+		Total = payout,
+		Multiplier = multiplier,
 		PeakMult = result.PeakMult,
 		Tier = result.Tier,
 		Duration = result.Duration,
@@ -316,6 +353,32 @@ local function onBuy(player: Player, kind: any, id: any)
 	else
 		return
 	end
+	sync(player)
+end
+
+local function onClaim(player: Player, slot: any)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	local now = os.clock()
+	local last = lastAction[player]
+	if last and now - last.Buy < BUY_COOLDOWN then
+		return
+	end
+	if last then
+		last.Buy = now
+	end
+
+	ensureDaily(data)
+	local defs = todaysDefs()
+	if not Dailies.CanClaim(data.Daily, defs, slot) then
+		return notify(player, "Nothing to claim there yet.", "Error")
+	end
+	local reward = Dailies.Reward(defs[slot], data.Progress.StrataUnlocked)
+	data.Daily.Claimed[tostring(slot)] = true
+	data.Shards += reward
+	notify(player, ("Daily complete! +%d shards"):format(reward), "Reward")
 	sync(player)
 end
 
@@ -399,6 +462,7 @@ local function onPlayerAdded(player: Player)
 	end
 
 	lastAction[player] = { Buy = 0, Detonate = 0 }
+	Purchases.LoadPasses(player)
 	player:LoadCharacter()
 	sync(player)
 
@@ -412,6 +476,7 @@ end
 
 local function onPlayerRemoving(player: Player)
 	releaseSite(player)
+	Purchases.Forget(player)
 	lastAction[player] = nil
 end
 
@@ -439,6 +504,8 @@ end
 function Game.Init()
 	Remotes.Detonate.OnServerEvent:Connect(onDetonate)
 	Remotes.Buy.OnServerEvent:Connect(onBuy)
+	Remotes.Claim.OnServerEvent:Connect(onClaim)
+	Purchases.Init({ Notify = notify, OnChanged = sync })
 
 	for siteId, entry in World.Registry.Sites do
 		entry.Prompt.Triggered:Connect(function(player)

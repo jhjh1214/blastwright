@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 2
+Schema.CURRENT_VERSION = 3
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -15,6 +15,7 @@ function Schema.Default(): { [string]: any }
 		Stats = { SeamsCleared = 0, BestChain = 0, TotalPops = 0, TotalShards = 0 },
 		Settings = { Music = true, Sfx = true },
 		Caches = {}, -- [cacheId] = true for geode caches this player has looted
+		Daily = { Day = 0, Progress = {}, Claimed = {} }, -- see Shared/Dailies.luau (string slot keys)
 		Purchases = {}, -- receipt ids, reserved for monetization
 	}
 end
@@ -25,6 +26,12 @@ local Migrations: { [number]: (data: { [string]: any }) -> () } = {
 	[2] = function(data)
 		if type(data.Caches) ~= "table" then
 			data.Caches = {}
+		end
+	end,
+	-- v3: daily objectives. Missing record is filled from defaults by reconcile; nothing to convert.
+	[3] = function(data)
+		if type(data.Daily) ~= "table" then
+			data.Daily = { Day = 0, Progress = {}, Claimed = {} }
 		end
 	end,
 }

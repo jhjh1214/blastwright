@@ -11,6 +11,8 @@ return {
 	Strata = require(script.Strata),
 	Rarities = require(script.Rarities),
 	World = require(script.World),
+	Dailies = require(script.Dailies),
+	Products = require(script.Products),
 	Tuning = Tuning,
 	Context = {
 		Crystals = Crystals.Defs,

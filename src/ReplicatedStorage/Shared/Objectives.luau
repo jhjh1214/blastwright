@@ -65,6 +65,12 @@ function Objectives.Roam(data: any, px: number, pz: number, cfg: any): Objective
 		}
 	end
 
+	for _, daily in data.Dailies or {} do
+		if daily.Progress >= daily.Target and not daily.Claimed then
+			return { Id = "ClaimDaily", Text = "A daily objective is done! Open the Menu to claim your reward.", Highlight = "Forge" }
+		end
+	end
+
 	local levels, cheapest = 0, math.huge
 	for _, lvl in data.Upgrades or {} do
 		levels += lvl
