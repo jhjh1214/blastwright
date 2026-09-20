@@ -77,6 +77,14 @@ function builders.Prism(model, pos, col, rng)
 	part(model, Vector3.new(0.9, 0.9, 0.9), CFrame.new(pos + Vector3.new(0, 2.4, 0)) * CFrame.Angles(0.7, 0.7, 0), Color3.new(1, 1, 1), Enum.Material.Neon)
 end
 
+-- Slowburn: dark egg-shaped body with a glowing fuse ring, so it reads as "a bomb waiting to go".
+function builders.Delayed(model, pos, col, rng)
+	part(model, Vector3.new(3.4, 0.7, 3.4), CFrame.new(pos + Vector3.new(0, 0.35, 0)), ROCK, Enum.Material.Slate)
+	part(model, Vector3.new(2.6, 2.6, 2.6), CFrame.new(pos + Vector3.new(0, 1.9, 0)), Color3.fromRGB(34, 22, 38), Enum.Material.Slate, Enum.PartType.Ball)
+	part(model, Vector3.new(0.3, 3.0, 3.0), CFrame.new(pos + Vector3.new(0, 1.9, 0)) * CFrame.Angles(0, 0, math.pi / 2), col, Enum.Material.Neon, Enum.PartType.Cylinder)
+	part(model, Vector3.new(0.35, 1.0, 0.35), CFrame.new(pos + Vector3.new(0, 3.6, 0)), col, Enum.Material.Neon)
+end
+
 function builders.Unstable(model, pos, col, rng)
 	part(model, Vector3.new(3.4, 0.7, 3.4), CFrame.new(pos + Vector3.new(0, 0.35, 0)), Color3.fromRGB(20, 16, 22), Enum.Material.Slate)
 	for i = 1, 5 do

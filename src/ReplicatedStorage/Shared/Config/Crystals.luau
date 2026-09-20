@@ -5,7 +5,7 @@ export type CrystalDef = {
 	Rarity: string,
 	Description: string,
 	Value: number,
-	Behavior: string, -- Inert | Volatile | Amplifier | Prism | Unstable
+	Behavior: string, -- Inert | Volatile | Amplifier | Prism | Unstable | Delayed
 	Params: { [string]: number },
 	Color: { number },
 	Stratum: number, -- first stratum this can appear in
@@ -68,9 +68,20 @@ local Defs: { [string]: CrystalDef } = {
 		Stratum = 2,
 		Weight = 10,
 	},
+	Slowburn = {
+		Name = "Slowburn",
+		Rarity = "Rare",
+		Description = "Delayed. Lights a fuse when hit and pops a second later, cashing in your full multiplier, then blasts radius 2.",
+		Value = 20,
+		Behavior = "Delayed",
+		Params = { Delay = 1.0, Radius = 2 },
+		Color = { 255, 80, 170 },
+		Stratum = 3,
+		Weight = 8,
+	},
 }
 
 return {
 	Defs = Defs,
-	Order = { "Glimmerstone", "Kindlequartz", "Resonite", "Lensglass", "Dreadgeode" },
+	Order = { "Glimmerstone", "Kindlequartz", "Resonite", "Lensglass", "Dreadgeode", "Slowburn" },
 }

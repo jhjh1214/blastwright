@@ -14,6 +14,7 @@ export type Event = {
 	Mult: number,
 	Mutated: boolean,
 	Cause: string, -- Charge | Chain | Beam
+	Lit: number?, -- Delayed crystals only: when the fuse was lit (T is when it actually pops)
 }
 export type Context = {
 	Crystals: { [string]: any },
@@ -34,7 +35,7 @@ export type Result = {
 	Momentum: boolean,
 }
 
-type QueueItem = { T: number, Seq: number, X: number, Z: number, Cause: string }
+type QueueItem = { T: number, Seq: number, X: number, Z: number, Cause: string, Lit: number? }
 
 local ChainSim = {}
 
@@ -56,8 +57,16 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 			return
 		end
 		local key = ChainSim.Key(size, x, z)
-		if grid.Cells[key] == nil or dead[key] then
+		local cell = grid.Cells[key]
+		if cell == nil or dead[key] then
 			return
+		end
+		-- Delayed crystals light a fuse when hit and pop later; t is the effective pop time.
+		local lit: number? = nil
+		local def = ctx.Crystals[cell.Kind]
+		if def.Behavior == "Delayed" then
+			lit = t
+			t += def.Params.Delay
 		end
 		local existing = pending[key]
 		if existing ~= nil and existing <= t then
@@ -75,7 +84,7 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 				hi = mid
 			end
 		end
-		table.insert(queue, lo, { T = t, Seq = seq, X = x, Z = z, Cause = cause })
+		table.insert(queue, lo, { T = t, Seq = seq, X = x, Z = z, Cause = cause, Lit = lit })
 	end
 
 	local function blast(ox: number, oz: number, t0: number, shape: string, radius: number, range: number, cause: string)
@@ -135,7 +144,7 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 			end
 			peak = math.max(peak, mult)
 
-			if behavior == "Volatile" then
+			if behavior == "Volatile" or behavior == "Delayed" then
 				blast(item.X, item.Z, item.T + tuning.VolatileDelay, "Radius", def.Params.Radius, 0, "Chain")
 			elseif behavior == "Prism" then
 				blast(item.X, item.Z, item.T + tuning.PrismDelay, "Row", 0, def.Params.Range, "Beam")
@@ -152,6 +161,7 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 				Mult = mult,
 				Mutated = cell.Mutated == true,
 				Cause = item.Cause,
+				Lit = item.Lit,
 			})
 		end
 	end

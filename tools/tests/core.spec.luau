@@ -210,5 +210,52 @@ test("validate: rejects hostile payloads", function()
 	bad(nine, "over hard cap", 99)
 end)
 
+test("delayed crystal pops one delay after being hit, last, cashing in the multiplier", function()
+	local g = grid(function(x, z)
+		if z ~= 5 then return nil end
+		if x == 5 then return "Resonite" end
+		if x == 4 then return "Glimmerstone" end
+		if x == 6 then return "Slowburn" end
+	end)
+	local r = ChainSim.Run(g, { cap(5, 5) }, ctx)
+	eq(r.Pops, 3, "pops")
+	local last = r.Events[3]
+	eq(last.Kind, "Slowburn", "slowburn pops last")
+	eq(last.Lit ~= nil, true, "fuse lit time reported")
+	if math.abs((last.T - last.Lit) - 1.0) > 1e-9 then error("delay is not 1.0s: " .. (last.T - last.Lit)) end
+	eq(last.Value, 30, "20 x 1.5 multiplier from Resonite")
+	eq(r.Events[1].Lit, nil, "non-delayed has no Lit")
+end)
+
+test("delayed crystal blasts radius 2 when it finally pops", function()
+	local g = grid(function(x, z)
+		if x == 5 and z == 5 then return "Slowburn" end
+		if x == 7 and z == 5 then return "Glimmerstone" end
+	end)
+	local r = ChainSim.Run(g, { cap(5, 5) }, ctx)
+	eq(r.Pops, 2, "inert two cells away is reached by the delayed blast")
+	if r.Events[2].T <= 1.0 then error("second pop should come after the delay") end
+end)
+
+test("delayed crystal that is never hit never pops", function()
+	local g = grid(function(x, z) if x == 9 and z == 9 then return "Slowburn" end end)
+	eq(ChainSim.Run(g, { cap(1, 1) }, ctx).Pops, 0, "pops")
+end)
+
+test("slowburn only appears from stratum 3", function()
+	for s = 1, 30 do
+		for _, c in Seam.Generate(Crystals, Tuning, 2, s).Cells do
+			if c.Kind == "Slowburn" then error("slowburn in stratum 2") end
+		end
+	end
+	local saw = false
+	for s = 1, 20 do
+		for _, c in Seam.Generate(Crystals, Tuning, 3, s).Cells do
+			if c.Kind == "Slowburn" then saw = true end
+		end
+	end
+	eq(saw, true, "stratum 3 spawns slowburn")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

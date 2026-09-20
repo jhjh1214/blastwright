@@ -66,12 +66,26 @@ local function popEvent(run, ev)
 	end
 end
 
+-- Fuse flash: shows when a Delayed crystal was hit, well before it actually pops.
+local function lightFuse(run, ev)
+	local view = run.View
+	local pos = Geometry.CellPosition(view.Origin, ev.X, ev.Z)
+	local col = crystalColor(ev.Kind)
+	VFX.Ring(pos + Vector3.new(0, 0.4, 0), col, CELL * 1.6, 0.5)
+	VFX.Burst(pos + Vector3.new(0, 3.4, 0), col, 5, 12)
+	AudioManager.Play("Click", { Pitch = 1.6 })
+end
+
 local function step()
 	local now = os.clock()
 	for i = #runs, 1, -1 do
 		local run = runs[i]
 		local elapsed = now - run.Start
 		local events = run.Result.Events
+		while run.FuseNext <= #run.Fuses and run.Fuses[run.FuseNext].Lit <= elapsed do
+			pcall(lightFuse, run, run.Fuses[run.FuseNext])
+			run.FuseNext += 1
+		end
 		while run.Next <= #events and events[run.Next].T <= elapsed do
 			local ok, err = pcall(popEvent, run, events[run.Next])
 			if not ok then
@@ -129,7 +143,17 @@ function Playback.Run(result)
 	end
 	AudioManager.Play("Detonate")
 
-	table.insert(runs, { Result = result, View = view, Own = own, Start = os.clock(), Next = 1, Count = 0 })
+	local fuses = {}
+	for _, ev in result.Events do
+		if ev.Lit then
+			table.insert(fuses, ev)
+		end
+	end
+	table.sort(fuses, function(a, b)
+		return a.Lit < b.Lit
+	end)
+
+	table.insert(runs, { Result = result, View = view, Own = own, Start = os.clock(), Next = 1, Count = 0, Fuses = fuses, FuseNext = 1 })
 	if not connection then
 		connection = RunService.Heartbeat:Connect(step)
 	end
