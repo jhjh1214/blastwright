@@ -17,7 +17,6 @@ Audio contains no scripts. License: listed as free on the Creator Store; no sepa
 | Reward | 135483737426662 | Coin Collect | G00byBBQSauce | 1s | coin collect | silent |
 | Click | 139804904213958 | ui_menu_click_03 | Vicktor2012 | 1s | ui click | silent |
 | Error | 16903690359 | warning beep | DjDan_123 | 1s | error buzz, denied | silent |
-
 | Ambience (loop) | 273398061 | Cave Ambience | Texodus | 118s | cave ambience | silent (id = nil) |
 
 Ambience note: uploader original (audio type "Unknown", artist = uploader, no album). Ducked to 45% while blasting.
