@@ -91,13 +91,14 @@ end
 ---------------------------------------------------------------- lighting
 
 local function buildLighting()
+	-- Tuned from playtest feedback: the first pass was too dark. Ambient carries the scene; crystals only accent it.
 	Lighting.ClockTime = 0
-	Lighting.Brightness = 0.6
-	Lighting.Ambient = Color3.fromRGB(44, 50, 78)
-	Lighting.OutdoorAmbient = Color3.fromRGB(44, 50, 78)
-	Lighting.EnvironmentDiffuseScale = 0.4
-	Lighting.EnvironmentSpecularScale = 0.4
-	Lighting.ExposureCompensation = 0.25
+	Lighting.Brightness = 1.6
+	Lighting.Ambient = Color3.fromRGB(96, 108, 146)
+	Lighting.OutdoorAmbient = Color3.fromRGB(96, 108, 146)
+	Lighting.EnvironmentDiffuseScale = 0.7
+	Lighting.EnvironmentSpecularScale = 0.5
+	Lighting.ExposureCompensation = 0.6
 	Lighting.GlobalShadows = false
 
 	local function ensure(class, name)
@@ -110,29 +111,30 @@ local function buildLighting()
 		return inst
 	end
 	local bloom = ensure("BloomEffect", "CaveBloom")
-	bloom.Intensity = 0.8
-	bloom.Size = 30
-	bloom.Threshold = 1.5
+	bloom.Intensity = 0.28
+	bloom.Size = 20
+	bloom.Threshold = 2.2
 	local cc = ensure("ColorCorrectionEffect", "CaveGrade")
-	cc.Saturation = 0.2
-	cc.Contrast = 0.12
-	cc.TintColor = Color3.fromRGB(232, 238, 255)
+	cc.Brightness = 0.04
+	cc.Saturation = 0.1
+	cc.Contrast = 0.06
+	cc.TintColor = Color3.fromRGB(238, 242, 255)
 	local atmo = ensure("Atmosphere", "CaveAtmosphere")
-	atmo.Density = 0.36
-	atmo.Offset = 0.2
-	atmo.Color = Color3.fromRGB(38, 44, 78)
-	atmo.Decay = Color3.fromRGB(20, 24, 46)
+	atmo.Density = 0.22
+	atmo.Offset = 0
+	atmo.Color = Color3.fromRGB(80, 92, 140)
+	atmo.Decay = Color3.fromRGB(50, 58, 96)
 	atmo.Glare = 0
-	atmo.Haze = 1.6
+	atmo.Haze = 0.8
 end
 
 ---------------------------------------------------------------- terrain
 
 local function buildTerrain()
 	Terrain:Clear()
-	Terrain:SetMaterialColor(Enum.Material.Slate, Color3.fromRGB(44, 50, 68))
-	Terrain:SetMaterialColor(Enum.Material.Basalt, Color3.fromRGB(30, 32, 46))
-	Terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(60, 66, 88))
+	Terrain:SetMaterialColor(Enum.Material.Slate, Color3.fromRGB(62, 70, 94))
+	Terrain:SetMaterialColor(Enum.Material.Basalt, Color3.fromRGB(44, 48, 66))
+	Terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(82, 90, 118))
 
 	local rng = Random.new(20260921)
 	local b = W.Bounds
@@ -206,7 +208,8 @@ local function cluster(parent, pos, color, scale, rng, withLight)
 		local h = (2 + rng:NextNumber() * 3.5) * scale
 		local off = Vector3.new(math.cos(a), 0, math.sin(a)) * (i == 1 and 0 or 0.8 * scale)
 		local tilt = math.rad(rng:NextNumber(8, 26))
-		local col = color:Lerp(Color3.new(1, 1, 1), rng:NextNumber() * 0.25)
+		-- Slightly darkened so Neon glows as an accent instead of blowing out.
+		local col = color:Lerp(Color3.new(0, 0, 0), 0.3):Lerp(Color3.new(1, 1, 1), rng:NextNumber() * 0.1)
 		local p = decorPart(model, Vector3.new(0.9 * scale, h, 0.9 * scale), CFrame.new(pos + off + Vector3.new(0, h / 2, 0)) * CFrame.Angles(math.sin(a) * tilt, a, -math.cos(a) * tilt), col, Enum.Material.Neon)
 		first = first or p
 	end
@@ -214,7 +217,7 @@ local function cluster(parent, pos, color, scale, rng, withLight)
 		local light = Instance.new("PointLight")
 		light.Color = color
 		light.Range = 8 + 6 * scale
-		light.Brightness = 1.4
+		light.Brightness = 0.8
 		light.Shadows = false
 		light.Parent = first
 	end
@@ -262,7 +265,7 @@ local function buildRoads()
 		local a, b = Vector3.new(p.AX, 0, p.AZ), Vector3.new(p.BX, 0, p.BZ)
 		local len = (b - a).Magnitude
 		local mid = (a + b) / 2
-		local road = decorPart(folder, Vector3.new(W.PathHalfWidth * 2 - 4, 0.5, len), CFrame.lookAt(mid + Vector3.new(0, 0.1, 0), b + Vector3.new(0, 0.1, 0)), Color3.fromRGB(64, 70, 92), Enum.Material.Cobblestone)
+		local road = decorPart(folder, Vector3.new(W.PathHalfWidth * 2 - 4, 0.5, len), CFrame.lookAt(mid + Vector3.new(0, 0.1, 0), b + Vector3.new(0, 0.1, 0)), Color3.fromRGB(84, 92, 120), Enum.Material.Cobblestone)
 		road.CanCollide = true
 		local dir = (b - a).Unit
 		local side = Vector3.new(-dir.Z, 0, dir.X)
@@ -306,8 +309,8 @@ local function beacon(parent, x, z, color, scale, name)
 	local core = cluster(group, Vector3.new(x, 0.4, z), color, scale, rng, true)
 	local light = core:FindFirstChildWhichIsA("PointLight", true)
 	if light then
-		light.Range = 70
-		light.Brightness = 2
+		light.Range = 60
+		light.Brightness = 1.1
 	end
 end
 
@@ -317,9 +320,9 @@ local function buildHub()
 	folder.Parent = root
 
 	local r = W.Hub.Radius
-	local plaza = decorPart(folder, Vector3.new(0.6, r * 2, r * 2), CFrame.new(W.Hub.X, 0.15, W.Hub.Z) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(58, 64, 88), Enum.Material.Cobblestone, Enum.PartType.Cylinder)
+	local plaza = decorPart(folder, Vector3.new(0.6, r * 2, r * 2), CFrame.new(W.Hub.X, 0.15, W.Hub.Z) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(80, 88, 116), Enum.Material.Cobblestone, Enum.PartType.Cylinder)
 	plaza.CanCollide = true
-	decorPart(folder, Vector3.new(0.2, r * 2 + 3, r * 2 + 3), CFrame.new(W.Hub.X, 0.05, W.Hub.Z) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(150, 190, 255), Enum.Material.Neon, Enum.PartType.Cylinder)
+	decorPart(folder, Vector3.new(0.2, r * 2 + 3, r * 2 + 3), CFrame.new(W.Hub.X, 0.05, W.Hub.Z) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(110, 150, 220), Enum.Material.Neon, Enum.PartType.Cylinder)
 	beacon(folder, W.Hub.X, W.Hub.Z - 4, Color3.fromRGB(150, 190, 255), 4.5, "DepotBeacon")
 
 	for _, biome in W.Biomes do
@@ -334,7 +337,8 @@ local function buildHub()
 		local compass = math.abs(dx) > math.abs(dz) and (dx < 0 and "West" or "East") or (dz < 0 and "North" or "South")
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = Enum.NormalId.Front
-		gui.SizeStudsPerPixel = 0.035
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 40
 		gui.LightInfluence = 0
 		gui.Brightness = 2
 		gui.Parent = sign
@@ -459,7 +463,7 @@ local function buildCaches()
 		local light = Instance.new("PointLight")
 		light.Color = color
 		light.Range = 14
-		light.Brightness = 1.2
+		light.Brightness = 0.7
 		light.Shadows = false
 		light.Parent = shell
 

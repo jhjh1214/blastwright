@@ -6,11 +6,15 @@ tools/bin/luau.exe tools/tests/core.spec.luau
 ```
 `tools/bin` is git-ignored; it holds the Luau CLI, analyzer and compiler (v0.739, from the luau-lang GitHub release).
 
-**Covered (26 tests, plus a developer smoke run in Studio that showed the cavern and UI):** chain propagation, ordering, bounds, amplifier, unstable, prism/column shapes, tiers, momentum, radius bonus, determinism and grid immutability, seed/stratum generation, save-schema migration/sanitizing, and hostile Detonate payloads, the delayed-fuse crystal (timing, multiplier cash-in, follow-on blast, stratum gating), the world layout (sites/caches unique, in bounds, off roads and each other), area names, and the v1 to v2 save migration.
+**Covered (33 tests, plus a developer smoke run in Studio that showed the cavern and UI):** chain propagation, ordering, bounds, amplifier, unstable, prism/column shapes, tiers, momentum, radius bonus, determinism and grid immutability, seed/stratum generation, save-schema migration/sanitizing, and hostile Detonate payloads, the delayed-fuse crystal (timing, multiplier cash-in, follow-on blast, stratum gating), the world layout (sites/caches unique, in bounds, off roads and each other), area names, the v1 to v2 save migration, and the objective/guide logic (what the player is told to do next, nearest-pad targeting).
 
 **Mutation-tested:** removing the unstable multiplier, amplifier bonus, volatile propagation, tier bonus, bounds check, the validator's unlock/duplicate/charges-left checks, and the delayed-crystal delay/blast/Lit logic each fails the suite. One mutant (the redundant `dead[key]` re-check in the pop loop) survives because it is logically redundant, not because of a test gap.
 
-Also run: `luau-compile --text <file>` on every `.luau` (syntax) and `rojo build`.
+Also run: `luau-compile --text <file>` on every `.luau` (syntax), `rojo build`, and
+```
+python tools/lint/roblox_api_check.py
+```
+which checks every Roblox property, method, enum and service name against the official API dump (`tools/bin/API-Dump.json`, download `https://setup.rbxcdn.com/<studio version>-API-Dump.json`). It exists because `luau-compile` cannot see wrong Roblox API names: a bad `SurfaceGui` property once silently killed the world build. Verified against 9 seeded errors of every kind it claims to catch.
 
 ## NOT covered by any automated test
 `Game.luau` (site reservation, rewards, seam end, caches, purchases), `World.luau` terrain and prop building, `Data.luau` (DataStore, locking, retries, shutdown), `World.luau`, and every client module (rendering, UI, input, camera, playback). These are compile-checked only.

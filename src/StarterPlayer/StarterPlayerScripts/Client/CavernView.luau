@@ -18,8 +18,9 @@ local root = Instance.new("Folder")
 root.Name = "Caverns"
 root.Parent = workspace
 
+-- Slightly darker than the config color so Neon reads as a glow accent, not a blown-out white.
 local function color(def)
-	return Color3.fromRGB(def.Color[1], def.Color[2], def.Color[3])
+	return Color3.fromRGB(def.Color[1], def.Color[2], def.Color[3]):Lerp(Color3.new(0, 0, 0), 0.22)
 end
 
 local function part(parent, size, cf, col, material, shape)

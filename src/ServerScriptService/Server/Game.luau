@@ -84,6 +84,7 @@ local function snapshot(player: Player): { [string]: any }?
 		Codex = data.Codex,
 		Caches = data.Caches,
 		BestChain = data.Stats.BestChain,
+		Stats = data.Stats,
 		ChargesLeft = seam and seam.Charges or 0,
 		ChargesMax = seam and seam.ChargesMax or 0,
 	}

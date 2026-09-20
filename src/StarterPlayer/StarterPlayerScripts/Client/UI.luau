@@ -80,13 +80,16 @@ local function commas(n)
 	return (out:gsub("^,", ""))
 end
 
-local gui, shardLabel, locationLabel, cacheLabel, hintLabel, seamLabel, chainLabel, previewFrame, previewLabel
+local gui, shardLabel, locationLabel, cacheLabel, objectiveCard, objectiveText, blastHint, seamLabel, chainLabel, previewFrame, previewLabel
+local welcomeFrame
 local toastHolder, tierLabel, chargeColumn, panel, panelScroll, detonateButton
 local roamGroup, blastGroup
 local activeTab = "Forge"
 local displayShards = 0
 local chargeButtons = {}
-local everEngaged = false
+local menuButtons = {}
+local menuStrokes = {}
+local highlighted = nil
 
 -- Callbacks provided by Input
 UI.OnDetonate = nil
@@ -102,7 +105,7 @@ function UI.Init()
 	gui = mk("ScreenGui", { Name = "BlastwrightUI", ResetOnSpawn = false, IgnoreGuiInset = false, DisplayOrder = 5 }, playerGui)
 
 	-- Always visible: shards (top-left) and toasts / tier banner
-	local shardFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.2, Position = UDim2.new(0, 12, 0, 8), Size = UDim2.fromOffset(170, 40) }, gui)
+	local shardFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.2, Position = UDim2.new(0, 12, 0, 8), Size = UDim2.fromOffset(140, 40) }, gui)
 	corner(shardFrame, 12)
 	shardLabel = label(shardFrame, "◆ 0", 24, THEME.Gold, { Size = UDim2.fromScale(1, 1) })
 
@@ -124,23 +127,31 @@ function UI.Init()
 	roamGroup = fullGroup("Roam")
 	locationLabel = label(roamGroup, "", 20, THEME.Text, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(320, 28) })
 	cacheLabel = label(roamGroup, "", 16, THEME.Dim, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.fromOffset(170, 22), TextXAlignment = Enum.TextXAlignment.Left })
-	hintLabel = label(roamGroup, "Explore the mine. Find a glowing blast pad and use its station to start blasting.", 17, THEME.Text, {
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -16),
-		Size = UDim2.fromOffset(460, 44),
-		TextWrapped = true,
-	})
+	objectiveCard = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.2, Position = UDim2.new(0, 12, 0, 80), Size = UDim2.fromOffset(250, 0), AutomaticSize = Enum.AutomaticSize.Y, Visible = false }, roamGroup)
+	corner(objectiveCard, 12)
+	mk("UIStroke", { Color = THEME.Gold, Thickness = 2, Transparency = 0.35 }, objectiveCard)
+	mk("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, objectiveCard)
+	mk("UIListLayout", { Padding = UDim.new(0, 2) }, objectiveCard)
+	label(objectiveCard, "OBJECTIVE", 13, THEME.Gold, { Size = UDim2.new(1, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 1 })
+	objectiveText = label(objectiveCard, "", 16, THEME.Text, { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = 2 })
 
 	local menu = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(200, 40) }, roamGroup)
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right, Padding = UDim.new(0, 8) }, menu)
 	for _, name in { "Forge", "Codex" } do
-		local b = button(menu, name, THEME.Panel, { Size = UDim2.fromOffset(94, 40) })
+		local b = button(menu, name, THEME.Panel, { Size = UDim2.fromOffset(70, 40), TextSize = 16 })
+		menuButtons[name] = b
+		menuStrokes[name] = mk("UIStroke", { Color = THEME.Gold, Thickness = 3, Enabled = false }, b)
 		b.Activated:Connect(function()
 			AudioManager.Play("Click")
 			local sameTabOpen = State.PanelOpen and activeTab == name
 			UI.SetPanel(not sameTabOpen, name)
 		end)
 	end
+	local help = button(menu, "?", THEME.Panel, { Size = UDim2.fromOffset(36, 40), LayoutOrder = 10 })
+	help.Activated:Connect(function()
+		AudioManager.Play("Click")
+		UI.ShowWelcome(true)
+	end)
 
 	----------------------------------------------------------- blast HUD (corners only)
 	blastGroup = fullGroup("Blast")
@@ -163,6 +174,10 @@ function UI.Init()
 	clear.Activated:Connect(function()
 		if UI.OnClear then UI.OnClear() end
 	end)
+
+	blastHint = label(blastGroup, "", 18, THEME.Text, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -84), Size = UDim2.fromOffset(300, 30), BackgroundTransparency = 0.35, BackgroundColor3 = THEME.Bg })
+	corner(blastHint, 10)
+	blastHint.Visible = false
 
 	detonateButton = button(blastGroup, "DETONATE", THEME.Hot, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -12), Size = UDim2.fromOffset(190, 62), TextSize = 26, Font = Enum.Font.GothamBlack })
 	detonateButton.Activated:Connect(function()
@@ -191,6 +206,36 @@ function UI.Init()
 	}, panel)
 	mk("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, panelScroll)
 
+	-- Welcome / how-to-play panel
+	welcomeFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.92, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Visible = false, ZIndex = 20 }, gui)
+	corner(welcomeFrame, 16)
+	mk("UISizeConstraint", { MaxSize = Vector2.new(460, 9999) }, welcomeFrame)
+	mk("UIStroke", { Color = THEME.Gold, Thickness = 2, Transparency = 0.3 }, welcomeFrame)
+	mk("UIPadding", { PaddingTop = UDim.new(0, 16), PaddingBottom = UDim.new(0, 16), PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18) }, welcomeFrame)
+	mk("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, HorizontalAlignment = Enum.HorizontalAlignment.Center }, welcomeFrame)
+	label(welcomeFrame, "Welcome to Blastwright", 26, THEME.Gold, { Size = UDim2.new(1, 0, 0, 34), LayoutOrder = 1, ZIndex = 21 })
+	local steps = {
+		"1. Follow the gold arrow to a glowing blast pad and use its station (E on PC, tap the prompt on mobile).",
+		"2. Tap the grid to plant charges, then press DETONATE. Kindlequartz chains to its neighbours, and Resonite boosts everything popped after it.",
+		"3. Spend shards in the Forge on upgrades and to unlock new mine areas.",
+		"4. Hidden geode caches are scattered off the roads. Explore to find them all.",
+	}
+	for i, text in steps do
+		label(welcomeFrame, text, 17, THEME.Text, { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = 1 + i, ZIndex = 21 })
+	end
+	local go = button(welcomeFrame, "Let's go", THEME.Accent, { Size = UDim2.fromOffset(180, 48), TextSize = 20, TextColor3 = THEME.Bg, LayoutOrder = 20, ZIndex = 21 })
+	go.Activated:Connect(function()
+		AudioManager.Play("Click")
+		UI.ShowWelcome(false)
+	end)
+
+	-- Pulse the highlighted menu button
+	RunService.Heartbeat:Connect(function()
+		if highlighted and menuStrokes[highlighted] then
+			menuStrokes[highlighted].Transparency = 0.15 + 0.4 * (0.5 + 0.5 * math.sin(os.clock() * 6))
+		end
+	end)
+
 	-- Shard count-up
 	RunService.Heartbeat:Connect(function(dt)
 		local target = State.Data and State.Data.Shards or 0
@@ -208,10 +253,43 @@ function UI.SetEngaged(engaged)
 	blastGroup.Visible = engaged
 	roamGroup.Visible = not engaged
 	if engaged then
-		everEngaged = true
 		UI.SetPanel(false)
+		UI.ShowWelcome(false)
 	end
-	hintLabel.Visible = not everEngaged
+end
+
+-- Objective card text (roaming). nil hides the card.
+function UI.SetObjective(text)
+	if not objectiveCard then return end
+	objectiveCard.Visible = text ~= nil and text ~= ""
+	if text then
+		objectiveText.Text = text
+	end
+end
+
+-- Pulse a menu button ("Forge") to draw the eye; nil clears.
+function UI.SetHighlight(name)
+	if highlighted == name then return end
+	if highlighted and menuStrokes[highlighted] then
+		menuStrokes[highlighted].Enabled = false
+	end
+	highlighted = name
+	if name and menuStrokes[name] then
+		menuStrokes[name].Enabled = true
+	end
+end
+
+-- Instruction pill shown above the blast controls. "" hides it.
+function UI.SetBlastHint(text)
+	if not blastHint then return end
+	blastHint.Visible = text ~= nil and text ~= ""
+	blastHint.Text = text or ""
+end
+
+function UI.ShowWelcome(show)
+	if welcomeFrame then
+		welcomeFrame.Visible = show
+	end
 end
 
 function UI.SetLocation(text)

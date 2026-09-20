@@ -325,5 +325,77 @@ test("schema: v1 saves migrate to v2 with caches and keep progress", function()
 	eq(type(d.Caches), "table", "caches added")
 end)
 
+local Objectives = require("../../src/ReplicatedStorage/Shared/Objectives")
+local Strata = require("../../src/ReplicatedStorage/Shared/Config/Strata")
+local Upgrades = require("../../src/ReplicatedStorage/Shared/Config/Upgrades")
+local WorldCfg = require("../../src/ReplicatedStorage/Shared/Config/World")
+local ocfg = { Strata = Strata, Upgrades = Upgrades.Defs, World = WorldCfg, Tuning = Tuning }
+local function snap(over)
+	local d = { Shards = 0, Upgrades = {}, StrataUnlocked = 1, Caches = {}, Stats = { TotalPops = 0 } }
+	for k, v in over or {} do d[k] = v end
+	return d
+end
+
+test("objectives: brand-new player is sent to the nearest stratum-1 pad", function()
+	local o = Objectives.Roam(snap(), 0, 0, ocfg)
+	eq(o.Id, "GoBlast", "id")
+	eq(o.Target ~= nil, true, "has target")
+	local near = Objectives.NearestSite(ocfg, 0, 0, 1)
+	eq(near.Stratum, 1, "stratum 1 site")
+	eq(o.Target.X, near.X, "target x is that site's station")
+	-- a player standing next to a west pad must be sent to a west pad, not an east one
+	local west = Objectives.Roam(snap(), -200, 40, ocfg)
+	eq(west.Target.X < 0, true, "west player gets a west pad")
+end)
+
+test("objectives: affordable first upgrade highlights the Forge", function()
+	local o = Objectives.Roam(snap({ Shards = 150, Stats = { TotalPops = 12 } }), 0, 0, ocfg)
+	eq(o.Id, "FirstUpgrade", "id")
+	eq(o.Highlight, "Forge", "highlight")
+	local poor = Objectives.Roam(snap({ Shards = 149, Stats = { TotalPops = 12 } }), 0, 0, ocfg)
+	eq(poor.Id, "Earn", "cannot afford yet")
+end)
+
+test("objectives: earning toward the next area points at a pad and names the area", function()
+	local o = Objectives.Roam(snap({ Shards = 300, Upgrades = { ExtraCharge = 1 }, Stats = { TotalPops = 50 } }), 0, 0, ocfg)
+	eq(o.Id, "Earn", "id")
+	eq(o.Target ~= nil, true, "target")
+	eq(o.Text:find("Prism Veins", 1, true) ~= nil, true, "names next area")
+	eq(o.Text:find("900", 1, true) ~= nil, true, "1200 - 300 = 900 more")
+end)
+
+test("objectives: enough shards to unlock the next area highlights the Forge", function()
+	local o = Objectives.Roam(snap({ Shards = 1200, Upgrades = { ExtraCharge = 1 }, Stats = { TotalPops = 50 } }), 0, 0, ocfg)
+	eq(o.Id, "UnlockArea", "id")
+	eq(o.Highlight, "Forge", "highlight")
+	eq(o.Text:find("1,200", 1, true) ~= nil, true, "thousands separator")
+end)
+
+test("objectives: everything unlocked falls back to exploring for caches", function()
+	local o = Objectives.Roam(snap({ Shards = 9999, Upgrades = { ExtraCharge = 3 }, StrataUnlocked = 3, Caches = { S1 = true, P2 = true }, Stats = { TotalPops = 999 } }), 0, 0, ocfg)
+	eq(o.Id, "Explore", "id")
+	eq(o.Text:find("2/17", 1, true) ~= nil, true, "cache progress")
+	eq(o.Target, nil, "no arrow: caches are meant to be found")
+end)
+
+test("objectives: in-blast hints follow the plant/detonate steps and stop for veterans", function()
+	eq(Objectives.Blast(snap(), 0).Id, "Plant", "nothing placed")
+	eq(Objectives.Blast(snap(), 2).Id, "Detonate", "charges placed")
+	eq(Objectives.Blast(snap({ Stats = { TotalPops = 500 } }), 0), nil, "veteran gets no hints")
+end)
+
+test("objectives: nearest pad is really the nearest, and the station offset is pinned", function()
+	-- Shallows sites are at x = -245 / -135 and z = -55 / +55.
+	local a = Objectives.NearestSite(ocfg, -135, 90, 1)
+	eq(a.X, -135, "near the east-south pad: x")
+	eq(a.Z, 55, "near the east-south pad: z")
+	local b = Objectives.NearestSite(ocfg, -245, -95, 1)
+	eq(b.X, -245, "near the west-north pad: x")
+	eq(b.Z, -55, "near the west-north pad: z")
+	local o = Objectives.Roam(snap(), -245, -95, ocfg)
+	eq(o.Target.X, -245, "arrow target x")
+	eq(o.Target.Z, -55 - (Tuning.GridSize * Tuning.CellSize) / 2 - 7, "station sits 7 studs past the pad's north edge")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end
