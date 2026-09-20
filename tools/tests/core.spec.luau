@@ -732,5 +732,111 @@ test("blast cells: shapes are clipped to the grid", function()
 	eq(none, 0, "unknown shape covers nothing")
 end)
 
+local Achievements = require("../../src/ReplicatedStorage/Shared/Achievements")
+local AchCfg = require("../../src/ReplicatedStorage/Shared/Config/Achievements")
+
+local function serverData(over)
+	local d = Schema.Default()
+	for k, v in over or {} do d[k] = v end
+	return d
+end
+
+test("goals: config is valid, unique, increasing within a stat, and reachable", function()
+	local KNOWN = { TotalPops = true, BestChain = true, SeamsCleared = true, TotalShards = true, Caches = true, Codex = true, Prismatic = true, Strata = true }
+	local valued = 0
+	for _, def in Crystals.Defs do if def.Value > 0 then valued += 1 end end
+	local limit = {
+		Caches = #WorldCfg.Caches,
+		Codex = #Crystals.Order,
+		Prismatic = valued,
+		Strata = #Strata,
+	}
+	local seen, lastTarget, lastReward = {}, {}, {}
+	for _, def in AchCfg.Defs do
+		if seen[def.Id] then error("duplicate goal id " .. def.Id) end
+		seen[def.Id] = true
+		if not KNOWN[def.Stat] then error(def.Id .. " uses unknown stat " .. tostring(def.Stat)) end
+		if def.Target <= 0 or def.Reward <= 0 then error(def.Id .. " needs a positive target and reward") end
+		if type(def.Name) ~= "string" or def.Name == "" or type(def.Description) ~= "string" then error(def.Id .. " needs text") end
+		if limit[def.Stat] and def.Target > limit[def.Stat] then error(def.Id .. " target " .. def.Target .. " is unreachable (max " .. limit[def.Stat] .. ")") end
+		if lastTarget[def.Stat] and def.Target <= lastTarget[def.Stat] then error(def.Id .. " target must exceed the previous tier of " .. def.Stat) end
+		if lastReward[def.Stat] and def.Reward <= lastReward[def.Stat] then error(def.Id .. " reward must exceed the previous tier of " .. def.Stat) end
+		lastTarget[def.Stat], lastReward[def.Stat] = def.Target, def.Reward
+	end
+	eq(#AchCfg.Defs >= 12, true, "a meaningful number of goals")
+end)
+
+test("goals: progress is read from the right place in the save", function()
+	local d = serverData()
+	d.Stats.TotalPops, d.Stats.BestChain, d.Stats.SeamsCleared, d.Stats.TotalShards = 321, 27, 9, 4567
+	d.Progress.StrataUnlocked = 3
+	d.Codex.Discovered = { Glimmerstone = true, Kindlequartz = true }
+	d.Codex.Mutated = { Glimmerstone = true }
+	d.Caches = { S1 = true, S2 = true, P1 = true }
+	eq(Achievements.Value(d, "TotalPops"), 321, "pops")
+	eq(Achievements.Value(d, "BestChain"), 27, "chain")
+	eq(Achievements.Value(d, "SeamsCleared"), 9, "seams")
+	eq(Achievements.Value(d, "TotalShards"), 4567, "shards")
+	eq(Achievements.Value(d, "Strata"), 3, "strata")
+	eq(Achievements.Value(d, "Codex"), 2, "codex counts discovered crystals")
+	eq(Achievements.Value(d, "Prismatic"), 1, "prismatic counts mutated crystals found")
+	eq(Achievements.Value(d, "Caches"), 3, "caches counts looted")
+	eq(Achievements.Value(d, "Nonsense"), 0, "unknown stat is 0, not an error")
+end)
+
+test("goals: claim only when complete, once, and only for a real goal id", function()
+	local first = AchCfg.Defs[1]
+	local d = serverData()
+	eq(Achievements.CanClaim(d, AchCfg, first.Id), false, "not complete")
+	d.Stats.TotalPops = first.Target
+	eq(Achievements.CanClaim(d, AchCfg, first.Id), true, "complete")
+	d.Achievements.Claimed[first.Id] = true
+	eq(Achievements.CanClaim(d, AchCfg, first.Id), false, "already claimed")
+	d.Stats.TotalPops = 1e9
+	for _, bad in { "", "__index", "nope", 5, true } do
+		eq(Achievements.CanClaim(d, AchCfg, bad), false, "bad id " .. tostring(bad))
+	end
+	eq(Achievements.CanClaim(d, AchCfg, nil), false, "nil id")
+end)
+
+test("goals: the client view reports progress, completion and claimed state", function()
+	local d = serverData()
+	local def = AchCfg.Defs[1]
+	d.Stats.TotalPops = math.floor(def.Target / 2)
+	local view = Achievements.View(d, AchCfg)
+	eq(#view, #AchCfg.Defs, "one row per goal")
+	eq(view[1].Id, def.Id, "order preserved")
+	eq(view[1].Progress, math.floor(def.Target / 2), "progress")
+	eq(view[1].Complete, false, "incomplete")
+	d.Stats.TotalPops = def.Target * 3
+	d.Achievements.Claimed[def.Id] = true
+	view = Achievements.View(d, AchCfg)
+	eq(view[1].Progress, def.Target, "progress capped at the target for display")
+	eq(view[1].Complete, true, "complete")
+	eq(view[1].Claimed, true, "claimed")
+end)
+
+test("schema: v3 saves migrate to v4 with an empty goals record", function()
+	local d = Schema.Migrate({ SchemaVersion = 3, Shards = 70, Daily = { Day = 5, Progress = {}, Claimed = {} } })
+	eq(d.SchemaVersion, Schema.CURRENT_VERSION, "version")
+	eq(Schema.CURRENT_VERSION >= 4, true, "v4 exists")
+	eq(type(d.Achievements.Claimed), "table", "claimed map")
+	eq(d.Daily.Day, 5, "daily kept")
+	eq(d.Shards, 70, "shards kept")
+end)
+
+test("objectives: a finished goal is surfaced (after dailies), and never for a brand-new player", function()
+	local data = snap({ Shards = 50, Stats = { TotalPops = 20 }, Goals = { { Id = "x", Progress = 100, Target = 100, Claimed = false, Complete = true } } })
+	local o = Objectives.Roam(data, 0, 0, ocfg)
+	eq(o.Id, "ClaimGoal", "id")
+	eq(o.Highlight, "Forge", "menu pulses")
+	data.Goals[1].Claimed = true
+	eq(Objectives.Roam(data, 0, 0, ocfg).Id ~= "ClaimGoal", true, "claimed one no longer nags")
+	local fresh = snap({ Goals = { { Id = "x", Progress = 100, Target = 100, Claimed = false, Complete = true } } })
+	eq(Objectives.Roam(fresh, 0, 0, ocfg).Id, "GoBlast", "brand-new player still starts at a pad")
+	local both = snap({ Stats = { TotalPops = 20 }, Dailies = { { Slot = 1, Progress = 5, Target = 5, Claimed = false } }, Goals = { { Id = "x", Progress = 1, Target = 1, Claimed = false, Complete = true } } })
+	eq(Objectives.Roam(both, 0, 0, ocfg).Id, "ClaimDaily", "dailies come first")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

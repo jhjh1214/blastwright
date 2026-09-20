@@ -204,8 +204,8 @@ function UI.Init()
 	end)
 	local tabBar = mk("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 42), ZIndex = 11 }, panel)
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, tabBar)
-	for i, name in { "Forge", "Daily", "Shop", "Codex" } do
-		local tab = button(tabBar, name, THEME.Row, { Size = UDim2.new(0.25, -5, 1, 0), TextSize = 16, LayoutOrder = i, ZIndex = 12 })
+	for i, name in { "Forge", "Daily", "Goals", "Shop", "Codex" } do
+		local tab = button(tabBar, name, THEME.Row, { Size = UDim2.new(0.2, -5, 1, 0), TextSize = 14, LayoutOrder = i, ZIndex = 12 })
 		tabButtons[name] = tab
 		tab.Activated:Connect(function()
 			AudioManager.Play("Click")
@@ -479,6 +479,29 @@ local function rebuildPanel()
 				if done and not item.Claimed then Remotes.Claim:FireServer(item.Slot) end
 			end)
 		end
+	elseif activeTab == "Goals" then
+		local goals = d.Goals or {}
+		local claimedCount = 0
+		for _, g in goals do
+			if g.Claimed then claimedCount += 1 end
+		end
+		titleLabel.Text = ("Goals  %d/%d"):format(claimedCount, #goals)
+		local order = 0
+		-- Ready to claim first, then in progress, then already claimed.
+		local function addRows(filter)
+			for _, g in goals do
+				if filter(g) then
+					order += 1
+					local btnText = g.Claimed and "Claimed" or (g.Complete and ("Claim  ◆ " .. commas(g.Reward)) or ("%s / %s"):format(commas(g.Progress), commas(g.Target)))
+					row(order, g.Name, g.Description .. ("  Reward: ◆ %s"):format(commas(g.Reward)), btnText, g.Complete and not g.Claimed, function()
+						if g.Complete and not g.Claimed then Remotes.ClaimGoal:FireServer(g.Id) end
+					end, g.Claimed and THEME.Dim or nil)
+				end
+			end
+		end
+		addRows(function(g) return g.Complete and not g.Claimed end)
+		addRows(function(g) return not g.Complete end)
+		addRows(function(g) return g.Claimed end)
 	elseif activeTab == "Shop" then
 		titleLabel.Text = "Shop"
 		local order = 0
@@ -558,6 +581,11 @@ function UI.Refresh()
 	local claimable = false
 	for _, item in d.Dailies or {} do
 		if item.Progress >= item.Target and not item.Claimed then
+			claimable = true
+		end
+	end
+	for _, g in d.Goals or {} do
+		if g.Complete and not g.Claimed then
 			claimable = true
 		end
 	end

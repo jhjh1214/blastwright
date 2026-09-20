@@ -11,6 +11,9 @@ The game is a walkable mine, not a single screen. Layout data and tests: `Config
 ## Daily objectives
 Menu > Daily shows three objectives that rotate each UTC day (same for everyone, deterministic from the day number). Targets and rewards rise by slot. Progress is recorded by the server as you blast. Claiming pays shards once. Unclaimed rewards are lost at reset, but a missed day costs nothing else (no streaks). A dot on the Menu button and a pulsing objective tell you when one is ready.
 
+## Goals
+Menu > Goals lists permanent milestones (pops, chain records, seams cleared, shards earned, geode caches, Codex, Prismatic finds, areas unlocked) in three or so rising tiers each, 23 in total. Progress is derived from stats the save already keeps, so nothing extra is tracked; only "claimed" is stored. Each pays shards once (about 46,700 in total across all goals). Ready goals are listed first, and a dot on the Menu button plus a pulsing objective say when one can be claimed. Adding a goal is one line in `Config/Achievements.luau`.
+
 ## Guidance
 `Shared/Objectives.luau` (pure, tested) decides the next step: go to a blast pad, open the Forge for a first upgrade, earn shards for the next area, unlock it, then hunt caches. The client `Guide` shows it as an objective card, a gold floating marker with distance, a glowing dot trail on the ground, an edge-of-screen arrow when the target is off-view, and a pulsing Forge button. In blast mode a short hint says "Tap the grid to plant a charge" then "Press DETONATE" until the player has popped 40 crystals. New players get a welcome panel; the "?" button reopens it. Caches deliberately get no arrow.
 

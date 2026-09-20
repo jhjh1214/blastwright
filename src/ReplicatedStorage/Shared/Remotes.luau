@@ -3,7 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local NAMES = { "Sync", "SeamStart", "SeamRemove", "Engage", "Detonate", "VolleyResult", "Buy", "Claim", "Setting", "Notify" }
+local NAMES = { "Sync", "SeamStart", "SeamRemove", "Engage", "Detonate", "VolleyResult", "Buy", "Claim", "ClaimGoal", "Setting", "Notify" }
 
 local Remotes: { [string]: RemoteEvent } = {}
 

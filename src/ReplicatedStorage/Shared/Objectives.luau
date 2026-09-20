@@ -71,6 +71,12 @@ function Objectives.Roam(data: any, px: number, pz: number, cfg: any): Objective
 		end
 	end
 
+	for _, goal in data.Goals or {} do
+		if goal.Complete and not goal.Claimed then
+			return { Id = "ClaimGoal", Text = "A goal is complete! Open the Menu to claim your reward.", Highlight = "Forge" }
+		end
+	end
+
 	local levels, cheapest = 0, math.huge
 	for _, lvl in data.Upgrades or {} do
 		levels += lvl

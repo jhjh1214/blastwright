@@ -4,6 +4,7 @@ Adding content is a data change:
 - **New crystal:** add an entry in `Config/Crystals.luau` (+ `Order`), pick an existing `Behavior` or add one in `ChainSim.Run` and a silhouette builder in `CavernView.luau`. Add a test.
 - **New charge:** `Config/Charges.luau`; add a shape in `ChainSim.blast` if needed.
 - **New stratum:** append to `Config/Strata.luau` and set crystals' `Stratum`.
+- **New goal:** one `goal(...)` line in `Config/Achievements.luau`; keep targets and rewards rising within a stat (a test enforces it, and that the target is reachable).
 - **New upgrade:** `Config/Upgrades.luau` plus its effect wiring in `Game.contextFor`/`Preview`.
 
 ## Backlog (ordered)

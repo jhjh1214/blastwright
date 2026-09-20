@@ -10,6 +10,7 @@ local Config = require(Shared.Config)
 local Geometry = require(Shared.Geometry)
 local Remotes = require(Shared.Remotes)
 
+local Achievements = require(Shared.Achievements)
 local Dailies = require(Shared.Dailies)
 local Data = require(script.Parent.Data)
 local Purchases = require(script.Parent.Purchases)
@@ -24,6 +25,7 @@ local Charges = Config.Charges
 local Strata = Config.Strata
 local WorldConfig = Config.World
 local DailiesConfig = Config.Dailies
+local AchievementsConfig = Config.Achievements
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -100,6 +102,7 @@ local function snapshot(player: Player): { [string]: any }?
 	end
 	return {
 		Passes = passes,
+		Goals = Achievements.View(data, AchievementsConfig),
 		Settings = data.Settings,
 		Dailies = Dailies.View(data.Daily, todaysDefs(), data.Progress.StrataUnlocked),
 		DailyResetIn = Dailies.SecondsUntilReset(os.time()),
@@ -367,6 +370,30 @@ local function onSetting(player: Player, name: any, value: any)
 	sync(player)
 end
 
+local function onClaimGoal(player: Player, id: any)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	local now = os.clock()
+	local last = lastAction[player]
+	if last and now - last.Buy < BUY_COOLDOWN then
+		return
+	end
+	if last then
+		last.Buy = now
+	end
+
+	if not Achievements.CanClaim(data, AchievementsConfig, id) then
+		return notify(player, "That goal is not complete yet.", "Error")
+	end
+	local def = Achievements.Find(AchievementsConfig, id)
+	data.Achievements.Claimed[def.Id] = true
+	data.Shards += def.Reward
+	notify(player, ("Goal complete: %s! +%d shards"):format(def.Name, def.Reward), "Reward")
+	sync(player)
+end
+
 local function onClaim(player: Player, slot: any)
 	local data = Data.Get(player)
 	if not data then
@@ -516,6 +543,7 @@ function Game.Init()
 	Remotes.Detonate.OnServerEvent:Connect(onDetonate)
 	Remotes.Buy.OnServerEvent:Connect(onBuy)
 	Remotes.Claim.OnServerEvent:Connect(onClaim)
+	Remotes.ClaimGoal.OnServerEvent:Connect(onClaimGoal)
 	Remotes.Setting.OnServerEvent:Connect(onSetting)
 	Purchases.Init({ Notify = notify, OnChanged = sync })
 

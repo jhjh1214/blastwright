@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 3
+Schema.CURRENT_VERSION = 4
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -16,6 +16,7 @@ function Schema.Default(): { [string]: any }
 		Settings = { Music = true, Sfx = true },
 		Caches = {}, -- [cacheId] = true for geode caches this player has looted
 		Daily = { Day = 0, Progress = {}, Claimed = {} }, -- see Shared/Dailies.luau (string slot keys)
+		Achievements = { Claimed = {} }, -- [goalId] = true once the reward was taken (see Shared/Achievements.luau)
 		Purchases = {}, -- receipt ids, reserved for monetization
 	}
 end
@@ -32,6 +33,12 @@ local Migrations: { [number]: (data: { [string]: any }) -> () } = {
 	[3] = function(data)
 		if type(data.Daily) ~= "table" then
 			data.Daily = { Day = 0, Progress = {}, Claimed = {} }
+		end
+	end,
+	-- v4: goals. Progress is derived from existing stats; only the claimed set is new.
+	[4] = function(data)
+		if type(data.Achievements) ~= "table" then
+			data.Achievements = { Claimed = {} }
 		end
 	end,
 }
