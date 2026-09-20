@@ -19,6 +19,6 @@
 | 15-16 QA / Launch | Not started |
 
 ## Next
-1. Developer playtest in Studio (see `TESTING.md`); fix what breaks.
-2. Asset workflow: audio first (silent game is the biggest presentation gap), then crystal/environment visuals.
+1. Developer confirms audio (`[Audio] ... OK` in Output), listens, and gives feel feedback; fix what breaks.
+2. Asset workflow for crystal/environment visuals, then music/ambience.
 3. Tune the economy from real play data.

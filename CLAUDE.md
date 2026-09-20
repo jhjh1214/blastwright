@@ -5,7 +5,7 @@
 
 ## Status (update this section as work lands)
 - Done and unit-tested (17 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
-- Written, **compile-checked only, never run in Studio**: `Game`, `Data`, `World`, all Client modules.
+- Runs in Studio (developer-confirmed) but has no automated tests and only a first smoke run: `Game`, `Data`, `World`, all Client modules.
 - Developer confirmed on 2026-09-21 that the game runs in Studio and shows the cavern and UI (after the lazy-DataStore fix). Feel/fun feedback not yet given.
 - Audio: 7 SFX cues wired from Creator Store results (`tools/asset-search`); **unheard, playback unconfirmed** until Output shows `[Audio] ... OK`.
 - Not started: monetization, external visual assets, music/ambience, mobile testing, world/hub, daily retention.
@@ -40,7 +40,7 @@ Never invent an asset or product ID. Use the Creator Store / Marketplace APIs, i
 Purchases only via `ProcessReceipt` (not built). Product IDs stay `nil` in config until supplied. Save data: `Schema.luau` versioned; bump `CURRENT_VERSION` and add a migration for any schema change.
 
 ## Known issues / risks
-- Untested in Studio (see Status). Expect first-run bugs in client modules.
+- Only smoke-tested in Studio: multi-player, mobile layout, seam end/regen, purchases in Forge and persistence are unverified.
 - Fun is unproven: the risk is "click and wait". Fix gameplay before adding content.
 - Preview may make planning too easy; Seismograph gating is a first mitigation.
 - Audio picks are metadata-only guesses. Visuals are procedural Parts placeholder quality.
