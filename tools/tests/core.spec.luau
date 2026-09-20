@@ -6,6 +6,7 @@ local Charges = require("../../src/ReplicatedStorage/Shared/Config/Charges")
 local Tuning = require("../../src/ReplicatedStorage/Shared/Config/Tuning")
 local Seam = require("../../src/ServerScriptService/Server/Seam")
 local Schema = require("../../src/ServerScriptService/Server/Schema")
+local Validate = require("../../src/ServerScriptService/Server/Validate")
 
 local ctx = { Crystals = Crystals.Defs, Charges = Charges.Defs, Tuning = Tuning }
 
@@ -170,6 +171,43 @@ test("schema: default, reconcile, migrate and sanitize", function()
 	local a, b = Schema.Default(), Schema.Default()
 	a.Codex.Discovered.X = true
 	eq(b.Codex.Discovered.X, nil, "defaults not shared")
+end)
+
+test("validate: accepts a clean volley and rebuilds it", function()
+	local raw = { { X = 3, Z = 4, Kind = "Basic", Evil = "x" } }
+	local out, why = Validate.Volley(raw, 4, { Basic = true }, 9, 8)
+	eq(why, nil, "reason")
+	eq(out[1].X, 3, "x")
+	eq(out[1].Evil, nil, "extra field stripped")
+	if out[1] == raw[1] then error("client table reused") end
+end)
+
+test("validate: rejects hostile payloads", function()
+	local unlocked = { Basic = true }
+	local function bad(p, what, left)
+		local out = Validate.Volley(p, left or 4, unlocked, 9, 8)
+		if out ~= nil then error("accepted: " .. what) end
+	end
+	bad(nil, "nil")
+	bad("x", "string")
+	bad(42, "number")
+	bad({}, "empty")
+	bad({ 1 }, "non-table entry")
+	bad({ { X = 1.5, Z = 1, Kind = "Basic" } }, "fractional")
+	bad({ { X = 0 / 0, Z = 1, Kind = "Basic" } }, "nan")
+	bad({ { X = math.huge, Z = 1, Kind = "Basic" } }, "inf")
+	bad({ { X = 0, Z = 1, Kind = "Basic" } }, "below range")
+	bad({ { X = 10, Z = 1, Kind = "Basic" } }, "above range")
+	bad({ { X = "3", Z = 1, Kind = "Basic" } }, "string coord")
+	bad({ { X = 1, Z = 1, Kind = "Shaft" } }, "locked charge")
+	bad({ { X = 1, Z = 1, Kind = "__index" } }, "junk kind")
+	bad({ { X = 1, Z = 1, Kind = 5 } }, "numeric kind")
+	bad({ { X = 1, Z = 1, Kind = "Basic" }, { X = 1, Z = 1, Kind = "Basic" } }, "duplicate cell")
+	bad({ { X = 1, Z = 1, Kind = "Basic" }, { X = 2, Z = 2, Kind = "Basic" } }, "more than charges left", 1)
+	bad({ { X = 1, Z = 1, Kind = "Basic" } }, "no charges left", 0)
+	local nine = {}
+	for i = 1, 9 do nine[i] = { X = i, Z = 1, Kind = "Basic" } end
+	bad(nine, "over hard cap", 99)
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))
