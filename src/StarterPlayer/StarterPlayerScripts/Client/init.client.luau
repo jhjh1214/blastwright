@@ -23,6 +23,7 @@ local UI = require(script.UI)
 
 task.spawn(AudioManager.Verify)
 AudioManager.StartLoops()
+AudioManager.StartMusic()
 
 UI.Init()
 Preview.OnText = UI.SetPreview
@@ -34,6 +35,10 @@ Guide.Init()
 UI.SetEngaged(false)
 
 Remotes.Sync.OnClientEvent:Connect(function(snapshot)
+	if snapshot.Settings then
+		AudioManager.SetEnabled("Music", snapshot.Settings.Music ~= false)
+		AudioManager.SetEnabled("Sfx", snapshot.Settings.Sfx ~= false)
+	end
 	State.SetData(snapshot)
 end)
 

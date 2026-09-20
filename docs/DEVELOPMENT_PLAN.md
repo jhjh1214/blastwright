@@ -13,7 +13,7 @@
 | 9 Economy | Paper math only |
 | 10 Monetization | Framework built (products, ProcessReceipt, shop tab); **no IDs, never tested live** |
 | 11 UI polish | Blast HUD moved to screen corners; roam HUD separate; further polish pending |
-| 12 Audio/VFX polish | SFX and a cave ambience bed wired; no music (none passed the provenance filter) |
+| 12 Audio/VFX polish | SFX, ambience and a shuffled classical music playlist wired (unheard); music/effects switches saved |
 | 13 Mobile | Not tested |
 | 14 Security | Remote validation done and tested; full audit later |
 | 15-16 QA / Launch | Not started |

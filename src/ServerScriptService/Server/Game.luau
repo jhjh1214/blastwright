@@ -100,6 +100,7 @@ local function snapshot(player: Player): { [string]: any }?
 	end
 	return {
 		Passes = passes,
+		Settings = data.Settings,
 		Dailies = Dailies.View(data.Daily, todaysDefs(), data.Progress.StrataUnlocked),
 		DailyResetIn = Dailies.SecondsUntilReset(os.time()),
 		Shards = data.Shards,
@@ -356,6 +357,16 @@ local function onBuy(player: Player, kind: any, id: any)
 	sync(player)
 end
 
+local function onSetting(player: Player, name: any, value: any)
+	local data = Data.Get(player)
+	local key, enabled = Validate.Setting(name, value)
+	if not data or not key then
+		return
+	end
+	data.Settings[key] = enabled
+	sync(player)
+end
+
 local function onClaim(player: Player, slot: any)
 	local data = Data.Get(player)
 	if not data then
@@ -505,6 +516,7 @@ function Game.Init()
 	Remotes.Detonate.OnServerEvent:Connect(onDetonate)
 	Remotes.Buy.OnServerEvent:Connect(onBuy)
 	Remotes.Claim.OnServerEvent:Connect(onClaim)
+	Remotes.Setting.OnServerEvent:Connect(onSetting)
 	Purchases.Init({ Notify = notify, OnChanged = sync })
 
 	for siteId, entry in World.Registry.Sites do

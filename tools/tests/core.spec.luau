@@ -604,5 +604,34 @@ test("sounds: ids are well-formed asset uris, groups known, loops sane", functio
 	eq(Sounds.Pop.Loop, nil, "effects do not loop")
 end)
 
+test("validate: settings accept only known keys with boolean values", function()
+	local k, v = Validate.Setting("Music", false)
+	eq(k, "Music", "music key")
+	eq(v, false, "false is a valid value")
+	k, v = Validate.Setting("Sfx", true)
+	eq(k, "Sfx", "sfx key")
+	eq(v, true, "true")
+	for _, bad in { { "Music", "yes" }, { "Music", 1 }, { "Music", nil }, { "Volume", true }, { "__index", true }, { 5, true }, { nil, true }, { "music", true }, { "", false } } do
+		local key = Validate.Setting(bad[1], bad[2])
+		if key ~= nil then error("accepted bad setting: " .. tostring(bad[1]) .. " = " .. tostring(bad[2])) end
+	end
+end)
+
+test("music: playlist is valid, has no duplicate ids, and stays cheerful-sized", function()
+	local Music = require("../../src/ReplicatedStorage/Shared/Config/Music")
+	local seen, total = {}, 0
+	eq(#Music.Tracks >= 6, true, "enough tracks that the shuffle does not feel repetitive")
+	for i, t in Music.Tracks do
+		if not string.match(t.Id, "^rbxassetid://%d+$") then error("track " .. i .. " has a malformed id") end
+		if seen[t.Id] then error("duplicate track " .. t.Id) end
+		seen[t.Id] = true
+		if t.Name == "" or t.Artist == "" then error("track " .. i .. " needs name and artist") end
+		if t.Seconds <= Music.CrossfadeSeconds * 4 then error("track " .. i .. " is too short to crossfade") end
+		total += t.Seconds
+	end
+	eq(total >= 20 * 60, true, "at least 20 minutes before the playlist repeats")
+	eq(Music.Volume > 0 and Music.Volume <= 1, true, "volume in range")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

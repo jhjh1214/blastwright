@@ -53,4 +53,12 @@ function Validate.Volley(
 	return clean, nil
 end
 
+-- A settings change from the client. Only known keys with boolean values are accepted.
+function Validate.Setting(name: any, value: any): (string?, boolean?)
+	if (name == "Music" or name == "Sfx") and type(value) == "boolean" then
+		return name :: string, value :: boolean
+	end
+	return nil, nil
+end
+
 return Validate

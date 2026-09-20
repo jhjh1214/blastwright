@@ -84,6 +84,7 @@ end
 
 local gui, shardLabel, locationLabel, cacheLabel, objectiveCard, objectiveText, blastHint, seamLabel, chainLabel, previewFrame, previewLabel
 local welcomeFrame, menuDot
+local settingButtons = {}
 local tabButtons = {}
 local toastHolder, tierLabel, chargeColumn, panel, panelScroll, detonateButton
 local roamGroup, blastGroup
@@ -236,6 +237,25 @@ function UI.Init()
 	for i, text in steps do
 		label(welcomeFrame, text, 17, THEME.Text, { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = 1 + i, ZIndex = 21 })
 	end
+	local settingsRow = mk("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 44), LayoutOrder = 15, ZIndex = 21 }, welcomeFrame)
+	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 10) }, settingsRow)
+	for _, setting in { { "Music", "Music" }, { "Sfx", "Effects" } } do
+		local key, title = setting[1], setting[2]
+		local b = button(settingsRow, title .. ": On", THEME.Row, { Size = UDim2.new(0.5, -5, 1, 0), TextSize = 17, ZIndex = 22 })
+		settingButtons[key] = { Button = b, Title = title }
+		b.Activated:Connect(function()
+			local current = not State.Data or not State.Data.Settings or State.Data.Settings[key] ~= false
+			local nextValue = not current
+			AudioManager.Play("Click")
+			if State.Data and State.Data.Settings then
+				State.Data.Settings[key] = nextValue
+			end
+			AudioManager.SetEnabled(key, nextValue)
+			Remotes.Setting:FireServer(key, nextValue)
+			UI.RefreshSettings()
+		end)
+	end
+
 	local go = button(welcomeFrame, "Let's go", THEME.Accent, { Size = UDim2.fromOffset(180, 48), TextSize = 20, TextColor3 = THEME.Bg, LayoutOrder = 20, ZIndex = 21 })
 	go.Activated:Connect(function()
 		AudioManager.Play("Click")
@@ -297,6 +317,16 @@ function UI.SetBlastHint(text)
 	if not blastHint then return end
 	blastHint.Visible = text ~= nil and text ~= ""
 	blastHint.Text = text or ""
+end
+
+function UI.RefreshSettings()
+	local settings = State.Data and State.Data.Settings
+	for key, entry in settingButtons do
+		local on = not settings or settings[key] ~= false
+		entry.Button.Text = ("%s: %s"):format(entry.Title, on and "On" or "Off")
+		entry.Button.BackgroundColor3 = on and THEME.Accent or THEME.Row
+		entry.Button.TextColor3 = on and THEME.Bg or THEME.Text
+	end
 end
 
 function UI.ShowWelcome(show)
@@ -514,6 +544,7 @@ function UI.Refresh()
 		end
 	end
 	menuDot.Visible = claimable
+	UI.RefreshSettings()
 
 	rebuildCharges()
 	rebuildPanel()

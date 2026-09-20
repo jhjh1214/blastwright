@@ -14,6 +14,7 @@ return {
 	Dailies = require(script.Dailies),
 	Products = require(script.Products),
 	Props = require(script.Props),
+	Music = require(script.Music),
 	Tuning = Tuning,
 	Context = {
 		Crystals = Crystals.Defs,
