@@ -21,18 +21,26 @@ local Preview = require(script.Preview)
 local State = require(script.State)
 local UI = require(script.UI)
 
+-- Optional presentation systems: a failure in one of these warns and the game still starts.
+local function optional(name, start)
+	local ok, err = pcall(start)
+	if not ok then
+		warn(("[Client] optional system '%s' failed to start: %s"):format(name, tostring(err)))
+	end
+end
+
 task.spawn(AudioManager.Verify)
-AudioManager.StartLoops()
-AudioManager.StartMusic()
+optional("ambience loops", AudioManager.StartLoops)
+optional("music", AudioManager.StartMusic)
 
 UI.Init()
 Preview.OnText = UI.SetPreview
 Preview.OnInfo = UI.SetInfo
 CameraFeedback.Start()
 Input.Init()
-CacheView.Init()
-Ambience.Init()
-Guide.Init()
+optional("cache visuals", CacheView.Init)
+optional("ambient motes", Ambience.Init)
+optional("guide", Guide.Init)
 UI.SetEngaged(false)
 
 Remotes.Sync.OnClientEvent:Connect(function(snapshot)

@@ -20,12 +20,43 @@ which checks every Roblox property, method, enum and service name against the of
 `Game.luau` (site reservation, rewards, seam end, caches, daily wiring), `Purchases.luau` (`ProcessReceipt`, gamepass checks), `Leaderboard.luau` (OrderedDataStore reads/writes and the hub board), `Props.luau` (model loading and sanitizing), music/ambience playback and the sound switches, `World.luau` terrain and prop building, `Data.luau` (DataStore, locking, retries, shutdown), `World.luau`, and every client module (rendering, UI, input, camera, playback). These are compile-checked only.
 
 ## Manual Studio checklist (developer)
-1. `rojo serve`, connect the plugin in Studio, press Play. Expect a few seconds of loading, then spawn on the hub plaza (no errors in Output).
-2. Walk down the west road to a Glimmer Shallows pad; use its station. Expect the camera to lift over the grid and movement to lock. Plant, Detonate, watch the cascade; shards count up. "Leave" (or X) returns you to free roaming.
-3. Clear a seam or run out of charges: expect a toast and a new seam after ~3s.
-3b. Walk to a Prism Veins or Ember Hollows pad before unlocking: expect a "locked" toast. Find a geode cache off the road: expect a shard reward, "n/22 found", and the cache to go dull.
-4. Open Forge: buy an upgrade; check shards drop and Lv rises. Open Codex.
-5. Test with 2 players (Test tab, 2 players): each has their own cavern and can see the other's.
-6. Stop and play again: in Studio the profile is volatile, so progress will not persist (expected; see output warning). Real persistence requires "Enable Studio Access to API Services" and a published place.
-7. Emulate a phone (Device emulator): check the layout, tap targets, and that the whole grid is visible in portrait.
-8. Report anything odd from the Output window.
+Everything below was written without being run in Studio (the automated tests cover only the pure logic). Run `rojo serve`, connect the Rojo plugin in a Baseplate place, press Play, and tick through in order. Paste any Output errors or oddities back to Claude.
+
+### A. Startup (Output window)
+1. No red errors. Expected lines: `[Data] DataStore unavailable in Studio ... volatile profile` (normal unpublished), `[Props] 8/8 props available`, one `[Audio] ... -> OK` per sound and per music track (about 19).
+2. No `World build failed`, no `optional system '...' failed to start`. A leaderboard warning about DataStore access is normal unpublished.
+3. World loads in a few seconds, you spawn on the hub plaza. Lighting is bright enough, crystals are not glaring.
+
+### B. Getting around
+4. Welcome panel shows for a new profile; "Let's go" closes it; "?" reopens it and shows Music / Effects / Shake switches.
+5. Objective card says to walk to a blast pad; a gold marker with distance, a glowing dot trail and (when off-screen) an edge arrow lead there.
+6. Four biomes off the hub: Shallows (west), Prism Veins (east), Ember Hollows (north), Echo Caverns (south, needs the new southern road). Signposts at the hub name them.
+7. Hub leaderboard board is beside the spawn (shows "Unavailable" until the game is published; that is expected).
+8. Music plays (cheerful classical), cave ambience underneath. Music and Effects switches work and persist after Stop/Play only when the game is published (volatile profile otherwise).
+
+### C. Blasting
+9. Use a Shallows pad station: camera lifts CLOSE over a round pad, movement locks, no "Start blasting" prompt is visible. HUD text sits above the grid, not on it; corner buttons at the bottom.
+10. Grid outline and faint lines visible. Hover a cell (PC) or tap (mobile): gold outline, and the exact blasted cells are tinted. Crystal info line appears.
+11. Plant charges (Blasting Cap; unlock Shaft Charge later for the strip), press Detonate (or Space): cascade with sounds, numbers, chain lines; tier banner on big chains; Momentum toast at 10+ pops.
+12. Gold links appear only with the Seismograph upgrade (900 shards); without it only white direct hits.
+13. Leave button (top right) or X returns you to walking, camera returns to normal.
+14. Clear a seam or run out of charges: toast, new seam after about 3 seconds.
+
+### D. Economy and menus (Menu button, top right)
+15. Forge: buy upgrades (Deep Satchel, Fat Fuse, Momentum Coil, Seismograph), unlock Shaft Charge (400), unlock areas (1,200 / 4,000 / 12,000). Locked pads show a "locked" toast.
+16. Daily tab: three objectives with progress; weekly challenges below; Claim pays out; red dot on Menu when something is claimable.
+17. Goals tab (24): progress bars, claim; a "Goal ready" toast appears the moment one completes.
+18. Shop tab: everything says "Not for sale yet" (no product IDs exist). Nothing crashes.
+19. Codex tab: crystals appear as you discover them (7 kinds); Blast colors section: Classic equipped; others locked with a hint ("Claim the goal: ..."); claiming that goal unlocks it and Equip works; your planting markers and blast rings change color.
+20. Geode caches (22) hidden off the roads: crack open once each, reward + "n/22", then the cache goes dull.
+
+### E. New mechanics
+21. Slowburn (area 3): fuse flash, pops about a second later at your peak multiplier.
+22. Echostone (area 4): popping one sets off every other Echostone on the grid; a long line shows the jump. (To reach these quickly, temporarily lower `Cost` in `Config/Strata.luau` and/or `Config/Tuning`, then restore.)
+
+### F. Multi-player and phones (Test > 2 players, and the Device emulator)
+23. Two players use different pads and see each other's grids and blasts (distant grids appear only when you are near: level of detail). A pad in use is labelled "In use". Walking 130+ studs away for a minute releases it.
+24. Phone-size window (for example 390 x 844): top bar (shards, Menu, ?) does not overlap; the Menu panel's 5 tabs fit; the grid is fully visible in the free band; buttons are tappable; text readable.
+
+### G. Publishing-only (do these last, see MANUAL_ACTIONS.md)
+25. Save persistence, the leaderboard, product prompts, and 2x Shards / Prismatic Luck can only be verified in a published place.

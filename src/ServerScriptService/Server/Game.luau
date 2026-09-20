@@ -621,6 +621,14 @@ local function idleLoop()
 	end
 end
 
+-- Optional systems must never be able to stop the core game from starting: a failure warns and the rest carries on.
+local function optional(name: string, start: () -> ())
+	local ok, err = pcall(start)
+	if not ok then
+		warn(("[Game] optional system '%s' failed to start: %s"):format(name, tostring(err)))
+	end
+end
+
 function Game.Init()
 	Remotes.Detonate.OnServerEvent:Connect(onDetonate)
 	Remotes.Buy.OnServerEvent:Connect(onBuy)
@@ -629,8 +637,12 @@ function Game.Init()
 	Remotes.ClaimGoal.OnServerEvent:Connect(onClaimGoal)
 	Remotes.Equip.OnServerEvent:Connect(onEquip)
 	Remotes.Setting.OnServerEvent:Connect(onSetting)
-	Purchases.Init({ Notify = notify, OnChanged = sync })
-	Leaderboard.Init(World.Registry.Board)
+	optional("Purchases", function()
+		Purchases.Init({ Notify = notify, OnChanged = sync })
+	end)
+	optional("Leaderboard", function()
+		Leaderboard.Init(World.Registry.Board)
+	end)
 
 	for siteId, entry in World.Registry.Sites do
 		entry.Prompt.Triggered:Connect(function(player)
