@@ -1,0 +1,187 @@
+--!strict
+-- Deterministic chain-reaction simulator. Pure: no Roblox APIs, does not mutate the grid.
+-- The SERVER runs this to decide rewards; the CLIENT runs the same code for the chain preview.
+
+export type Cell = { Kind: string, Mutated: boolean? }
+export type Grid = { Size: number, Cells: { [number]: Cell } }
+export type Charge = { X: number, Z: number, Kind: string }
+export type Event = {
+	T: number,
+	X: number,
+	Z: number,
+	Kind: string,
+	Value: number,
+	Mult: number,
+	Mutated: boolean,
+	Cause: string, -- Charge | Chain | Beam
+}
+export type Context = {
+	Crystals: { [string]: any },
+	Charges: { [string]: any },
+	Tuning: any,
+	RadiusBonus: number?,
+	MomentumPops: number?,
+}
+export type Result = {
+	Events: { Event },
+	Pops: number,
+	Raw: number,
+	Bonus: number,
+	Total: number,
+	PeakMult: number,
+	Tier: string?,
+	Duration: number,
+	Momentum: boolean,
+}
+
+type QueueItem = { T: number, Seq: number, X: number, Z: number, Cause: string }
+
+local ChainSim = {}
+
+function ChainSim.Key(size: number, x: number, z: number): number
+	return (z - 1) * size + x
+end
+
+function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
+	local size = grid.Size
+	local tuning = ctx.Tuning
+	local dead: { [number]: boolean } = {}
+	local pending: { [number]: number } = {}
+	local queue: { QueueItem } = {}
+	local seq = 0
+
+	-- Schedule a cell to pop at time t; keeps only the earliest pending time per cell.
+	local function schedule(x: number, z: number, t: number, cause: string)
+		if x < 1 or x > size or z < 1 or z > size then
+			return
+		end
+		local key = ChainSim.Key(size, x, z)
+		if grid.Cells[key] == nil or dead[key] then
+			return
+		end
+		local existing = pending[key]
+		if existing ~= nil and existing <= t then
+			return
+		end
+		pending[key] = t
+		seq += 1
+		local lo, hi = 1, #queue + 1
+		while lo < hi do
+			local mid = (lo + hi) // 2
+			local q = queue[mid]
+			if q.T < t or (q.T == t and q.Seq < seq) then
+				lo = mid + 1
+			else
+				hi = mid
+			end
+		end
+		table.insert(queue, lo, { T = t, Seq = seq, X = x, Z = z, Cause = cause })
+	end
+
+	local function blast(ox: number, oz: number, t0: number, shape: string, radius: number, range: number, cause: string)
+		local step = tuning.StepPerCell
+		if shape == "Radius" then
+			local reach = math.ceil(radius)
+			for dz = -reach, reach do
+				for dx = -reach, reach do
+					local d = math.sqrt(dx * dx + dz * dz)
+					if d <= radius then
+						schedule(ox + dx, oz + dz, t0 + d * step, cause)
+					end
+				end
+			end
+		elseif shape == "Column" then
+			for dz = -range, range do
+				schedule(ox, oz + dz, t0 + math.abs(dz) * step, cause)
+			end
+		elseif shape == "Row" then
+			for dx = -range, range do
+				schedule(ox + dx, oz, t0 + math.abs(dx) * step, cause)
+			end
+		end
+	end
+
+	for _, c in charges do
+		local def = ctx.Charges[c.Kind]
+		if def ~= nil then
+			local radius = (def.Radius or 0) + (def.Shape == "Radius" and (ctx.RadiusBonus or 0) or 0)
+			blast(c.X, c.Z, 0, def.Shape, radius, def.Range or 0, "Charge")
+		end
+	end
+
+	local events: { Event } = {}
+	local mult = 1
+	local peak = 1
+	local raw = 0
+
+	while #queue > 0 do
+		local item = table.remove(queue, 1) :: QueueItem
+		local key = ChainSim.Key(size, item.X, item.Z)
+		if not dead[key] and pending[key] == item.T then
+			dead[key] = true
+			local cell = grid.Cells[key]
+			local def = ctx.Crystals[cell.Kind]
+			local behavior = def.Behavior
+			local value = 0
+			local mutMult = cell.Mutated and tuning.MutationValueMult or 1
+
+			if behavior == "Unstable" then
+				mult = math.max(1, mult * def.Params.MultScale)
+			elseif behavior == "Amplifier" then
+				mult += def.Params.MultAdd
+				value = def.Value * mutMult * mult
+			else
+				value = def.Value * mutMult * mult
+			end
+			peak = math.max(peak, mult)
+
+			if behavior == "Volatile" then
+				blast(item.X, item.Z, item.T + tuning.VolatileDelay, "Radius", def.Params.Radius, 0, "Chain")
+			elseif behavior == "Prism" then
+				blast(item.X, item.Z, item.T + tuning.PrismDelay, "Row", 0, def.Params.Range, "Beam")
+			end
+
+			local rounded = math.floor(value + 0.5)
+			raw += rounded
+			table.insert(events, {
+				T = item.T,
+				X = item.X,
+				Z = item.Z,
+				Kind = cell.Kind,
+				Value = rounded,
+				Mult = mult,
+				Mutated = cell.Mutated == true,
+				Cause = item.Cause,
+			})
+		end
+	end
+
+	local pops = #events
+	local tier: string? = nil
+	local bonus = 0
+	for _, t in tuning.ChainTiers do
+		if pops >= t.Pops then
+			tier = t.Name
+			bonus = t.Bonus
+		end
+	end
+
+	local duration = 0
+	if pops > 0 then
+		duration = events[pops].T + 0.4
+	end
+
+	return {
+		Events = events,
+		Pops = pops,
+		Raw = raw,
+		Bonus = bonus,
+		Total = math.floor(raw * (1 + bonus)),
+		PeakMult = peak,
+		Tier = tier,
+		Duration = duration,
+		Momentum = pops >= (ctx.MomentumPops or tuning.MomentumPops),
+	}
+end
+
+return ChainSim
