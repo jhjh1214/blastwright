@@ -1039,5 +1039,50 @@ test("receipts: granting a cosmetic marks it owned, once, and never touches shar
 	eq(d.Cosmetics.Owned.NeonPink, true, "granting twice is harmless")
 end)
 
+test("goals: newly completed goals are reported once, and already-complete ones are never announced", function()
+	local d = serverData()
+	local first, second = AchCfg.Defs[1], AchCfg.Defs[2]
+	d.Stats.TotalPops = first.Target -- one goal already complete when the player joins
+	local seen = {}
+	local initial = Achievements.NewlyComplete(d, AchCfg, seen)
+	eq(#initial, 1, "join-time scan sees the existing completion")
+	eq(#Achievements.NewlyComplete(d, AchCfg, seen), 0, "nothing new on a repeat scan")
+	d.Stats.TotalPops = second.Target
+	local fresh = Achievements.NewlyComplete(d, AchCfg, seen)
+	eq(#fresh, 1, "exactly the newly reached goal")
+	eq(fresh[1].Id, second.Id, "it is the second tier")
+	eq(#Achievements.NewlyComplete(d, AchCfg, seen), 0, "announced only once")
+end)
+
+test("goals: a goal that is already claimed counts as seen, so it is never announced", function()
+	local d = serverData()
+	local def = AchCfg.Defs[1]
+	d.Stats.TotalPops = def.Target
+	d.Achievements.Claimed[def.Id] = true
+	local seen = {}
+	Achievements.NewlyComplete(d, AchCfg, seen)
+	d.Stats.TotalPops = def.Target + 1
+	eq(#Achievements.NewlyComplete(d, AchCfg, seen), 0, "no re-announcement")
+end)
+
+test("goals: several goals crossing at once are all reported, in config order", function()
+	local d = serverData()
+	local seen = {}
+	Achievements.NewlyComplete(d, AchCfg, seen)
+	d.Stats.TotalPops = 1e6
+	d.Stats.BestChain = 40
+	local list = Achievements.NewlyComplete(d, AchCfg, seen)
+	local sawPops, sawChain, lastIndex = false, false, 0
+	for _, def in list do
+		if def.Stat == "TotalPops" then sawPops = true end
+		if def.Stat == "BestChain" then sawChain = true end
+		local index
+		for i, x in AchCfg.Defs do if x.Id == def.Id then index = i end end
+		if index < lastIndex then error("not in config order") end
+		lastIndex = index
+	end
+	eq(sawPops and sawChain, true, "both stats reported")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

@@ -56,6 +56,7 @@ local siteOwner: { [number]: Player } = {}
 local playerSite: { [Player]: number } = {}
 local awaySince: { [Player]: number } = {}
 local lastAction: { [Player]: { Buy: number, Detonate: number } } = {}
+local seenGoals: { [Player]: { [string]: boolean } } = {}
 local seamCounter = 0
 
 local cachesById: { [string]: any } = {}
@@ -83,6 +84,18 @@ end
 
 local function notify(player: Player, text: string, kind: string)
 	Remotes.Notify:FireClient(player, text, kind)
+end
+
+-- Tell the player the moment a goal becomes claimable (not for ones that were already done when they joined).
+local function announceGoals(player: Player)
+	local data = Data.Get(player)
+	local seen = seenGoals[player]
+	if not data or not seen then
+		return
+	end
+	for _, def in Achievements.NewlyComplete(data, AchievementsConfig, seen) do
+		notify(player, ("Goal ready: %s  (Menu > Goals)"):format(def.Name), "Reward")
+	end
 end
 
 local function isNear(player: Player, position: Vector3, maxDistance: number): boolean
@@ -207,6 +220,7 @@ local function endSeam(player: Player, seam: SeamState)
 		data.Stats.TotalShards += bonus
 		data.Stats.SeamsCleared += 1
 		recordDaily(data, "Seams", 1)
+		announceGoals(player)
 		notify(player, ("Seam cleared! +%d bonus shards"):format(bonus), "Reward")
 	else
 		notify(player, "Seam spent. New seam incoming.", "Info")
@@ -277,6 +291,7 @@ local function onDetonate(player: Player, payload: any)
 		seam.Charges = math.min(seam.Charges + 1, seam.ChargesMax)
 	end
 
+	announceGoals(player)
 	Remotes.VolleyResult:FireAllClients({
 		UserId = player.UserId,
 		Style = Cosmetics.Active(data, CosmeticsConfig).Id,
@@ -362,6 +377,7 @@ local function onBuy(player: Player, kind: any, id: any)
 	else
 		return
 	end
+	announceGoals(player)
 	sync(player)
 end
 
@@ -487,6 +503,7 @@ local function onCacheTriggered(player: Player, cacheId: string)
 		found += 1
 	end
 	notify(player, ("Geode cache! +%d shards (%d/%d found)"):format(cache.Reward, found, #WorldConfig.Caches), "Reward")
+	announceGoals(player)
 	sync(player)
 end
 
@@ -517,6 +534,8 @@ local function onPlayerAdded(player: Player)
 	end
 
 	lastAction[player] = { Buy = 0, Detonate = 0 }
+	seenGoals[player] = {}
+	Achievements.NewlyComplete(session.Data, AchievementsConfig, seenGoals[player]) -- silent: old completions are not announced
 	Purchases.LoadPasses(player)
 	player:LoadCharacter()
 	sync(player)
@@ -532,6 +551,7 @@ end
 local function onPlayerRemoving(player: Player)
 	releaseSite(player)
 	Purchases.Forget(player)
+	seenGoals[player] = nil
 	lastAction[player] = nil
 end
 

@@ -60,6 +60,19 @@ function Achievements.CanClaim(data: any, cfg: any, id: any): boolean
 	return Achievements.Value(data, def.Stat) >= def.Target
 end
 
+-- Goals that are complete (or already claimed) but not yet in `seen`; marks them seen. Call once when a player joins and
+-- ignore the result, so old completions are never announced, then again after gameplay events to announce new ones.
+function Achievements.NewlyComplete(data: any, cfg: any, seen: { [string]: boolean }): { any }
+	local out = {}
+	for _, def in cfg.Defs do
+		if not seen[def.Id] and (data.Achievements.Claimed[def.Id] == true or Achievements.Value(data, def.Stat) >= def.Target) then
+			seen[def.Id] = true
+			table.insert(out, def)
+		end
+	end
+	return out
+end
+
 -- One row per goal, in config order, for the client.
 function Achievements.View(data: any, cfg: any): { View }
 	local out: { View } = {}
