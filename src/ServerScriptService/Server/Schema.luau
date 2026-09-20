@@ -13,7 +13,7 @@ function Schema.Default(): { [string]: any }
 		Progress = { StrataUnlocked = 1, ActiveStratum = 1 },
 		Codex = { Discovered = {}, Mutated = {} }, -- [crystalId] = true
 		Stats = { SeamsCleared = 0, BestChain = 0, TotalPops = 0, TotalShards = 0 },
-		Settings = { Music = true, Sfx = true },
+		Settings = { Music = true, Sfx = true, Shake = true },
 		Caches = {}, -- [cacheId] = true for geode caches this player has looted
 		Daily = { Day = 0, Progress = {}, Claimed = {} }, -- see Shared/Dailies.luau (string slot keys)
 		Weekly = { Day = 0, Progress = {}, Claimed = {} }, -- same shape; Day holds the week number

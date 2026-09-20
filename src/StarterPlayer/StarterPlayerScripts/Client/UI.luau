@@ -13,6 +13,7 @@ local Remotes = require(Shared.Remotes)
 local Products = Config.Products
 
 local AudioManager = require(script.Parent.AudioManager)
+local CameraFeedback = require(script.Parent.CameraFeedback)
 local State = require(script.Parent.State)
 
 local UI = {}
@@ -243,9 +244,9 @@ function UI.Init()
 	end
 	local settingsRow = mk("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 44), LayoutOrder = 15, ZIndex = 21 }, welcomeFrame)
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 10) }, settingsRow)
-	for _, setting in { { "Music", "Music" }, { "Sfx", "Effects" } } do
+	for _, setting in { { "Music", "Music" }, { "Sfx", "Effects" }, { "Shake", "Shake" } } do
 		local key, title = setting[1], setting[2]
-		local b = button(settingsRow, title .. ": On", THEME.Row, { Size = UDim2.new(0.5, -5, 1, 0), TextSize = 17, ZIndex = 22 })
+		local b = button(settingsRow, title .. ": On", THEME.Row, { Size = UDim2.new(1 / 3, -7, 1, 0), TextSize = 15, ZIndex = 22 })
 		settingButtons[key] = { Button = b, Title = title }
 		b.Activated:Connect(function()
 			local current = not State.Data or not State.Data.Settings or State.Data.Settings[key] ~= false
@@ -255,6 +256,9 @@ function UI.Init()
 				State.Data.Settings[key] = nextValue
 			end
 			AudioManager.SetEnabled(key, nextValue)
+			if key == "Shake" then
+				CameraFeedback.SetShakeEnabled(nextValue)
+			end
 			Remotes.Setting:FireServer(key, nextValue)
 			UI.RefreshSettings()
 		end)

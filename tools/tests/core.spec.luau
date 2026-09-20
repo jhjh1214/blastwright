@@ -1197,5 +1197,17 @@ test("objectives: a finished weekly objective is surfaced too", function()
 	eq(Objectives.Roam(data, 0, 0, ocfg).Id ~= "ClaimDaily", true, "claimed one no longer nags")
 end)
 
+test("settings: screen shake is a valid boolean setting, defaults on, and old saves get the default", function()
+	local k, v = Validate.Setting("Shake", false)
+	eq(k, "Shake", "shake key accepted")
+	eq(v, false, "false is valid")
+	eq(Validate.Setting("Shake", "off"), nil, "non-boolean rejected")
+	eq(Validate.Setting("shake", true), nil, "case matters")
+	eq(Schema.Default().Settings.Shake, true, "on by default")
+	local old = Schema.Migrate({ SchemaVersion = 5, Settings = { Music = false, Sfx = true } })
+	eq(old.Settings.Shake, true, "an old save without the key gets the default")
+	eq(old.Settings.Music, false, "existing choices are kept")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

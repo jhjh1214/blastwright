@@ -36,11 +36,27 @@ function CameraFeedback.Clear()
 	end
 end
 
+local shakeEnabled = true
+
+-- Accessibility: some players (and small screens) do not want the camera to move on impact.
+function CameraFeedback.SetShakeEnabled(on)
+	shakeEnabled = on
+	if not on then
+		shake, punch = 0, 0
+	end
+end
+
 function CameraFeedback.Shake(amount)
+	if not shakeEnabled then
+		return
+	end
 	shake = math.max(shake, math.min(amount, 1.2))
 end
 
 function CameraFeedback.Punch(degrees)
+	if not shakeEnabled then
+		return
+	end
 	punch = math.max(punch, math.min(degrees, 10))
 end
 

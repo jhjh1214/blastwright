@@ -39,6 +39,7 @@ Remotes.Sync.OnClientEvent:Connect(function(snapshot)
 	if snapshot.Settings then
 		AudioManager.SetEnabled("Music", snapshot.Settings.Music ~= false)
 		AudioManager.SetEnabled("Sfx", snapshot.Settings.Sfx ~= false)
+		CameraFeedback.SetShakeEnabled(snapshot.Settings.Shake ~= false)
 	end
 	State.SetData(snapshot)
 end)
