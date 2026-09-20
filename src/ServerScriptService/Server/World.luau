@@ -194,6 +194,21 @@ local function buildTerrain()
 			end
 		end
 	end
+	-- Rocky rim around each blast pad, open on the station side (toward -Z), so the pad reads as a cavern chamber.
+	for _, site in W.Sites do
+		for i = 1, 18 do
+			local a = (i / 18) * math.pi * 2 + rng:NextNumber() * 0.15
+			if math.abs(math.atan2(math.sin(a + math.pi / 2), math.cos(a + math.pi / 2))) > 0.7 then
+				local r = rng:NextNumber(2.8, 5.5)
+				local d = W.PadRadius + 2 + rng:NextNumber(0, 3)
+				Terrain:FillBall(Vector3.new(site.X + math.cos(a) * d, r * 0.3, site.Z + math.sin(a) * d), r, Enum.Material.Rock)
+				n += 1
+				if n % 12 == 0 then
+					task.wait()
+				end
+			end
+		end
+	end
 	return spires, rng
 end
 
@@ -435,7 +450,7 @@ local function buildSites()
 	local folder = Instance.new("Folder")
 	folder.Name = "Sites"
 	folder.Parent = root
-	local half = (Geometry.Extent() + 6) / 2
+	local radius = W.PadRadius
 	local dark = Color3.fromRGB(30, 34, 46)
 
 	for _, biome in W.Biomes do
@@ -452,11 +467,19 @@ local function buildSites()
 		local color = c3(biome.Color)
 		local origin = Geometry.Origin(site.Id)
 
-		local padPart = mk(folder, Vector3.new(half * 2, 1, half * 2), CFrame.new(origin + Vector3.new(0, -0.3, 0)), Color3.fromRGB(34, 38, 52), Enum.Material.Slate)
+		-- Round cavern floor with a soft glowing edge (a wider, lower disc peeking out under the floor).
+		local padPart = mk(folder, Vector3.new(0.9, radius * 2, radius * 2), CFrame.new(origin + Vector3.new(0, -0.25, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(46, 52, 72), Enum.Material.Slate, Enum.PartType.Cylinder)
 		padPart.Name = "Pad" .. site.Id
-		for _, sgn in { -1, 1 } do
-			decorPart(folder, Vector3.new(half * 2, 0.2, 0.4), CFrame.new(origin + Vector3.new(0, 0.25, sgn * half)), color, Enum.Material.Neon)
-			decorPart(folder, Vector3.new(0.4, 0.2, half * 2), CFrame.new(origin + Vector3.new(sgn * half, 0.25, 0)), color, Enum.Material.Neon)
+		decorPart(folder, Vector3.new(0.6, (radius + 1.4) * 2, (radius + 1.4) * 2), CFrame.new(origin + Vector3.new(0, -0.4, 0)) * CFrame.Angles(0, 0, math.pi / 2), color:Lerp(Color3.new(0, 0, 0), 0.3), Enum.Material.Neon, Enum.PartType.Cylinder)
+
+		-- A few crystal clusters just outside the rim, leaving the station side (toward -Z) open.
+		local prng = Random.new(site.Id * 13)
+		for i = 1, 6 do
+			local a = (i / 6) * math.pi * 2 + prng:NextNumber() * 0.4
+			if math.abs(math.atan2(math.sin(a + math.pi / 2), math.cos(a + math.pi / 2))) > 0.7 then
+				local r = radius + 5 + prng:NextNumber() * 3
+				cluster(folder, origin + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r), color, 1.2 + prng:NextNumber() * 0.6, prng, false)
+			end
 		end
 
 		local stationPos = Geometry.Station(site.Id)

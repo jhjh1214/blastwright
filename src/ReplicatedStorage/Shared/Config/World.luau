@@ -74,6 +74,7 @@ local World = {
 	Paths = Paths,
 	Spawn = { X = 0, Z = 24 },
 	Bounds = { MinX = -340, MaxX = 340, MinZ = -350, MaxZ = 130 }, -- playable area; walls sit outside
+	PadRadius = 34, -- blast pads are round; the 9x9 grid corners sit ~28 studs from the center
 	SiteClearRadius = 44,
 	PathHalfWidth = 12,
 }

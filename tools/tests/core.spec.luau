@@ -260,7 +260,7 @@ end)
 test("world: sites are unique, in bounds, and clear of each other, hub and paths", function()
 	local W = require("../../src/ReplicatedStorage/Shared/Config/World")
 	eq(#W.Sites, 12, "3 biomes x 4 sites")
-	local half = (Tuning.GridSize * Tuning.CellSize + 6) / 2
+	local half = W.PadRadius -- pads are round
 	for i, a in W.Sites do
 		eq(a.Id, i, "sequential id")
 		if a.X - half < W.Bounds.MinX or a.X + half > W.Bounds.MaxX or a.Z - half < W.Bounds.MinZ or a.Z + half > W.Bounds.MaxZ then
@@ -270,7 +270,7 @@ test("world: sites are unique, in bounds, and clear of each other, hub and paths
 		if W.DistToPath(a.X, a.Z) < half + W.PathHalfWidth then error("site blocks a path: " .. a.Name) end
 		for j = i + 1, #W.Sites do
 			local b = W.Sites[j]
-			if math.abs(a.X - b.X) < half * 2 + 4 and math.abs(a.Z - b.Z) < half * 2 + 4 then error("sites overlap: " .. a.Name .. " / " .. b.Name) end
+			if math.sqrt((a.X - b.X) ^ 2 + (a.Z - b.Z) ^ 2) < half * 2 + 4 then error("sites overlap: " .. a.Name .. " / " .. b.Name) end
 		end
 	end
 end)
@@ -631,6 +631,15 @@ test("music: playlist is valid, has no duplicate ids, and stays cheerful-sized",
 	end
 	eq(total >= 20 * 60, true, "at least 20 minutes before the playlist repeats")
 	eq(Music.Volume > 0 and Music.Volume <= 1, true, "volume in range")
+end)
+
+test("world: round pad fits the grid, contains its station, and leaves room around it", function()
+	local W = require("../../src/ReplicatedStorage/Shared/Config/World")
+	local corner = ((Tuning.GridSize - 1) / 2) * Tuning.CellSize * math.sqrt(2)
+	eq(W.PadRadius >= corner + 3, true, "grid corners (" .. corner .. ") fit inside the round pad with margin")
+	local stationDist = (Tuning.GridSize * Tuning.CellSize) / 2 + 7
+	eq(stationDist <= W.PadRadius + 2, true, "station sits on the pad rim, not off in the rocks")
+	eq(W.SiteClearRadius >= W.PadRadius + 8, true, "terrain features keep clear of the pad and its rock rim")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

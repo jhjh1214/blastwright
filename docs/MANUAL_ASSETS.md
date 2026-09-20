@@ -1,5 +1,7 @@
 # Manual Assets
 
+**Status: DONE (2026-09-21).** The developer added the 8 models to their inventory and all load ("8/8 props available"). The block below is kept as the record and as the fix if it ever recurs (for example on a different account or a published game).
+
 ```
 ========================================
 MANUAL ASSET ACTION REQUIRED

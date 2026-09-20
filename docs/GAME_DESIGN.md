@@ -4,7 +4,7 @@
 The game is a walkable mine, not a single screen. Layout data and tests: `Config/World.luau`.
 - **Blastwright Depot (hub):** spawn plaza with a beacon and signposts to each biome.
 - **Three biomes,** each with 4 blast pads and a landmark beacon, linked to the hub by lantern-lit roads: Glimmer Shallows (west, stratum 1), Prism Veins (east, stratum 2), Ember Hollows (north, stratum 3). You can walk into any biome at any time; you can only *blast* there once its stratum is unlocked in the Forge. Seeing where you are heading is part of the pull.
-- **Blast pads:** walk to a pad's station and use its prompt. The camera lifts to the fixed top-down view of that pad's grid and your movement locks; "Leave" (or X) returns to free roaming. A pad is reserved for you until you take another pad, leave the game, or wander more than 130 studs away for 60s.
+- **Blast pads:** round cavern floors (34-stud radius) ringed by rocks and crystal clusters, open on the station side. Walk to a pad's station and use its prompt. The camera lifts to the fixed top-down view of that pad's grid and your movement locks; "Leave" (or X) returns to free roaming. A pad is reserved for you until you take another pad, leave the game, or wander more than 130 studs away for 60s.
 - **Geode caches:** 17 hidden caches (5 per biome, 2 near the hub) reward shards once per player (100 hub / 60 Shallows / 150 Prism / 400 Ember). They sit off the roads, so exploring pays.
 - **Terrain and look:** Roblox Terrain rock, cliffs, spires and mounds, glowing crystal clusters, lanterns, and drifting motes tinted by area.
 

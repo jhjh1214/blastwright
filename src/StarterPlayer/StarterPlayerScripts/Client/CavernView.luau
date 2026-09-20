@@ -43,11 +43,38 @@ end
 
 local ROCK = Color3.fromRGB(38, 42, 56)
 
+-- A lumpy half-buried rock instead of a square slab, so the grid does not read as a checkerboard.
+local function rockBase(model, pos, rng, color)
+	local w = 2.8 + rng:NextNumber() * 1.2
+	return part(
+		model,
+		Vector3.new(w, 1.0 + rng:NextNumber() * 0.6, w * (0.8 + rng:NextNumber() * 0.3)),
+		CFrame.new(pos + Vector3.new(0, 0.05, 0)) * CFrame.Angles(0, rng:NextNumber() * math.pi * 2, 0),
+		color:Lerp(Color3.new(1, 1, 1), rng:NextNumber() * 0.12),
+		Enum.Material.Slate,
+		Enum.PartType.Ball
+	)
+end
+
+-- Rotate and scale a finished model about `pivot` (cosmetic variety only; game logic never uses model positions).
+local function transformModel(model, pivot, yaw, scale)
+	local origin = CFrame.new(pivot)
+	local rot = origin * CFrame.Angles(0, yaw, 0)
+	for _, p in model:GetChildren() do
+		if p:IsA("BasePart") then
+			local rel = origin:ToObjectSpace(p.CFrame)
+			-- CFrame.new(-position) * rel leaves only the rotation (the translations cancel).
+			p.CFrame = rot * CFrame.new(rel.Position * scale) * (CFrame.new(-rel.Position) * rel)
+			p.Size = p.Size * scale
+		end
+	end
+end
+
 -- One silhouette per behavior so crystal types read at a glance.
 local builders = {}
 
 function builders.Inert(model, pos, col, rng)
-	part(model, Vector3.new(3.4, 0.7, 3.4), CFrame.new(pos + Vector3.new(0, 0.35, 0)), ROCK, Enum.Material.Slate)
+	rockBase(model, pos, rng, ROCK)
 	for i, h in { 3.0, 2.1, 1.6 } do
 		local a = (i / 3) * math.pi * 2 + rng:NextNumber() * 0.6
 		local off = Vector3.new(math.cos(a), 0, math.sin(a)) * (i == 1 and 0 or 0.9)
@@ -56,7 +83,7 @@ function builders.Inert(model, pos, col, rng)
 end
 
 function builders.Volatile(model, pos, col, rng)
-	part(model, Vector3.new(3.4, 0.7, 3.4), CFrame.new(pos + Vector3.new(0, 0.35, 0)), ROCK, Enum.Material.Slate)
+	rockBase(model, pos, rng, ROCK)
 	for i = 1, 4 do
 		local a = (i / 4) * math.pi * 2
 		local off = Vector3.new(math.cos(a), 0, math.sin(a)) * 0.8
@@ -66,13 +93,13 @@ function builders.Volatile(model, pos, col, rng)
 end
 
 function builders.Amplifier(model, pos, col, rng)
-	part(model, Vector3.new(3.4, 0.7, 3.4), CFrame.new(pos + Vector3.new(0, 0.35, 0)), ROCK, Enum.Material.Slate)
+	rockBase(model, pos, rng, ROCK)
 	part(model, Vector3.new(1, 4.4, 1), CFrame.new(pos + Vector3.new(0, 2.9, 0)), col, Enum.Material.Neon)
 	part(model, Vector3.new(0.25, 3, 3), CFrame.new(pos + Vector3.new(0, 2.6, 0)) * CFrame.Angles(0, 0, math.pi / 2), col:Lerp(Color3.new(1, 1, 1), 0.4), Enum.Material.Neon, Enum.PartType.Cylinder)
 end
 
 function builders.Prism(model, pos, col, rng)
-	part(model, Vector3.new(3.4, 0.7, 3.4), CFrame.new(pos + Vector3.new(0, 0.35, 0)), ROCK, Enum.Material.Slate)
+	rockBase(model, pos, rng, ROCK)
 	local disc = part(model, Vector3.new(0.5, 3.4, 3.4), CFrame.new(pos + Vector3.new(0, 2.4, 0)), col, Enum.Material.Glass, Enum.PartType.Cylinder)
 	disc.Transparency = 0.15
 	part(model, Vector3.new(0.9, 0.9, 0.9), CFrame.new(pos + Vector3.new(0, 2.4, 0)) * CFrame.Angles(0.7, 0.7, 0), Color3.new(1, 1, 1), Enum.Material.Neon)
@@ -80,14 +107,14 @@ end
 
 -- Slowburn: dark egg-shaped body with a glowing fuse ring, so it reads as "a bomb waiting to go".
 function builders.Delayed(model, pos, col, rng)
-	part(model, Vector3.new(3.4, 0.7, 3.4), CFrame.new(pos + Vector3.new(0, 0.35, 0)), ROCK, Enum.Material.Slate)
+	rockBase(model, pos, rng, ROCK)
 	part(model, Vector3.new(2.6, 2.6, 2.6), CFrame.new(pos + Vector3.new(0, 1.9, 0)), Color3.fromRGB(34, 22, 38), Enum.Material.Slate, Enum.PartType.Ball)
 	part(model, Vector3.new(0.3, 3.0, 3.0), CFrame.new(pos + Vector3.new(0, 1.9, 0)) * CFrame.Angles(0, 0, math.pi / 2), col, Enum.Material.Neon, Enum.PartType.Cylinder)
 	part(model, Vector3.new(0.35, 1.0, 0.35), CFrame.new(pos + Vector3.new(0, 3.6, 0)), col, Enum.Material.Neon)
 end
 
 function builders.Unstable(model, pos, col, rng)
-	part(model, Vector3.new(3.4, 0.7, 3.4), CFrame.new(pos + Vector3.new(0, 0.35, 0)), Color3.fromRGB(20, 16, 22), Enum.Material.Slate)
+	rockBase(model, pos, rng, Color3.fromRGB(20, 16, 22))
 	for i = 1, 5 do
 		local a = (i / 5) * math.pi * 2
 		local off = Vector3.new(math.cos(a), 0, math.sin(a)) * (i == 5 and 0 or 0.9)
@@ -102,11 +129,14 @@ local function buildCrystal(parent, kind, mutated, pos, key)
 	local model = Instance.new("Model")
 	model.Name = "C" .. key
 	local rng = Random.new(key * 977)
+	-- Small random offset, turn and size so neighbours never line up like a grid (cosmetic only).
+	local center = pos + Vector3.new((rng:NextNumber() - 0.5) * 1.5, 0, (rng:NextNumber() - 0.5) * 1.5)
 	local build = builders[def.Behavior] or builders.Inert
-	build(model, pos, color(def), rng)
+	build(model, center, color(def), rng)
 	if mutated then
-		part(model, Vector3.new(0.9, 0.9, 0.9), CFrame.new(pos + Vector3.new(0, 4.8, 0)), Color3.fromRGB(255, 150, 230), Enum.Material.Neon, Enum.PartType.Ball)
+		part(model, Vector3.new(0.9, 0.9, 0.9), CFrame.new(center + Vector3.new(0, 4.8, 0)), Color3.fromRGB(255, 150, 230), Enum.Material.Neon, Enum.PartType.Ball)
 	end
+	transformModel(model, center, rng:NextNumber() * math.pi * 2, 0.9 + rng:NextNumber() * 0.22)
 	model.Parent = parent
 	return model
 end

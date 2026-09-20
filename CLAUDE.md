@@ -4,13 +4,13 @@
 **Blastwright** is a PvE Roblox game: plant charges in crystal caverns, detonate, and plan chain reactions for shards. Concept approved 2026-09-21. Design: `docs/GAME_DESIGN.md`. Architecture: `docs/TECHNICAL_ARCHITECTURE.md`.
 
 ## Status (update this section as work lands)
-- Done and unit-tested (50 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
+- Done and unit-tested (51 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
 - Runs in Studio (developer-confirmed) but has no automated tests and only a first smoke run: `Game`, `Data`, `World`, all Client modules.
 - Developer confirmed on 2026-09-21 that the game runs in Studio and shows the cavern and UI (after the lazy-DataStore fix). Developer reported it "feels very good" (2026-09-21); audio playback not explicitly confirmed.
 - Audio: 7 SFX cues wired from Creator Store results (`tools/asset-search`); **unheard, playback unconfirmed** until Output shows `[Audio] ... OK`.
 - Explorable mine (hub, 3 biomes, 12 blast pads, 17 geode caches, terrain, lighting) and the reworked HUD are written and compile-checked; **not yet seen in Studio**. Save schema is v2 (`Caches`).
 - Daily objectives (3 per UTC day, claim in Menu > Daily) and the monetization framework (`Purchases.luau`, `Receipts.luau`, `Config/Products.luau`, Shop tab) are written and unit-tested where pure; **unseen in Studio, no product IDs exist**. Save schema is v3 (`Daily`).
-- Real decor models (8, Creator Store, thumbnails viewed) load via `Server/Props.luau` with script-stripping and procedural fallbacks; a looping cave ambience bed and an 11-track shuffled classical playlist (APMOfficial) are wired. Playtest 2026-09-21: audio all OK; **all 8 props failed with "User is not authorized to access Asset" (inventory ownership needed; fallback works; see docs/MANUAL_ASSETS.md)**. Music unheard so far.
+- Real decor models (8, Creator Store, thumbnails viewed) load via `Server/Props.luau` with script-stripping and procedural fallbacks; a looping cave ambience bed and an 11-track shuffled classical playlist (APMOfficial) are wired. Playtest 2026-09-21: all audio OK, music volume and mood approved by the developer, **all 8 props load (8/8; inventory step done)**. Developer said the square blasting grid still looked bad: pads are now round with rock rims, crystal slabs replaced by lumpy rocks, per-crystal jitter/turn/size (unseen yet).
 - Not started: mobile testing, cosmetics.
 - Stratum 3 (Slowburn delayed-fuse crystal) added and unit-tested; its visuals, fuse flash and Codex entry are **not yet seen in Studio**.
 - Playtest 2026-09-21: world build died on an invalid `SurfaceGui` property (fixed; API checker added). Lighting/crystal glow retuned after "too dark / too bright" feedback; guide system (objective card, marker, trail, edge arrow, welcome panel) added. **Both unseen in Studio.**
