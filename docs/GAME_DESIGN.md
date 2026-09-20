@@ -15,10 +15,11 @@
 | Resonite | Rare | Amplifier: +0.5 to the volley's multiplier | 1 |
 | Lensglass | Epic | Prism: beams along its row (range 5) | 2 |
 | Dreadgeode | Uncommon | Unstable: worth 0, halves the multiplier (min 1) | 2 |
+| Slowburn | Rare | Delayed: lights a fuse when hit, pops 1s later (after the rest of the chain, so it cashes in the peak multiplier), then blasts radius 2. Value 20 | 3 |
 
 Any crystal with value has a 4% chance to be **Prismatic** (3x value).
 
-The multiplier is applied in pop order, so hitting Resonite *before* the valuable crystals matters, and a Dreadgeode popped early hurts.
+The multiplier is applied in pop order, so hitting Resonite *before* the valuable crystals matters, and a Dreadgeode popped early hurts. Slowburn flips the puzzle: it is worth the most when it pops *last*, so you want the multiplier built up before its fuse ends.
 
 ## Charges (`Config/Charges.luau`)
 - **Blasting Cap:** radius blast (1.5 cells; Fat Fuse upgrade widens it).

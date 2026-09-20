@@ -10,9 +10,10 @@ Every tier introduces a change in how you play, not only a bigger number.
 | Shaft Charge | 400 | New blast shape (column); combos with Lensglass (row) |
 | Seismograph | 900 | Full-chain preview |
 | Stratum 2: Prism Veins | 1200 | Lensglass beams and Dreadgeode hazards |
+| Stratum 3: Ember Hollows | 4000 | Slowburn delayed-fuse crystals (timing becomes part of planning) |
 
 ## Planned (not built)
-Strata 3+ (e.g. delay crystals, magnetic crystals), more charge shapes, rare Legendary/Mythic crystals, Codex milestone rewards, Prestige ("Collapse and re-seed") with mastery bonuses.
+Strata 4+ (e.g. magnetic crystals), more charge shapes, rare Legendary/Mythic crystals, Codex milestone rewards, Prestige ("Collapse and re-seed") with mastery bonuses.
 
 ## Collection
 Codex tracks discovered crystals and whether a Prismatic variant has been found.
