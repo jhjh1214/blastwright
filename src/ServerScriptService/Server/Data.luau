@@ -23,7 +23,15 @@ export type Session = {
 
 local DataService = {}
 local sessions: { [Player]: Session } = {}
-local store = DataStoreService:GetDataStore(STORE_NAME)
+local store: DataStore? = nil
+
+-- GetDataStore itself throws in an unpublished place, so it must only be called inside a pcall.
+local function getStore(): DataStore
+	if not store then
+		store = DataStoreService:GetDataStore(STORE_NAME)
+	end
+	return store :: DataStore
+end
 
 local function keyFor(player: Player): string
 	return "Player_" .. player.UserId
@@ -36,7 +44,7 @@ function DataService.Load(player: Player): Session?
 	for attempt = 1, LOAD_ATTEMPTS do
 		local lockedElsewhere = false
 		local ok, result = pcall(function()
-			return store:UpdateAsync(key, function(old)
+			return getStore():UpdateAsync(key, function(old)
 				lockedElsewhere = false
 				local now = os.time()
 				if
@@ -94,7 +102,7 @@ function DataService.Save(player: Player, releasing: boolean): boolean
 	for attempt = 1, SAVE_ATTEMPTS do
 		local ownedByUs = true
 		local ok, err = pcall(function()
-			store:UpdateAsync(key, function(old)
+			getStore():UpdateAsync(key, function(old)
 				ownedByUs = true
 				if old and old.Meta and old.Meta.LockJobId and old.Meta.LockJobId ~= JOB_ID then
 					ownedByUs = false
