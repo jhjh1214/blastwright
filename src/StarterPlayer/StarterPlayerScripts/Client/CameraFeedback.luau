@@ -1,11 +1,16 @@
 --!nonstrict
 -- Fixed top-down camera over the player's cavern, plus shake and FOV punch for impact.
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local CameraFeedback = {}
 
 local BASE_FOV = 55
+-- Screen space (pixels) kept free of the grid: the top holds the shard counter and the planning text, the bottom
+-- the charge and Detonate buttons. The grid is fitted into what is left, so the HUD never covers it.
+local TOP_RESERVE = 140
+local BOTTOM_RESERVE = 92
 local PITCH = math.rad(62)
 local focus = nil -- { Center = Vector3, Extent = number }
 local shake = 0
@@ -53,10 +58,16 @@ function CameraFeedback.Start()
 		local aspect = view.X / math.max(view.Y, 1)
 		local tanV = math.tan(math.rad(camera.FieldOfView) / 2)
 		local half = focus.Extent * 0.62
-		local dist = math.max(half / tanV, half / (tanV * aspect)) * 1.22
+		local top = GuiService:GetGuiInset().Y + TOP_RESERVE
+		local usableH = math.max(view.Y - top - BOTTOM_RESERVE, view.Y * 0.35)
+		local usableW = math.max(view.X - 24, 100)
+		local dist = math.max(half / (tanV * usableH / view.Y), half / (tanV * aspect * usableW / view.X)) * 1.05
 
 		local dir = Vector3.new(0, math.sin(PITCH), -math.cos(PITCH))
 		local cf = CFrame.lookAt(focus.Center + dir * dist, focus.Center)
+		-- Slide the view so the grid sits in the free band between the HUD rows (moving the camera up moves the scene down).
+		local pixelsDown = (top + usableH / 2) - view.Y / 2
+		cf = cf * CFrame.new(0, pixelsDown / view.Y * 2 * tanV * dist, 0)
 
 		if shake > 0.001 then
 			local a = shake

@@ -83,7 +83,8 @@ local function commas(n)
 end
 
 local gui, shardLabel, locationLabel, cacheLabel, objectiveCard, objectiveText, blastHint, seamLabel, chainLabel, previewFrame, previewLabel, infoLabel
-local welcomeFrame, menuDot
+local welcomeFrame, menuDot, detonateStroke
+local detonatePulse = false
 local settingButtons = {}
 local tabButtons = {}
 local toastHolder, tierLabel, chargeColumn, panel, panelScroll, detonateButton
@@ -166,17 +167,17 @@ function UI.Init()
 		if UI.OnLeave then UI.OnLeave() end
 	end)
 
-	seamLabel = label(blastGroup, "", 17, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 54), Size = UDim2.fromOffset(340, 24) })
-	previewFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.35, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 80), Size = UDim2.new(1, -24, 0, 30), Visible = false }, blastGroup)
+	seamLabel = label(blastGroup, "", 17, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 54), Size = UDim2.fromOffset(340, 24), Visible = false })
+	previewFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.35, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 54), Size = UDim2.new(1, -24, 0, 30), Visible = false }, blastGroup)
 	corner(previewFrame, 10)
 	mk("UISizeConstraint", { MaxSize = Vector2.new(440, 30) }, previewFrame)
 	previewLabel = label(previewFrame, "", 17, THEME.Text, { Size = UDim2.fromScale(1, 1), TextScaled = true })
 	mk("UITextSizeConstraint", { MaxTextSize = 17, MinTextSize = 11 }, previewLabel)
-	infoLabel = label(blastGroup, "", 14, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 114), Size = UDim2.new(1, -24, 0, 44), BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.45, TextWrapped = true, Visible = false, TextYAlignment = Enum.TextYAlignment.Center })
+	infoLabel = label(blastGroup, "", 14, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 88), Size = UDim2.new(1, -24, 0, 44), BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.45, TextWrapped = true, Visible = false, TextYAlignment = Enum.TextYAlignment.Center })
 	corner(infoLabel, 10)
 	mk("UISizeConstraint", { MaxSize = Vector2.new(440, 44) }, infoLabel)
 	mk("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 10 }, infoLabel)
-	chainLabel = label(blastGroup, "", 40, THEME.Hot, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 118), Size = UDim2.fromOffset(340, 52), Font = Enum.Font.GothamBlack })
+	chainLabel = label(blastGroup, "", 40, THEME.Hot, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 90), Size = UDim2.fromOffset(340, 52), Font = Enum.Font.GothamBlack })
 
 	chargeColumn = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -12), Size = UDim2.fromOffset(150, 180) }, blastGroup)
 	mk("UIListLayout", { VerticalAlignment = Enum.VerticalAlignment.Bottom, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, chargeColumn)
@@ -185,11 +186,8 @@ function UI.Init()
 		if UI.OnClear then UI.OnClear() end
 	end)
 
-	blastHint = label(blastGroup, "", 18, THEME.Text, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -84), Size = UDim2.fromOffset(300, 30), BackgroundTransparency = 0.35, BackgroundColor3 = THEME.Bg })
-	corner(blastHint, 10)
-	blastHint.Visible = false
-
 	detonateButton = button(blastGroup, "DETONATE", THEME.Hot, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -12), Size = UDim2.fromOffset(190, 62), TextSize = 26, Font = Enum.Font.GothamBlack })
+	detonateStroke = mk("UIStroke", { Color = THEME.Gold, Thickness = 4, Enabled = false }, detonateButton)
 	detonateButton.Activated:Connect(function()
 		if UI.OnDetonate then UI.OnDetonate() end
 	end)
@@ -270,8 +268,12 @@ function UI.Init()
 
 	-- Pulse the highlighted menu button
 	RunService.Heartbeat:Connect(function()
+		local pulse = 0.15 + 0.4 * (0.5 + 0.5 * math.sin(os.clock() * 6))
 		if highlighted and menuStrokes[highlighted] then
-			menuStrokes[highlighted].Transparency = 0.15 + 0.4 * (0.5 + 0.5 * math.sin(os.clock() * 6))
+			menuStrokes[highlighted].Transparency = pulse
+		end
+		if detonatePulse and detonateStroke then
+			detonateStroke.Transparency = pulse
 		end
 	end)
 
@@ -319,10 +321,12 @@ function UI.SetHighlight(name)
 end
 
 -- Instruction pill shown above the blast controls. "" hides it.
+-- The next-step hint no longer floats over the grid: a non-empty hint just makes the Detonate button pulse.
 function UI.SetBlastHint(text)
-	if not blastHint then return end
-	blastHint.Visible = text ~= nil and text ~= ""
-	blastHint.Text = text or ""
+	detonatePulse = text ~= nil and text ~= ""
+	if detonateStroke then
+		detonateStroke.Enabled = detonatePulse
+	end
 end
 
 function UI.RefreshSettings()

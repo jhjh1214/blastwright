@@ -1,12 +1,14 @@
 --!nonstrict
--- Planning aids for blast mode. Everything here is drawn flat on the floor with non-glowing parts:
---   * a faint dot at every cell, so it is obvious where charges can go
---   * a hover ghost showing where you would plant and the blast area it would cover
---   * planted charges, each with its blast area
---   * the predicted chain: colored rings on crystals and lines showing what sets off what
---       white = hit directly by a charge, gold = chain reaction, cyan = prism beam
--- Without the Seismograph upgrade only the direct hits are shown (reading crystal types matters early on);
--- with it the whole chain, estimated shards, tier bonus and momentum refund are shown.
+-- Planning overlay for blast mode. Drawn with BoxHandleAdornments that render ON TOP of the world, so rocks and
+-- crystals can never hide it:
+--   * a bright outline around the whole grid and faint lines between cells
+--   * hovering (or, on touch, the last tapped cell): the cell is outlined in gold and the exact cells a charge
+--     there would blast are tinted, so you can see what you are about to plant
+--   * planted charges: cell filled orange, blast cells tinted
+--   * the predicted chain: white = hit directly by a charge, gold = chain reaction, cyan = prism beam,
+--     with lines from whatever sets each crystal off
+-- Without the Seismograph upgrade only direct hits are shown (reading crystal types matters early on); with it the
+-- whole chain, estimated shards, tier bonus and momentum refund are shown.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -30,101 +32,127 @@ local COLORS = {
 	Planted = Color3.fromRGB(255, 120, 50),
 	Hover = Color3.fromRGB(255, 225, 140),
 	Blocked = Color3.fromRGB(255, 90, 100),
-	Dot = Color3.fromRGB(170, 190, 230),
+	Border = Color3.fromRGB(150, 200, 255),
+	Lattice = Color3.fromRGB(170, 195, 235),
 }
 
--- Heights above the floor, so overlapping layers never z-fight.
-local Y_AREA, Y_DOT, Y_HOVER, Y_PLANT, Y_MARK, Y_LINE = 0.30, 0.34, 0.42, 0.44, 0.50, 0.90
+-- Draw order among always-on-top adornments (higher = on top).
+local Z_LATTICE, Z_AREA, Z_MARK, Z_LINK, Z_HOVER, Z_PLANT = 1, 2, 3, 4, 5, 6
+local Y = 0.6 -- height of the overlay above the floor (only matters for the perspective of thin boxes)
 
 local folder = Instance.new("Folder")
-folder.Name = "PreviewMarkers"
+folder.Name = "PreviewOverlay"
 folder.Parent = workspace
 
-local pools = { Disc = { used = {}, free = {} }, Bar = { used = {}, free = {} } }
+-- Every adornment is anchored to one invisible, unrotated part sitting at the pad's center.
+local anchor = Instance.new("Part")
+anchor.Name = "OverlayAnchor"
+anchor.Anchored = true
+anchor.CanCollide = false
+anchor.CanQuery = false
+anchor.CanTouch = false
+anchor.CastShadow = false
+anchor.Transparency = 1
+anchor.Size = Vector3.one
+anchor.Parent = folder
+
+local used, free = {}, {}
 local hoverCell = nil -- { X, Z }
+local origin = Vector3.zero
 
-local function acquire(kind)
-	local pool = pools[kind]
-	local p = table.remove(pool.free)
-	if not p then
-		p = Instance.new("Part")
-		p.Anchored = true
-		p.CanCollide = false
-		p.CanQuery = false
-		p.CanTouch = false
-		p.CastShadow = false
-		p.Material = Enum.Material.SmoothPlastic
-		if kind == "Disc" then
-			p.Shape = Enum.PartType.Cylinder
-		end
+local function acquire()
+	local a = table.remove(free)
+	if not a then
+		a = Instance.new("BoxHandleAdornment")
+		a.Adornee = anchor
+		a.AlwaysOnTop = true
+		a.Parent = folder
 	end
-	table.insert(pool.used, p)
-	return p
-end
-
-local function disc(position, diameter, color, transparency)
-	local p = acquire("Disc")
-	p.Color = color
-	p.Transparency = transparency
-	p.Size = Vector3.new(0.06, diameter, diameter)
-	p.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.pi / 2)
-	p.Parent = folder
-end
-
-local function bar(a, b, width, color, transparency)
-	local dist = (b - a).Magnitude
-	if dist < 0.05 then
-		return
-	end
-	local p = acquire("Bar")
-	p.Color = color
-	p.Transparency = transparency
-	p.Size = Vector3.new(width, 0.12, dist)
-	p.CFrame = CFrame.lookAt((a + b) / 2, b)
-	p.Parent = folder
+	a.Visible = true
+	table.insert(used, a)
+	return a
 end
 
 local function clear()
-	for _, pool in pools do
-		for _, p in pool.used do
-			p.Parent = nil
-			table.insert(pool.free, p)
-		end
-		table.clear(pool.used)
+	for _, a in used do
+		a.Visible = false
+		table.insert(free, a)
 	end
+	table.clear(used)
 end
 
-local function setText(text)
-	if Preview.OnText then
-		Preview.OnText(text)
-	end
+-- A flat filled square centered on a world position (x, z).
+local function fill(cx, cz, width, depth, color, transparency, zindex)
+	local a = acquire()
+	a.Size = Vector3.new(width, 0.1, depth)
+	a.CFrame = CFrame.new(cx - origin.X, Y - origin.Y, cz - origin.Z)
+	a.Color3 = color
+	a.Transparency = transparency
+	a.ZIndex = zindex
 end
 
-local function setInfo(text)
-	if Preview.OnInfo then
-		Preview.OnInfo(text)
-	end
-end
-
-local function cellPos(view, x, z, y)
-	return Geometry.CellPosition(view.Origin, x, z) + Vector3.new(0, y, 0)
-end
-
--- The area a charge would blast, as a flat translucent shape.
-local function drawArea(view, x, z, kind, transparency)
-	local def = Config.Charges.Defs[kind]
-	if not def then
+-- A flat straight line between two world positions (x, z).
+local function line(ax, az, bx, bz, thickness, color, transparency, zindex)
+	local length = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+	if length < 0.05 then
 		return
 	end
-	if def.Shape == "Radius" then
-		local radius = (def.Radius or 0) + State.UpgradeLevel("BlastRadius") * Config.Upgrades.Defs.BlastRadius.PerLevel
-		disc(cellPos(view, x, z, Y_AREA), (radius + 0.45) * 2 * CELL, COLORS.Planted, transparency)
-	elseif def.Shape == "Column" then
-		local range = def.Range or 0
-		local z1, z2 = math.max(1, z - range), math.min(view.Size, z + range)
-		local overhang = Vector3.new(0, 0, CELL * 0.45)
-		bar(cellPos(view, x, z1, Y_AREA) - overhang, cellPos(view, x, z2, Y_AREA) + overhang, CELL * 0.9, COLORS.Planted, transparency)
+	local a = acquire()
+	a.Size = Vector3.new(thickness, 0.1, length)
+	local mid = Vector3.new((ax + bx) / 2 - origin.X, Y - origin.Y, (az + bz) / 2 - origin.Z)
+	a.CFrame = CFrame.lookAt(mid, mid + Vector3.new(bx - ax, 0, bz - az))
+	a.Color3 = color
+	a.Transparency = transparency
+	a.ZIndex = zindex
+end
+
+local function cellCenter(view, x, z)
+	local p = Geometry.CellPosition(view.Origin, x, z)
+	return p.X, p.Z
+end
+
+-- Square outline of a cell.
+local function outline(view, x, z, thickness, color, transparency, zindex)
+	local cx, cz = cellCenter(view, x, z)
+	local h = CELL / 2 * 0.96
+	line(cx - h, cz - h, cx + h, cz - h, thickness, color, transparency, zindex)
+	line(cx + h, cz - h, cx + h, cz + h, thickness, color, transparency, zindex)
+	line(cx + h, cz + h, cx - h, cz + h, thickness, color, transparency, zindex)
+	line(cx - h, cz + h, cx - h, cz - h, thickness, color, transparency, zindex)
+end
+
+local function tintCell(view, x, z, color, transparency, zindex)
+	local cx, cz = cellCenter(view, x, z)
+	fill(cx, cz, CELL * 0.94, CELL * 0.94, color, transparency, zindex)
+end
+
+-- Outline of the whole grid plus faint lines between cells.
+local function drawLattice(view)
+	local n = view.Size
+	local half = n * CELL / 2
+	local ox, oz = view.Origin.X, view.Origin.Z
+	for i = 0, n do
+		local c = (i - n / 2) * CELL
+		local edge = i == 0 or i == n
+		local thickness = edge and 0.55 or 0.14
+		local transparency = edge and 0.25 or 0.72
+		local color = edge and COLORS.Border or COLORS.Lattice
+		line(ox + c, oz - half, ox + c, oz + half, thickness, color, transparency, Z_LATTICE)
+		line(ox - half, oz + c, ox + half, oz + c, thickness, color, transparency, Z_LATTICE)
 	end
+end
+
+-- The exact cells a charge of this kind would blast from (x, z).
+local function areaCells(view, x, z, kind)
+	local def = Config.Charges.Defs[kind]
+	if not def then
+		return {}
+	end
+	local radius = (def.Radius or 0)
+	if def.Shape == "Radius" then
+		radius += State.UpgradeLevel("BlastRadius") * Config.Upgrades.Defs.BlastRadius.PerLevel
+	end
+	return ChainSim.BlastCells(def.Shape, x, z, radius, def.Range or 0, view.Size)
 end
 
 -- One-line description of the crystal at the hovered (or last planted) cell.
@@ -145,6 +173,18 @@ local function crystalInfo(view)
 	return ("%s%s: %s"):format(def.Name, crystal.Mutated and " (Prismatic, worth 3x)" or "", def.Description)
 end
 
+local function setText(text)
+	if Preview.OnText then
+		Preview.OnText(text)
+	end
+end
+
+local function setInfo(text)
+	if Preview.OnInfo then
+		Preview.OnInfo(text)
+	end
+end
+
 local function refresh()
 	clear()
 	local view = CavernView.Get(State.UserId)
@@ -153,45 +193,51 @@ local function refresh()
 		setInfo("")
 		return
 	end
+	origin = view.Origin
+	anchor.CFrame = CFrame.new(origin)
 
 	local available = State.Data.ChargesLeft or 0
+	local maxCharges = State.Data.ChargesMax or available
 	local canPlant = #State.Placed < math.min(available, Config.Tuning.MaxVolleyCharges)
-
-	-- A faint dot at every cell.
-	for z = 1, view.Size do
-		for x = 1, view.Size do
-			disc(cellPos(view, x, z, Y_DOT), 0.9, COLORS.Dot, 0.78)
-		end
-	end
-
 	local planted = {}
 	for _, c in State.Placed do
 		planted[c.Z * 100 + c.X] = true
 	end
 
-	-- Hover ghost: where you would plant, and what it would cover.
+	drawLattice(view)
+
+	-- Hover: where you would plant, and the exact cells it would blast.
 	if hoverCell then
 		local hx, hz = hoverCell.X, hoverCell.Z
 		if planted[hz * 100 + hx] then
-			disc(cellPos(view, hx, hz, Y_HOVER), 4.8, COLORS.Hover, 0.3) -- tap again to remove
+			tintCell(view, hx, hz, COLORS.Hover, 0.55, Z_HOVER)
+			outline(view, hx, hz, 0.45, COLORS.Hover, 0.05, Z_HOVER) -- tap again to remove
 		elseif canPlant then
-			drawArea(view, hx, hz, State.SelectedCharge, 0.9)
-			disc(cellPos(view, hx, hz, Y_HOVER), 4.2, COLORS.Hover, 0.5)
+			for _, c in areaCells(view, hx, hz, State.SelectedCharge) do
+				tintCell(view, c.X, c.Z, COLORS.Planted, 0.86, Z_AREA)
+			end
+			tintCell(view, hx, hz, COLORS.Hover, 0.6, Z_HOVER)
+			outline(view, hx, hz, 0.45, COLORS.Hover, 0.05, Z_HOVER)
 		else
-			disc(cellPos(view, hx, hz, Y_HOVER), 4.2, COLORS.Blocked, 0.5) -- no charges left
+			tintCell(view, hx, hz, COLORS.Blocked, 0.55, Z_HOVER) -- no charges left
+			outline(view, hx, hz, 0.45, COLORS.Blocked, 0.05, Z_HOVER)
 		end
 	end
 
-	-- Planted charges, each with its own blast area.
+	-- Planted charges, each with the cells it blasts.
 	for _, c in State.Placed do
-		drawArea(view, c.X, c.Z, c.Kind, 0.82)
-		disc(cellPos(view, c.X, c.Z, Y_PLANT), 4.6, COLORS.Planted, 0.1)
-		disc(cellPos(view, c.X, c.Z, Y_PLANT + 0.02), 2.2, Color3.fromRGB(255, 235, 200), 0.05)
+		for _, cell in areaCells(view, c.X, c.Z, c.Kind) do
+			tintCell(view, cell.X, cell.Z, COLORS.Planted, 0.8, Z_AREA)
+		end
+		tintCell(view, c.X, c.Z, COLORS.Planted, 0.3, Z_PLANT)
+		outline(view, c.X, c.Z, 0.5, Color3.fromRGB(255, 240, 210), 0.05, Z_PLANT)
+		local cx, cz = cellCenter(view, c.X, c.Z)
+		fill(cx, cz, CELL * 0.28, CELL * 0.28, Color3.fromRGB(255, 245, 220), 0, Z_PLANT)
 	end
 
 	local crystalText = crystalInfo(view)
 	if #State.Placed == 0 then
-		setText(("Tap a spot to plant a charge (%d available)"):format(available))
+		setText(("Tap a spot to plant a charge  |  Charges %d/%d"):format(available, maxCharges))
 		setInfo(crystalText or "Tap a planted charge again to remove it.")
 		return
 	end
@@ -215,14 +261,16 @@ local function refresh()
 		end
 		if seismograph or isDirect then
 			local color = COLORS[ev.Cause] or COLORS.Chain
-			disc(cellPos(view, ev.X, ev.Z, Y_MARK), 3.4, color, 0.3)
-			bar(cellPos(view, ev.SX, ev.SZ, Y_LINE), cellPos(view, ev.X, ev.Z, Y_LINE), 0.28, color, 0.25)
+			tintCell(view, ev.X, ev.Z, color, 0.5, Z_MARK)
+			local sx, sz = cellCenter(view, ev.SX, ev.SZ)
+			local tx, tz = cellCenter(view, ev.X, ev.Z)
+			line(sx, sz, tx, tz, 0.35, color, 0.1, Z_LINK)
 		end
 	end
 
-	local plantedText = ("Planted %d/%d"):format(#State.Placed, available)
+	local left = available - #State.Placed
 	if seismograph then
-		setText(("%s | Chain %d | ~%d shards"):format(plantedText, result.Pops, result.Total))
+		setText(("Charges %d/%d  |  Chain %d  |  ~%d shards"):format(left, maxCharges, result.Pops, result.Total))
 		local parts = {}
 		if result.Tier then
 			table.insert(parts, ("%s +%d%%"):format(result.Tier, math.floor(result.Bonus * 100 + 0.5)))
@@ -233,7 +281,7 @@ local function refresh()
 		table.insert(parts, "white = direct, gold = chain, cyan = beam")
 		setInfo((crystalText and (crystalText .. "\n") or "") .. table.concat(parts, "  |  "))
 	else
-		setText(("%s | Direct hits: %d"):format(plantedText, direct))
+		setText(("Charges %d/%d  |  Direct hits: %d"):format(left, maxCharges, direct))
 		setInfo(crystalText or "Get the Seismograph in the Forge to preview whole chains.")
 	end
 end

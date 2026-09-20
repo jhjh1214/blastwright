@@ -143,7 +143,7 @@ local function refreshObjective()
 
 	if State.Engaged then
 		local hint = Objectives.Blast(State.Data, #State.Placed)
-		UI.SetBlastHint(hint and hint.Text or "")
+		UI.SetBlastHint(hint and hint.Id == "Detonate" and hint.Text or "") -- planting is explained by the preview line
 		UI.SetObjective(nil)
 		UI.SetHighlight(nil)
 		target = nil

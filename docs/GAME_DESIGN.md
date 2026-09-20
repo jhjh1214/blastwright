@@ -46,14 +46,17 @@ Rumble (5 pops, +10%), Cascade (10, +25%), Avalanche (20, +50%), Cataclysm (35, 
 A volley of 10+ pops (Momentum Coil lowers this to 8 then 6) refunds one charge. Big chains keep the seam alive: this is the "one more volley" hook.
 
 ## Planning aid
-In blast mode the floor explains itself (all flat, non-glowing shapes):
-- a faint dot at every cell shows where charges can go;
-- on PC, hovering a cell shows a ghost of the charge and the area it would blast (a circle for a Blasting Cap, a strip for a Shaft Charge); on touch, the last tapped cell acts as the hover cell;
-- planted charges show their blast area;
+In blast mode an overlay drawn ON TOP of the world (so rocks and crystals cannot hide it) explains the floor:
+- a bright outline around the whole grid and faint lines between cells show where charges can go;
+- on PC, hovering a cell outlines it in gold and tints the exact cells a charge there would blast (a plus-shaped blob for a Blasting Cap, a strip for a Shaft Charge); on touch, the last tapped cell acts as the hover cell;
+- planted charges fill their cell orange and tint the cells they blast;
 - crystals it will hit are ringed and linked by lines back to whatever sets them off. **White** = hit directly by a charge, **gold** = chain reaction, **cyan** = prism beam;
 - a second line describes the crystal you are pointing at (name, what it does, Prismatic bonus).
 
 Base game: direct hits only, so early play is still about reading crystal types. **Seismograph** upgrade: the whole chain, estimated shards, tier bonus and whether it refunds a charge. While a volley plays, a short line shows which crystal set each chained crystal off.
+
+## HUD layout
+All planning text is one compact block under the top row (shard counter left, Leave button right). The camera reserves screen space for it and for the bottom buttons and fits the grid into the free band, so the HUD never covers the grid. The "press Detonate" hint is a pulsing gold outline on the Detonate button, not floating text. Charges remaining are part of the preview line.
 
 ## Server authority
 The client sends only cell coordinates and charge kinds. The server validates them (`Validate.luau`), runs the simulation itself, applies results and pays out.
