@@ -16,6 +16,7 @@
 | 12 Audio/VFX polish | SFX, ambience and a shuffled classical music playlist wired (unheard); music/effects switches saved |
 | 13 Mobile | Not tested |
 | 14 Security | Remote validation done and tested; full audit later |
+| Social | Hub leaderboard of longest chains (needs a published game to test) |
 | 15-16 QA / Launch | Not started |
 
 ## Next

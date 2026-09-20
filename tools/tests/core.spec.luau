@@ -1084,5 +1084,69 @@ test("goals: several goals crossing at once are all reported, in config order", 
 	eq(sawPops and sawChain, true, "both stats reported")
 end)
 
+local Board = require("../../src/ReplicatedStorage/Shared/Board")
+
+test("board: ranks by value, breaks ties by name, and caps the row count", function()
+	local rows = {
+		{ Name = "Dov", Value = 7 },
+		{ Name = "Bea", Value = 40 }, -- ties listed out of alphabetical order on purpose
+		{ Name = "Cara", Value = 12 },
+		{ Name = "Abe", Value = 40 },
+	}
+	local sorted = Board.Rank(rows, 3)
+	eq(#sorted, 3, "capped at 3")
+	eq(sorted[1].Name, "Abe", "highest first")
+	eq(sorted[2].Name, "Bea", "tie broken alphabetically")
+	eq(sorted[3].Name, "Cara", "then by value")
+	eq(rows[1].Name, "Dov", "input order not mutated")
+end)
+
+test("board: ignores junk rows instead of crashing", function()
+	local sorted = Board.Rank({ { Name = "Ok", Value = 5 }, { Name = "NaN", Value = 0 / 0 }, { Name = "Inf", Value = math.huge }, { Name = "Neg", Value = -3 }, { Name = 5, Value = 9 }, { Value = 4 }, "row", { Name = "Str", Value = "9" } }, 10)
+	eq(#sorted, 1, "only the valid row survives")
+	eq(sorted[1].Name, "Ok", "the valid one")
+end)
+
+test("board: text shows rank, a truncated name and the value, and a friendly empty state", function()
+	local text = Board.Format("LONGEST CHAINS", { { Name = "A very very long player name indeed", Value = 1234 }, { Name = "Bo", Value = 35 } }, 10)
+	local lines = {}
+	for line in string.gmatch(text, "[^\n]+") do table.insert(lines, line) end
+	eq(lines[1], "LONGEST CHAINS", "title")
+	eq(lines[2]:find(" 1 ", 1, true) ~= nil, true, "rank 1 shown")
+	eq(lines[2]:find("A very very long", 1, true) ~= nil, true, "name truncated but recognisable")
+	eq(lines[2]:find("indeed", 1, true), nil, "long name is cut off")
+	eq(lines[2]:find("1,234", 1, true) ~= nil, true, "thousands separator")
+	eq(lines[3]:find("Bo", 1, true) ~= nil and lines[3]:find("35", 1, true) ~= nil, true, "second row")
+	local empty = Board.Format("LONGEST CHAINS", {}, 10)
+	eq(empty:find("Be the first", 1, true) ~= nil, true, "empty state invites the first entry")
+end)
+
+test("board: a tied group is ordered alphabetically no matter how it arrives", function()
+	local names = { "Abe", "Bea", "Cal", "Dee" }
+	local function permutations(list)
+		local out = {}
+		local function go(arr, n)
+			if n == 1 then table.insert(out, table.clone(arr)) return end
+			for i = 1, n do
+				arr[i], arr[n] = arr[n], arr[i]
+				go(arr, n - 1)
+				arr[i], arr[n] = arr[n], arr[i]
+			end
+		end
+		go(table.clone(list), #list)
+		return out
+	end
+	local perms = permutations(names)
+	eq(#perms, 24, "all 24 arrival orders")
+	for _, order in perms do
+		local rows = {}
+		for _, name in order do table.insert(rows, { Name = name, Value = 30 }) end
+		local ranked = Board.Rank(rows, 10)
+		for i = 1, 4 do
+			if ranked[i].Name ~= names[i] then error("arrival order " .. table.concat(order, ",") .. " produced " .. ranked[i].Name .. " at " .. i) end
+		end
+	end
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

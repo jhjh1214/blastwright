@@ -14,6 +14,7 @@ local Achievements = require(Shared.Achievements)
 local Cosmetics = require(Shared.Cosmetics)
 local Dailies = require(Shared.Dailies)
 local Data = require(script.Parent.Data)
+local Leaderboard = require(script.Parent.Leaderboard)
 local Purchases = require(script.Parent.Purchases)
 local Seam = require(script.Parent.Seam)
 local Validate = require(script.Parent.Validate)
@@ -287,6 +288,7 @@ local function onDetonate(player: Player, payload: any)
 		recordDaily(data, "Tiers", 1)
 	end
 	data.Stats.BestChain = math.max(data.Stats.BestChain, result.Pops)
+	Leaderboard.Submit(player.UserId, data.Stats.BestChain)
 	if result.Momentum then
 		seam.Charges = math.min(seam.Charges + 1, seam.ChargesMax)
 	end
@@ -535,6 +537,7 @@ local function onPlayerAdded(player: Player)
 
 	lastAction[player] = { Buy = 0, Detonate = 0 }
 	seenGoals[player] = {}
+	Leaderboard.Submit(player.UserId, session.Data.Stats.BestChain)
 	Achievements.NewlyComplete(session.Data, AchievementsConfig, seenGoals[player]) -- silent: old completions are not announced
 	Purchases.LoadPasses(player)
 	player:LoadCharacter()
@@ -550,6 +553,7 @@ end
 
 local function onPlayerRemoving(player: Player)
 	releaseSite(player)
+	Leaderboard.Flush(player.UserId)
 	Purchases.Forget(player)
 	seenGoals[player] = nil
 	lastAction[player] = nil
@@ -584,6 +588,7 @@ function Game.Init()
 	Remotes.Equip.OnServerEvent:Connect(onEquip)
 	Remotes.Setting.OnServerEvent:Connect(onSetting)
 	Purchases.Init({ Notify = notify, OnChanged = sync })
+	Leaderboard.Init(World.Registry.Board)
 
 	for siteId, entry in World.Registry.Sites do
 		entry.Prompt.Triggered:Connect(function(player)

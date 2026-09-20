@@ -14,6 +14,9 @@ Menu > Daily shows three objectives that rotate each UTC day (same for everyone,
 ## Blast colors (cosmetic)
 Menu > Codex > Blast colors. Styles recolor your planting markers and your detonation rings and bursts (other players see your color on your blasts). No gameplay effect. Classic is free; Frostfire, Rose Gold, Verdant, Royal and Solar unlock by claiming specific Goals (ownership is derived from claimed goals, so nothing extra is tracked); Neon Pink is a shop item. Equipping is validated by the server, and a bad or stale saved choice falls back to Classic.
 
+## Leaderboard
+A "Longest Chains" board stands beside the hub spawn: the top 10 best chains across all players (names resolved from Roblox). Your best chain is queued after every volley and written at most every 30 seconds (only improvements are stored); the board refreshes every 90 seconds. It needs a published game with API access; otherwise it says it is unavailable and nothing else is affected. Ranking and text are pure, tested code (`Shared/Board.luau`); the DataStore part (`Server/Leaderboard.luau`) is best-effort and untested.
+
 ## Goals
 Menu > Goals lists permanent milestones (pops, chain records, seams cleared, shards earned, geode caches, Codex, Prismatic finds, areas unlocked) in three or so rising tiers each, 23 in total. Progress is derived from stats the save already keeps, so nothing extra is tracked; only "claimed" is stored. Each pays shards once (about 46,700 in total across all goals). Ready goals are listed first. The moment a goal becomes claimable a "Goal ready" toast appears (never for goals that were already done when you joined), and a dot on the Menu button plus a pulsing objective say one can be claimed. Adding a goal is one line in `Config/Achievements.luau`.
 
