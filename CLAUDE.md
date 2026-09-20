@@ -1,18 +1,45 @@
 # CLAUDE.md
 
-## Status
-Phase 0/1: repo scaffolded; concept proposal awaiting user approval. No game code yet.
+## Project
+**Blastwright** is a PvE Roblox game: plant charges in crystal caverns, detonate, and plan chain reactions for shards. Concept approved 2026-09-21. Design: `docs/GAME_DESIGN.md`. Architecture: `docs/TECHNICAL_ARCHITECTURE.md`.
 
-## Environment
-Windows, PowerShell. Rojo 7.7.0 at C:\Tools\Rojo. Studio installed. No Luau linters installed.
-Roblox web APIs reachable (Creator Store toolbox endpoint returned 200).
+## Status (update this section as work lands)
+- Done and unit-tested (17 tests): `ChainSim`, `Seam`, `Schema`, `Validate`.
+- Written, **compile-checked only, never run in Studio**: `Game`, `Data`, `World`, all Client modules.
+- Not started: monetization, audio assets, external visual assets, mobile testing, world/hub, daily retention.
+- Next: developer playtest (`docs/MANUAL_ACTIONS.md`), then asset workflow (audio first).
 
-## Rules (project)
-- Rojo is the source of truth; no logic only in Studio.
-- Server-authoritative; validate all remotes. Purchases only via ProcessReceipt.
-- Never invent asset or product IDs; register external assets in docs/ASSET_REGISTRY.md.
-- Strip scripts from third-party models.
-- Commits: Conventional Commits, no co-author/tool attribution (user's global rule).
+## Environment (Windows, PowerShell)
+Rojo 7.7.0 (`C:\Tools\Rojo`), Git, Node, Python. Luau CLI/analyzer/compiler are in `tools/bin` (git-ignored; re-download from the luau-lang GitHub release if missing). Roblox Studio is installed but cannot be driven by Claude.
 
-## To be filled after concept approval
-Concept, architecture, conventions, decisions, known issues, manual actions.
+## Commands
+- Tests: `tools/bin/luau.exe tools/tests/core.spec.luau`
+- Syntax check a file: `tools/bin/luau-compile.exe --text <file>`
+- Build: `rojo build -o "$env:TEMP\gamev1.rbxl"`
+- Live sync: `rojo serve`
+
+## Architecture rules
+- Rojo is the source of truth. No logic lives only in Studio.
+- Pure logic (`ChainSim`, `Seam`, `Schema`, `Validate`, `Config/*`) uses no Roblox APIs so the CLI tests can load it. ChainSim takes config via a `ctx` argument; do not add `require(script...)` to these files.
+- Content is data: crystals, charges, upgrades and strata are in `Config/*`. Behaviors live in `ChainSim`.
+- Server is authoritative. Clients send intents only (`Detonate` cells, `Buy` ids). Validate every remote argument with a pure function and test it with hostile inputs.
+- Crystal visuals are built client-side from grid data (`CavernView`); the server holds no crystal Parts.
+- Optional systems (VFX, audio, UI effects) must never break gameplay: wrap in `pcall`, skip on missing config.
+
+## Conventions
+- Luau, tabs, `--!strict` for pure modules, `--!nonstrict` for Roblox-facing ones. Files are `.luau`; `init.server.luau` / `init.client.luau` for entry scripts.
+- Write files as UTF-8 **without BOM** (PowerShell 5.1 `Set-Content -Encoding utf8` adds a BOM and breaks Rojo). Prefer the Write tool.
+- Conventional Commits. Attribution is the user alone: no Co-Authored-By or tool mentions.
+
+## Assets
+Never invent an asset or product ID. Use the Creator Store / Marketplace APIs, inspect and strip scripts, record in `docs/ASSET_REGISTRY.md`. If unverifiable, build procedural.
+
+## Monetization / DataStore
+Purchases only via `ProcessReceipt` (not built). Product IDs stay `nil` in config until supplied. Save data: `Schema.luau` versioned; bump `CURRENT_VERSION` and add a migration for any schema change.
+
+## Known issues / risks
+- Untested in Studio (see Status). Expect first-run bugs in client modules.
+- Fun is unproven: the risk is "click and wait". Fix gameplay before adding content.
+- Preview may make planning too easy; Seismograph gating is a first mitigation.
+- Game is silent (no audio IDs). Visuals are procedural Parts placeholder quality.
+- Economy numbers are paper math.

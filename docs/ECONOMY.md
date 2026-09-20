@@ -1,0 +1,21 @@
+# Economy
+
+## Currency
+**Shards** are the only currency in the slice. No premium currency yet: add one only if monetization needs it.
+
+## Sources
+- Volley payout: sum of (crystal value x multiplier) x (1 + tier bonus).
+- Seam clear bonus: 25% of seam earnings x cleared fraction, if at least 50% cleared.
+
+## Sinks
+Upgrades, charge unlocks, stratum unlocks (see `PROGRESSION.md`).
+
+## Rough pacing (paper math, **not** playtested)
+- A 9x9 seam is ~70 crystals. A decent volley pops 10-20 for roughly 60-150 shards.
+- A seam pays roughly 150-350 shards, so the first upgrade (150) comes within the first seam or two, and Stratum 2 (1200) after roughly 5 seams.
+
+## Late game / inflation
+Not designed yet. Upgrade costs grow roughly 3x per level. Stratum values should rise with stratum; that needs playtest data first.
+
+## Tuning knobs
+All in `Config/Tuning.luau`, `Crystals.luau`, `Upgrades.luau`, `Charges.luau`, `Strata.luau`.
