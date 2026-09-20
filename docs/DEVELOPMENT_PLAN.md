@@ -9,6 +9,7 @@
 | 5 Game feel | Hooks exist (VFX, shake, tiers); tuning needs playtest |
 | 6 Progression | Basic (upgrades, charges, strata, Codex) |
 | 7 World/content | Explorable mine built (hub, 4 biomes, 16 pads, 22 caches, terrain); **unseen in Studio** |
+| Retention | Daily objectives, weekly challenges and 24 goals (unseen in Studio) |
 | 8 Collection | Codex, 24 milestone Goals and 7 blast colors (unseen in Studio) |
 | 9 Economy | Paper math only |
 | 10 Monetization | Framework built (products, ProcessReceipt, shop tab); **no IDs, never tested live** |

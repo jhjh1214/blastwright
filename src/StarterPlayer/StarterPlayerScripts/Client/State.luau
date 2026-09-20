@@ -17,6 +17,7 @@ State.Changed = Instance.new("BindableEvent") -- fires a string: "Data" | "Place
 function State.SetData(snapshot)
 	State.Data = snapshot
 	State.DailyResetAt = os.clock() + (snapshot.DailyResetIn or 0)
+	State.WeeklyResetAt = os.clock() + (snapshot.WeeklyResetIn or 0)
 	if not (snapshot.UnlockedCharges and snapshot.UnlockedCharges[State.SelectedCharge]) then
 		State.SelectedCharge = "Basic"
 	end

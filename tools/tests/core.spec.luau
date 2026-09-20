@@ -1148,5 +1148,54 @@ test("board: a tied group is ordered alphabetically no matter how it arrives", f
 	end
 end)
 
+local WeekCfg = require("../../src/ReplicatedStorage/Shared/Config/Weeklies")
+
+test("weekly: weeks start on Monday 00:00 UTC and last exactly seven days", function()
+	local monday = 1704067200 -- 2024-01-01 00:00:00 UTC, a Monday
+	local week = Dailies.WeekNumber(monday)
+	eq(Dailies.WeekNumber(monday - 1), week - 1, "the second before Monday belongs to the previous week")
+	eq(Dailies.WeekNumber(monday + 3 * 86400 + 12345), week, "midweek")
+	eq(Dailies.WeekNumber(monday + 7 * 86400 - 1), week, "Sunday 23:59:59 is still this week")
+	eq(Dailies.WeekNumber(monday + 7 * 86400), week + 1, "next Monday starts a new week")
+	eq(Dailies.SecondsUntilWeekReset(monday), 7 * 86400, "a full week left at the very start")
+	eq(Dailies.SecondsUntilWeekReset(monday + 7 * 86400 - 1), 1, "one second left")
+	eq(Dailies.SecondsUntilWeekReset(monday + 2 * 86400 + 3600), 5 * 86400 - 3600, "midweek countdown")
+end)
+
+test("weekly: three distinct objectives per week, rising targets and rewards, harder than the daily ones", function()
+	for w = 2800, 2840 do
+		local defs = Dailies.ForDay(w, WeekCfg)
+		eq(#defs, 3, "three objectives")
+		eq(defs[1].Id ~= defs[2].Id and defs[2].Id ~= defs[3].Id and defs[1].Id ~= defs[3].Id, true, "distinct")
+		if not (defs[1].RewardBase < defs[2].RewardBase and defs[2].RewardBase < defs[3].RewardBase) then error("rewards do not rise in week " .. w) end
+	end
+	for i, def in WeekCfg.Templates do
+		local daily = nil
+		for _, d in DailiesCfg.Templates do if d.Kind == def.Kind then daily = d end end
+		if daily == nil then error("weekly kind " .. def.Kind .. " is not a daily kind, so it would never be recorded") end
+		for slot = 1, 3 do
+			if def.Targets[slot] <= daily.Targets[slot] then error(def.Id .. " weekly target " .. slot .. " must exceed the daily one") end
+		end
+	end
+	eq(WeekCfg.SlotRewards[1] > DailiesCfg.SlotRewards[3], true, "weekly rewards dwarf daily ones")
+end)
+
+test("schema: v5 saves migrate to v6 with an empty weekly record", function()
+	local d = Schema.Migrate({ SchemaVersion = 5, Shards = 9, Cosmetics = { Owned = { NeonPink = true }, Equipped = { BlastColor = "Classic" } } })
+	eq(d.SchemaVersion, Schema.CURRENT_VERSION, "version")
+	eq(Schema.CURRENT_VERSION >= 6, true, "v6 exists")
+	eq(d.Weekly.Day, 0, "weekly period")
+	eq(next(d.Weekly.Progress), nil, "weekly progress")
+	eq(d.Cosmetics.Owned.NeonPink, true, "cosmetics kept")
+	eq(d.Shards, 9, "shards kept")
+end)
+
+test("objectives: a finished weekly objective is surfaced too", function()
+	local data = snap({ Stats = { TotalPops = 20 }, Weeklies = { { Slot = 2, Progress = 9, Target = 9, Claimed = false } } })
+	eq(Objectives.Roam(data, 0, 0, ocfg).Id, "ClaimDaily", "weekly claim nudges through the same objective")
+	data.Weeklies[1].Claimed = true
+	eq(Objectives.Roam(data, 0, 0, ocfg).Id ~= "ClaimDaily", true, "claimed one no longer nags")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

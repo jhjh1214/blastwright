@@ -17,6 +17,21 @@ function Dailies.SecondsUntilReset(now: number): number
 	return SECONDS_PER_DAY - now % SECONDS_PER_DAY
 end
 
+-- Weeks run Monday 00:00 UTC to the next Monday. The Unix epoch (day 0) was a Thursday, so shifting by 3 days puts the
+-- week boundary on Mondays: day 4 (1970-01-05) is the first Monday.
+local function weekOfDay(day: number): number
+	return (day + 3) // 7
+end
+
+function Dailies.WeekNumber(now: number): number
+	return weekOfDay(now // SECONDS_PER_DAY)
+end
+
+function Dailies.SecondsUntilWeekReset(now: number): number
+	local nextStartDay = (weekOfDay(now // SECONDS_PER_DAY) + 1) * 7 - 3
+	return nextStartDay * SECONDS_PER_DAY - now
+end
+
 -- Park-Miller PRNG: exact in Luau doubles.
 local function makeRng(seed: number)
 	local state = seed % 2147483646 + 1

@@ -6,6 +6,7 @@
 | Short | 10-30s | One volley: plan, detonate, see the chain tier banner and shard payout. |
 | Session | 1-5min | Clear a seam within its charge budget (Momentum refunds keep it going), get the clear bonus, walk off to hunt a geode cache or a new area, spend shards in the Forge. |
 | Daily | once per day | Three rotating objectives (pops, chains, seams, shards, volleys) with rising rewards. They reset at UTC midnight and never punish a missed day. |
+| Weekly | once per week | Three larger challenges (Menu > Daily, below the dailies) that reset Monday 00:00 UTC. |
 | Milestones | days+ | 23 permanent Goals (Menu > Goals) with one-time shard rewards, so long-term play always has a next target. |
 | Long | hours+ | Strata (new crystal mechanics), charge types, rig upgrades, Codex completion, Prismatic hunting. |
 

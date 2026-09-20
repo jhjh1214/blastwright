@@ -479,6 +479,16 @@ local function rebuildPanel()
 				if done and not item.Claimed then Remotes.Claim:FireServer(item.Slot) end
 			end)
 		end
+		-- Weekly challenges: bigger targets and rewards, reset Monday 00:00 UTC.
+		local weekSecs = math.max(0, math.floor((State.WeeklyResetAt or 0) - os.clock()))
+		header(10, ("Weekly challenges: reset in %dd %02dh (unclaimed rewards are lost)"):format(weekSecs // 86400, (weekSecs % 86400) // 3600))
+		for _, item in d.Weeklies or {} do
+			local done = item.Progress >= item.Target
+			local btnText = item.Claimed and "Claimed" or (done and ("Claim  ◆ " .. commas(item.Reward)) or ("%s / %s"):format(commas(item.Progress), commas(item.Target)))
+			row(10 + item.Slot, item.Text, ("Reward: ◆ %s"):format(commas(item.Reward)), btnText, done and not item.Claimed, function()
+				if done and not item.Claimed then Remotes.ClaimWeekly:FireServer(item.Slot) end
+			end)
+		end
 	elseif activeTab == "Goals" then
 		local goals = d.Goals or {}
 		local claimedCount = 0
@@ -610,6 +620,11 @@ function UI.Refresh()
 	end
 	for _, g in d.Goals or {} do
 		if g.Complete and not g.Claimed then
+			claimable = true
+		end
+	end
+	for _, item in d.Weeklies or {} do
+		if item.Progress >= item.Target and not item.Claimed then
 			claimable = true
 		end
 	end

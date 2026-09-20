@@ -11,6 +11,9 @@ The game is a walkable mine, not a single screen. Layout data and tests: `Config
 ## Daily objectives
 Menu > Daily shows three objectives that rotate each UTC day (same for everyone, deterministic from the day number). Targets and rewards rise by slot. Progress is recorded by the server as you blast. Claiming pays shards once. Unclaimed rewards are lost at reset, but a missed day costs nothing else (no streaks). A dot on the Menu button and a pulsing objective tell you when one is ready.
 
+## Weekly challenges
+Below the daily objectives in Menu > Daily: three larger challenges per week (Monday 00:00 UTC to the next Monday), same recording as the dailies but with much bigger targets (for example 400 to 2,000 pops) and rewards (600, 1,400, 3,000 shards, scaled by areas unlocked). Every weekly target is enforced by a test to exceed the matching daily target. Unclaimed rewards are lost at reset; a missed week costs nothing else.
+
 ## Blast colors (cosmetic)
 Menu > Codex > Blast colors. Styles recolor your planting markers and your detonation rings and bursts (other players see your color on your blasts). No gameplay effect. Classic is free; Frostfire, Rose Gold, Verdant, Royal and Solar unlock by claiming specific Goals (ownership is derived from claimed goals, so nothing extra is tracked); Neon Pink is a shop item. Equipping is validated by the server, and a bad or stale saved choice falls back to Classic.
 

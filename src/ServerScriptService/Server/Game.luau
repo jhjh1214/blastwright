@@ -27,6 +27,7 @@ local Charges = Config.Charges
 local Strata = Config.Strata
 local WorldConfig = Config.World
 local DailiesConfig = Config.Dailies
+local WeekliesConfig = Config.Weeklies
 local AchievementsConfig = Config.Achievements
 local CosmeticsConfig = Config.Cosmetics
 
@@ -78,9 +79,20 @@ local function ensureDaily(data: any)
 	Dailies.Refresh(data.Daily, Dailies.DayNumber(os.time()))
 end
 
+local function weeklyDefs()
+	return Dailies.ForDay(Dailies.WeekNumber(os.time()), WeekliesConfig)
+end
+
+local function ensureWeekly(data: any)
+	Dailies.Refresh(data.Weekly, Dailies.WeekNumber(os.time()))
+end
+
+-- Gameplay progress feeds both today's objectives and this week's challenges.
 local function recordDaily(data: any, kind: string, amount: number)
 	ensureDaily(data)
 	Dailies.Record(data.Daily, todaysDefs(), kind, amount)
+	ensureWeekly(data)
+	Dailies.Record(data.Weekly, weeklyDefs(), kind, amount)
 end
 
 local function notify(player: Player, text: string, kind: string)
@@ -112,6 +124,7 @@ local function snapshot(player: Player): { [string]: any }?
 	end
 	local seam = seams[player]
 	ensureDaily(data)
+	ensureWeekly(data)
 	local passes = {}
 	for key in Config.Products.Gamepasses do
 		passes[key] = Purchases.Owns(player, key)
@@ -123,6 +136,8 @@ local function snapshot(player: Player): { [string]: any }?
 		ActiveStyle = Cosmetics.Active(data, CosmeticsConfig).Id,
 		Settings = data.Settings,
 		Dailies = Dailies.View(data.Daily, todaysDefs(), data.Progress.StrataUnlocked),
+		Weeklies = Dailies.View(data.Weekly, weeklyDefs(), data.Progress.StrataUnlocked),
+		WeeklyResetIn = Dailies.SecondsUntilWeekReset(os.time()),
 		DailyResetIn = Dailies.SecondsUntilReset(os.time()),
 		Shards = data.Shards,
 		Upgrades = data.Upgrades,
@@ -429,6 +444,32 @@ local function onClaimGoal(player: Player, id: any)
 	sync(player)
 end
 
+local function onClaimWeekly(player: Player, slot: any)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	local now = os.clock()
+	local last = lastAction[player]
+	if last and now - last.Buy < BUY_COOLDOWN then
+		return
+	end
+	if last then
+		last.Buy = now
+	end
+
+	ensureWeekly(data)
+	local defs = weeklyDefs()
+	if not Dailies.CanClaim(data.Weekly, defs, slot) then
+		return notify(player, "Nothing to claim there yet.", "Error")
+	end
+	local reward = Dailies.Reward(defs[slot], data.Progress.StrataUnlocked)
+	data.Weekly.Claimed[tostring(slot)] = true
+	data.Shards += reward
+	notify(player, ("Weekly challenge complete! +%d shards"):format(reward), "Reward")
+	sync(player)
+end
+
 local function onClaim(player: Player, slot: any)
 	local data = Data.Get(player)
 	if not data then
@@ -584,6 +625,7 @@ function Game.Init()
 	Remotes.Detonate.OnServerEvent:Connect(onDetonate)
 	Remotes.Buy.OnServerEvent:Connect(onBuy)
 	Remotes.Claim.OnServerEvent:Connect(onClaim)
+	Remotes.ClaimWeekly.OnServerEvent:Connect(onClaimWeekly)
 	Remotes.ClaimGoal.OnServerEvent:Connect(onClaimGoal)
 	Remotes.Equip.OnServerEvent:Connect(onEquip)
 	Remotes.Setting.OnServerEvent:Connect(onSetting)

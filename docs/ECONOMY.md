@@ -8,6 +8,7 @@
 - Seam clear bonus: 25% of seam earnings x cleared fraction, if at least 50% cleared.
 
 - Daily objectives: 3 per day, 120 / 250 / 450 shards by slot, times (1 + 0.5 x extra areas unlocked).
+- Weekly challenges: 3 per week at 600 / 1,400 / 3,000 shards (times 1 + 0.5 x extra areas unlocked).
 - Goals: one-time shard rewards, 100 to 20,000 each, about 46,700 in total (`Config/Achievements.luau`).
 - Geode caches: one-time 60-800 shards each (22 total).
 - Shard packs (real money): see `MONETIZATION.md`.

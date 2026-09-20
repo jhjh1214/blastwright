@@ -12,6 +12,7 @@ return {
 	Rarities = require(script.Rarities),
 	World = require(script.World),
 	Dailies = require(script.Dailies),
+	Weeklies = require(script.Weeklies),
 	Products = require(script.Products),
 	Props = require(script.Props),
 	Music = require(script.Music),
