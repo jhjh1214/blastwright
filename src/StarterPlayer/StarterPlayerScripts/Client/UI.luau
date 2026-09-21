@@ -233,12 +233,15 @@ function UI.Init()
 	end)
 	local tabBar = mk("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 42), ZIndex = 11 }, panel)
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, tabBar)
-	for i, name in { "Forge", "Daily", "Goals", "Shop", "Codex" } do
-		local tab = button(tabBar, name, THEME.Row, { Size = UDim2.new(0.2, -5, 1, 0), TextSize = 14, LayoutOrder = i, ZIndex = 12 })
+	for i, name in { "Forge", "Daily", "Farm", "Goals", "Shop", "Codex" } do
+		local tab = button(tabBar, name, THEME.Row, { Size = UDim2.new(1 / 6, -5, 1, 0), TextSize = 14, LayoutOrder = i, ZIndex = 12 })
 		tabButtons[name] = tab
 		tab.Activated:Connect(function()
 			AudioManager.Play("Click")
 			UI.SetPanel(true, name)
+			if name == "Farm" then
+				Remotes.FarmAction:FireServer("refresh")
+			end
 		end)
 	end
 	panelScroll = mk("ScrollingFrame", {
@@ -583,6 +586,23 @@ local function rebuildPanel()
 			row(10 + item.Slot, item.Text, ("Reward: ◆ %s"):format(commas(item.Reward)), btnText, done and not item.Claimed, function()
 				if done and not item.Claimed then Remotes.ClaimWeekly:FireServer(item.Slot) end
 			end)
+		end
+	elseif activeTab == "Farm" then
+		local f = d.Farm
+		titleLabel.Text = "Crystal Farm"
+		if f then
+			header(0, ("Level %d / %d: produces %s shards an hour, stores up to %d hours (even while you are away)"):format(f.Level, f.MaxLevel, commas(f.PerHour), f.CapHours))
+			local full = f.Pending >= f.PerHour * f.CapHours
+			row(1, "Store", full and "The store is full: collect it so it keeps producing!" or "Shards waiting for you.", f.Pending > 0 and ("Collect  ◆ " .. commas(f.Pending)) or "Empty", f.Pending > 0, function()
+				Remotes.FarmAction:FireServer("collect")
+			end)
+			if f.NextCost then
+				row(2, ("Upgrade to level %d"):format(f.Level + 1), ("Produces %s shards an hour. Collects the store first."):format(commas(f.NextPerHour)), "Upgrade  ◆ " .. commas(f.NextCost), d.Shards >= f.NextCost, function()
+					Remotes.FarmAction:FireServer("upgrade")
+				end)
+			else
+				row(2, "Fully upgraded", "Nothing left to build here.", "Max", false, function() end)
+			end
 		end
 	elseif activeTab == "Goals" then
 		local goals = d.Goals or {}

@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 8
+Schema.CURRENT_VERSION = 9
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -20,6 +20,7 @@ function Schema.Default(): { [string]: any }
 		Cosmetics = { Owned = {}, Equipped = { BlastColor = "Classic" } }, -- Owned = purchased styles; goal styles are derived
 		Achievements = { Claimed = {} }, -- [goalId] = true once the reward was taken (see Shared/Achievements.luau)
 		Puzzle = { Day = 0, Score = 0, Par = 0, Medal = "", Streak = 0, LastDay = 0, BestStreak = 0 }, -- see Shared/Puzzle.luau
+		Farm = { Level = 1, LastCollect = 0 }, -- see Shared/Farm.luau (LastCollect 0 = stamped with the time on first load)
 		Purchases = {}, -- receipt ids, reserved for monetization
 	}
 end
@@ -71,6 +72,12 @@ local Migrations: { [number]: (data: { [string]: any }) -> () } = {
 	[8] = function(data)
 		if type(data.Puzzle) ~= "table" then
 			data.Puzzle = { Day = 0, Score = 0, Par = 0, Medal = "", Streak = 0, LastDay = 0, BestStreak = 0 }
+		end
+	end,
+	-- v9: crystal farm. Missing record is filled from defaults; LastCollect 0 is stamped by the server on load (no backpay).
+	[9] = function(data)
+		if type(data.Farm) ~= "table" then
+			data.Farm = { Level = 1, LastCollect = 0 }
 		end
 	end,
 }

@@ -1909,7 +1909,70 @@ test("puzzle: schema v8 adds a puzzle record and keeps old saves intact", functi
 	eq(d.Puzzle.Day, 0, "day")
 	eq(d.Puzzle.Streak, 0, "streak")
 	eq(d.Puzzle.Medal, "", "medal")
-	eq(Schema.CURRENT_VERSION, 8, "version")
+	eq(Schema.CURRENT_VERSION >= 8, true, "version")
+end)
+
+local Farm = require("../../src/ReplicatedStorage/Shared/Farm")
+local FarmCfg = require("../../src/ReplicatedStorage/Shared/Config/Farm")
+
+test("farm: pending grows with time at the level's rate and is capped by storage hours", function()
+	local rate = FarmCfg.Levels[1].PerHour
+	eq(Farm.Pending({ Level = 1, LastCollect = 1000 }, 1000, FarmCfg), 0, "nothing at the same instant")
+	eq(Farm.Pending({ Level = 1, LastCollect = 1000 }, 1000 + 1800, FarmCfg), math.floor(rate / 2), "half an hour")
+	local full = Farm.Pending({ Level = 1, LastCollect = 0 }, FarmCfg.CapHours * 3600, FarmCfg)
+	eq(full, rate * FarmCfg.CapHours, "a full store")
+	eq(Farm.Pending({ Level = 1, LastCollect = 0 }, FarmCfg.CapHours * 3600 * 10, FarmCfg), full, "never more than the cap")
+end)
+
+test("farm: a clock that goes backwards or a corrupt record gives nothing", function()
+	eq(Farm.Pending({ Level = 1, LastCollect = 5000 }, 4000, FarmCfg), 0, "clock went back")
+	eq(Farm.Pending({ Level = 0, LastCollect = 0 }, 99999, FarmCfg), 0, "level zero")
+	eq(Farm.Pending({ Level = 999, LastCollect = 0 }, 99999, FarmCfg), 0, "unknown level")
+	eq(Farm.Pending({ Level = 1, LastCollect = 0 / 0 }, 99999, FarmCfg), 0, "NaN time")
+end)
+
+test("farm: collecting pays the pending amount and restarts the timer", function()
+	local farm = { Level = 2, LastCollect = 0 }
+	local amount = Farm.Collect(farm, 3600, FarmCfg)
+	eq(amount, FarmCfg.Levels[2].PerHour, "one hour of level 2")
+	eq(farm.LastCollect, 3600, "timer restarted")
+	eq(Farm.Collect(farm, 3600, FarmCfg), 0, "nothing left right away")
+end)
+
+test("farm: upgrading pays out pending first at the OLD rate, then charges the cost", function()
+	local farm = { Level = 1, LastCollect = 0 }
+	local cost = FarmCfg.Levels[2].Cost
+	local ok, paid = Farm.Upgrade(farm, 3600, cost, FarmCfg)
+	eq(ok, true, "upgraded")
+	eq(paid, FarmCfg.Levels[1].PerHour, "an hour at the old rate was collected")
+	eq(farm.Level, 2, "level")
+	eq(farm.LastCollect, 3600, "timer restarted")
+end)
+
+test("farm: upgrade is refused without the shards and at the top level, changing nothing", function()
+	local farm = { Level = 1, LastCollect = 0 }
+	local ok, why = Farm.Upgrade(farm, 3600, FarmCfg.Levels[2].Cost - 1, FarmCfg)
+	eq(ok, false, "too poor")
+	eq(farm.Level, 1, "level unchanged")
+	eq(farm.LastCollect, 0, "timer unchanged")
+	local top = { Level = #FarmCfg.Levels, LastCollect = 0 }
+	eq((Farm.Upgrade(top, 3600, 1e12, FarmCfg)), false, "already max")
+	eq(top.Level, #FarmCfg.Levels, "still max")
+end)
+
+test("farm: config levels get richer and dearer", function()
+	for i = 2, #FarmCfg.Levels do
+		eq(FarmCfg.Levels[i].PerHour > FarmCfg.Levels[i - 1].PerHour, true, "rate rises at " .. i)
+		eq(FarmCfg.Levels[i].Cost > FarmCfg.Levels[i - 1].Cost, true, "cost rises at " .. i)
+	end
+end)
+
+test("farm: schema v9 gives old saves a level-1 farm that starts now-ish", function()
+	local d = Schema.Migrate({ SchemaVersion = 8, Shards = 7 })
+	eq(d.Shards, 7, "shards kept")
+	eq(d.Farm.Level, 1, "level")
+	eq(d.Farm.LastCollect, 0, "no backpay: server stamps the time on load")
+	eq(Schema.CURRENT_VERSION, 9, "version")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

@@ -17,6 +17,7 @@ local Dailies = require(Shared.Dailies)
 local Events = require(Shared.Events)
 local Expedition = require(Shared.Expedition)
 local Puzzle = require(Shared.Puzzle)
+local Farm = require(Shared.Farm)
 local Data = require(script.Parent.Data)
 local Leaderboard = require(script.Parent.Leaderboard)
 local Purchases = require(script.Parent.Purchases)
@@ -39,6 +40,7 @@ local EventsConfig = Config.Events
 local CommunityConfig = Config.Community
 local ExpeditionConfig = Config.Expedition
 local PuzzleConfig = Config.Puzzle
+local FarmConfig = Config.Farm
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -189,6 +191,20 @@ local function snapshot(player: Player): { [string]: any }?
 		Stats = data.Stats,
 		ChargesLeft = seam and seam.Charges or 0,
 		ChargesMax = seam and seam.ChargesMax or 0,
+		Farm = (function()
+			local f = data.Farm
+			local now = os.time()
+			local nextDef = FarmConfig.Levels[f.Level + 1]
+			return {
+				Level = f.Level,
+				MaxLevel = #FarmConfig.Levels,
+				PerHour = FarmConfig.Levels[f.Level].PerHour,
+				CapHours = FarmConfig.CapHours,
+				Pending = Farm.Pending(f, now, FarmConfig),
+				NextCost = nextDef and nextDef.Cost or nil,
+				NextPerHour = nextDef and nextDef.PerHour or nil,
+			}
+		end)(),
 		Puzzle = (function()
 			local today = Dailies.DayNumber(os.time())
 			local p = data.Puzzle
@@ -639,6 +655,38 @@ local function onBuy(player: Player, kind: any, id: any)
 	sync(player)
 end
 
+-- Crystal Farm: "collect" takes the store; "upgrade" buys the next level (which collects first, at the old rate).
+local function onFarmAction(player: Player, action: any)
+	local data = Data.Get(player)
+	if not data or (action ~= "collect" and action ~= "upgrade" and action ~= "refresh") then
+		return
+	end
+	local now = os.time()
+	if action == "refresh" then
+		return sync(player) -- the store fills with time, so opening the tab asks for a fresh number
+	elseif action == "collect" then
+		local amount = Farm.Collect(data.Farm, now, FarmConfig)
+		if amount > 0 then
+			award(data, amount)
+			notify(player, ("Collected %d shards from the Crystal Farm."):format(amount), "Reward")
+		else
+			notify(player, "The farm store is empty. Check back later!", "Info")
+		end
+	else
+		local nextDef = FarmConfig.Levels[data.Farm.Level + 1]
+		local ok, paid = Farm.Upgrade(data.Farm, now, data.Shards, FarmConfig)
+		if not ok then
+			notify(player, paid == "max" and "The farm is fully upgraded." or "Not enough shards.", paid == "max" and "Info" or "Error")
+			return
+		end
+		data.Shards -= nextDef.Cost
+		award(data, paid)
+		notify(player, ("Crystal Farm upgraded to level %d!%s"):format(data.Farm.Level, paid > 0 and (" (collected %d first)"):format(paid) or ""), "Reward")
+	end
+	announceGoals(player)
+	sync(player)
+end
+
 local function onSetting(player: Player, name: any, value: any)
 	local data = Data.Get(player)
 	local key, enabled = Validate.Setting(name, value)
@@ -935,6 +983,9 @@ local function onPlayerAdded(player: Player)
 	end
 
 	lastAction[player] = { Buy = 0, Detonate = 0 }
+	if session.Data.Farm.LastCollect == 0 then
+		session.Data.Farm.LastCollect = os.time() -- a new farm starts producing now (no backpay for old saves)
+	end
 	seenGoals[player] = {}
 	Leaderboard.Submit(player.UserId, session.Data.Stats.BestChain)
 	Achievements.NewlyComplete(session.Data, AchievementsConfig, seenGoals[player]) -- silent: old completions are not announced
@@ -998,6 +1049,7 @@ function Game.Init()
 	Remotes.Equip.OnServerEvent:Connect(guarded("Equip", 5, 8, onEquip))
 	Remotes.Setting.OnServerEvent:Connect(guarded("Setting", 5, 8, onSetting))
 	Remotes.RunPick.OnServerEvent:Connect(guarded("RunPick", 5, 8, onRunPick))
+	Remotes.FarmAction.OnServerEvent:Connect(guarded("FarmAction", 3, 5, onFarmAction))
 	Remotes.PuzzleStart.OnServerEvent:Connect(guarded("PuzzleStart", 2, 3, onPuzzleStart))
 	optional("Purchases", function()
 		Purchases.Init({ Notify = notify, OnChanged = sync })
