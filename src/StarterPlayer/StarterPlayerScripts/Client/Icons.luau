@@ -6,6 +6,12 @@ local Theme = require(script.Parent.Theme)
 
 local Icons = {}
 
+-- Painted icons can replace the drawn ones: put a REAL image asset id (from the Creator Store or your own upload) here and
+-- that button/tile uses the image instead. Leave nil to keep the drawn icon. Never invent an id.
+Icons.Assets = {
+	-- Forge = "rbxassetid://...",
+}
+
 local OUT = Theme.Colors.Outline
 local WHITE = Color3.fromRGB(255, 255, 255)
 
@@ -142,12 +148,20 @@ function Icons.Draw(name, parent, tint, fill)
 	canvas.Position = UDim2.fromScale(0.5, 0.5)
 	canvas.Size = UDim2.fromScale(fill or 0.8, fill or 0.8)
 	canvas.ZIndex = (parent.ZIndex or 1) + 1
-	local ratio = Instance.new("UIAspectRatioConstraint")
-	ratio.AspectRatio = 1
-	ratio.Parent = canvas
-	local draw = DRAW[name]
-	if draw then
-		draw(canvas, tint)
+	local asset = Icons.Assets[name]
+	if asset then
+		local image = Instance.new("ImageLabel")
+		image.BackgroundTransparency = 1
+		image.Size = UDim2.fromScale(1, 1)
+		image.Image = asset
+		image.ScaleType = Enum.ScaleType.Fit
+		image.ZIndex = canvas.ZIndex + 1
+		image.Parent = canvas
+	else
+		local draw = DRAW[name]
+		if draw then
+			draw(canvas, tint)
+		end
 	end
 	for _, d in canvas:GetDescendants() do
 		if d:IsA("GuiObject") then

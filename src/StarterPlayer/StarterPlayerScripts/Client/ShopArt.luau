@@ -34,7 +34,7 @@ local function text(parent, str, size, color, props)
 		p[k] = v
 	end
 	local l = make("TextLabel", p, parent)
-	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = size >= 24 and 3.5 or 2.5, LineJoinMode = Enum.LineJoinMode.Round }, l)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = Theme.StrokeFor(size, 3.5), LineJoinMode = Enum.LineJoinMode.Round }, l)
 	return l
 end
 
@@ -265,7 +265,7 @@ function ShopArt.Card(parent, spec)
 
 	text(card, spec.Name, 22, Color3.new(1, 1, 1), { Position = UDim2.fromOffset(12, 116), Size = UDim2.new(1, -24, 0, 28), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 14, TextTruncate = Enum.TextTruncate.AtEnd })
 	local desc = text(card, spec.Description, 13, Color3.fromRGB(226, 232, 250), { Font = Enum.Font.BuilderSansBold, Position = UDim2.fromOffset(12, 146), Size = UDim2.new(1, -24, 0, 34), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 14 })
-	desc:FindFirstChildOfClass("UIStroke").Thickness = 2
+	desc:FindFirstChildOfClass("UIStroke").Enabled = false -- small body text: no outline, just bright text on the dark card
 
 	if spec.Hint then
 		local chip = make("Frame", { AnchorPoint = Vector2.new(0, 1), BackgroundColor3 = Theme.Colors.PanelDark, Position = UDim2.new(0, 10, 1, -12), Size = UDim2.fromOffset(86, 40), BorderSizePixel = 0, ZIndex = 14 }, card)

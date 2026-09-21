@@ -977,8 +977,6 @@ local function rebuildPanel()
 				Hint = priceHint(packHint[key]), Button = def.Id and "Buy" or "Not for sale yet", Enabled = def.Id ~= nil, Order = i, OnClick = buyPrompt(def),
 			})
 		end
-		order += 1
-		header(order, "Everything is earnable by playing. The shop only saves time and adds style.")
 	else
 		titleLabel.Text = "Codex"
 		local found = 0

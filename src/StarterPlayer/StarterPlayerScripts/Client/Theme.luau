@@ -56,6 +56,12 @@ Theme.Anim = {
 -- Draw order of the big layers (ZIndexBehavior is Sibling, so these order siblings inside the ScreenGui).
 Theme.Z = { Hud = 5, Panel = 10, Popup = 20, Feed = 30, Banner = 40, Modal = 50 }
 
+-- An outline thickness that suits a text size: at most `want`, never more than a tenth of the size (a thick outline on
+-- small letters fills them in and the text looks dark).
+function Theme.StrokeFor(size, want)
+	return math.min(want or 3.5, math.max(1, size * 0.1))
+end
+
 -- Slightly darker / lighter version of a colour (used for button edges and highlights).
 function Theme.Shade(c, amount)
 	return c:Lerp(Color3.new(0, 0, 0), amount)

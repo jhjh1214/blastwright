@@ -39,7 +39,7 @@ Kit.Tween = tween
 function Kit.Outline(label, thickness, color)
 	local s = label:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke")
 	s.Color = color or C.Outline
-	s.Thickness = thickness or Theme.Stroke.Text
+	s.Thickness = Theme.StrokeFor(label.TextSize, thickness or Theme.Stroke.Text)
 	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	s.LineJoinMode = Enum.LineJoinMode.Round
 	s.Parent = label
@@ -119,16 +119,24 @@ function Kit.Button(parent, o)
 	local iconHolder, textLabel, subLabel
 	if hasIcon then
 		iconHolder = make("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 5 }, face)
+		local fraction = vertical and (hasText and 0.62 or 0.8) or 0.86
 		if vertical then
 			iconHolder.Position = UDim2.new(0.5, 0, hasText and 0.4 or 0.5, 0)
-			iconHolder.Size = UDim2.fromScale(0, hasText and 0.62 or 0.8)
-			make("UIAspectRatioConstraint", { AspectRatio = 1, DominantAxis = Enum.DominantAxis.Height }, iconHolder)
 		else
-			iconHolder.Position = UDim2.new(0, 10, 0.5, 0)
 			iconHolder.AnchorPoint = Vector2.new(0, 0.5)
-			iconHolder.Size = UDim2.fromScale(0, 0.86)
-			make("UIAspectRatioConstraint", { AspectRatio = 1, DominantAxis = Enum.DominantAxis.Height }, iconHolder)
+			iconHolder.Position = UDim2.new(0, 10, 0.5, 0)
 		end
+		-- a square in pixels, from the face's height (zero-width scale frames with aspect constraints collapse)
+		local function sizeIcon()
+			local h = face.AbsoluteSize.Y
+			if h > 0 then
+				local px = math.floor(h * fraction)
+				iconHolder.Size = UDim2.fromOffset(px, px)
+			end
+		end
+		face:GetPropertyChangedSignal("AbsoluteSize"):Connect(sizeIcon)
+		iconHolder.Size = UDim2.fromOffset(40, 40)
+		sizeIcon()
 		Icons.Draw(o.Icon, iconHolder, color, 1)
 	end
 	if hasText then
@@ -326,8 +334,16 @@ function Kit.Currency(parent, o)
 	make("UIStroke", { Color = C.Outline, Thickness = Theme.Stroke.Outer, LineJoinMode = Enum.LineJoinMode.Round }, root)
 	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(C.PanelDark, 0.16), Theme.Shade(C.PanelDark, 0.2)), Rotation = 90 }, root)
 	local scale = make("UIScale", { Scale = 1 }, root)
-	local iconHolder = make("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, -4, 0.5, 0), Size = UDim2.fromScale(0, 1.3), ZIndex = (o.ZIndex or 5) + 2 }, root)
-	make("UIAspectRatioConstraint", { AspectRatio = 1, DominantAxis = Enum.DominantAxis.Height }, iconHolder)
+	local iconHolder = make("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, -6, 0.5, 0), Size = UDim2.fromOffset(64, 64), ZIndex = (o.ZIndex or 5) + 2 }, root)
+	local function sizeCurrencyIcon()
+		local h = root.AbsoluteSize.Y
+		if h > 0 then
+			local px = math.floor(h * 1.25)
+			iconHolder.Size = UDim2.fromOffset(px, px)
+		end
+	end
+	root:GetPropertyChangedSignal("AbsoluteSize"):Connect(sizeCurrencyIcon)
+	sizeCurrencyIcon()
 	Icons.Draw(o.Icon or "Gem", iconHolder, color, 1)
 	local text = Kit.Label(root, "0", 26, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.new(1, -66, 0.72, 0), ZIndex = (o.ZIndex or 5) + 2, TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = Theme.Tint(color, 0.4) })
 	local cur = { Root = root, Label = text, Value = 0, Shown = 0 }

@@ -115,10 +115,10 @@ function Feed.Push(kind, title, body)
 	local column = make("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 32 }, card)
 	make("UIListLayout", { Padding = UDim.new(0, 2) }, column)
 	local titleLabel = make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Font = DISPLAY, Text = title, TextSize = 21, TextColor3 = Color3.new(1, 1, 1), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 33, LayoutOrder = 1 }, column)
-	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3, LineJoinMode = Enum.LineJoinMode.Round }, titleLabel)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = Theme.StrokeFor(21, 3), LineJoinMode = Enum.LineJoinMode.Round }, titleLabel)
 	if body and body ~= "" then
 		local bodyLabel = make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Font = BODY_BOLD, Text = body, TextSize = 15, TextColor3 = Color3.fromRGB(240, 244, 255), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 33, LayoutOrder = 2 }, column)
-		make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 2, LineJoinMode = Enum.LineJoinMode.Round }, bodyLabel)
+		make("UIStroke", { Color = Theme.Colors.Outline, Thickness = Theme.StrokeFor(15, 2), LineJoinMode = Enum.LineJoinMode.Round }, bodyLabel)
 	end
 
 	TweenService:Create(card, TweenInfo.new(Theme.Anim.Popup, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromOffset(0, 0) }):Play()
