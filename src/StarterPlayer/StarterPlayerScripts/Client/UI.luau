@@ -96,7 +96,7 @@ local welcomeFrame, detonateStroke
 local detonatePulse = false
 local settingButtons = {}
 local tabButtons = {}
-local chargeColumn, panel, panelScroll, detonateButton, dock, topCenter, bossHud, leftCol, readPanel
+local chargeColumn, panel, panelScroll, detonateButton, dock, topCenter, bossHud, leftCol, readPanel, panelRule
 local roamGroup, blastGroup
 local runLabel, runModal, runCards, runTitle, runBank, rigLabel
 local bossFrame, bossName, bossFill, bossHint, dodgeButton, criticalLabel
@@ -320,17 +320,19 @@ function UI.Init()
 	end)
 
 	----------------------------------------------------------- Forge / Codex panel
-	panel = mk("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.45), Size = UDim2.new(0.92, 0, 0.7, 0), Visible = false, ZIndex = 10 }, gui)
+	panel = mk("Frame", { BackgroundColor3 = Color3.fromRGB(21, 24, 39), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.45), Size = UDim2.new(0.92, 0, 0.7, 0), Visible = false, ZIndex = 10 }, gui)
 	corner(panel, 16)
 	mk("UISizeConstraint", { MaxSize = Vector2.new(560, 460) }, panel)
-	Fx.Gradient(panel, Color3.fromRGB(32, 36, 68), Color3.fromRGB(14, 16, 28), 90)
-	Fx.AnimatedBorder(panel, { THEME.Accent, Color3.fromRGB(255, 100, 200), THEME.Gold, THEME.Accent }, 3, 7)
-	label(panel, "", 26, THEME.Text, { Name = "Title", Position = UDim2.fromOffset(16, 8), Size = UDim2.new(1, -80, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11 })
+	mk("UIStroke", { Color = Color3.fromRGB(78, 86, 120), Thickness = 1.5, Transparency = 0.2 }, panel)
+	panelRule = mk("Frame", { BackgroundColor3 = THEME.Accent, Size = UDim2.new(1, 0, 0, 6), BorderSizePixel = 0, ZIndex = 11 }, panel)
+	corner(panelRule, 16)
+	label(panel, "", 30, THEME.Text, { Name = "Title", Position = UDim2.fromOffset(18, 12), Size = UDim2.new(1, -90, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11, Font = Enum.Font.FredokaOne })
 	local close = button(panel, "X", THEME.Row, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), Size = UDim2.fromOffset(48, 48), ZIndex = 11 })
 	close.Activated:Connect(function()
 		UI.SetPanel(false)
 	end)
-	local tabBar = mk("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 42), ZIndex = 11 }, panel)
+	-- (the dock along the bottom is the navigation now; this in-panel tab bar stays hidden but keeps the tab buttons wired)
+	local tabBar = mk("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 42), ZIndex = 11, Visible = false }, panel)
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, tabBar)
 	for i, name in { "Forge", "Daily", "Farm", "Goals", "Shop", "Codex" } do
 		local tab = button(tabBar, name, THEME.Row, { Size = UDim2.new(1 / 6, -5, 1, 0), TextSize = 14, LayoutOrder = i, ZIndex = 12 })
@@ -347,8 +349,8 @@ function UI.Init()
 	end
 	panelScroll = mk("ScrollingFrame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(12, 108),
-		Size = UDim2.new(1, -24, 1, -120),
+		Position = UDim2.fromOffset(12, 62),
+		Size = UDim2.new(1, -24, 1, -74),
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 6,
@@ -691,6 +693,7 @@ local function rebuildPanel()
 	local d = State.Data
 	local titleLabel = panel:FindFirstChild("Title")
 	titleLabel.TextColor3 = Fx.Lighten(Fx.Tab[activeTab] or THEME.Accent, 0.35)
+	panelRule.BackgroundColor3 = Fx.Tab[activeTab] or THEME.Accent
 	for name, tab in tabButtons do
 		local selected = name == activeTab
 		tab.BackgroundColor3 = selected and Fx.Tab[name] or THEME.Row
