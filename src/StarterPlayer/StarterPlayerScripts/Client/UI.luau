@@ -97,7 +97,7 @@ local toastHolder, tierLabel, chargeColumn, panel, panelScroll, detonateButton
 local roamGroup, blastGroup
 local runLabel, runModal, runCards, runTitle, runBank, rigLabel
 local bossFrame, bossName, bossFill, bossHint, dodgeButton, criticalLabel
-local boostLabel, chargeButton, reviveModal, reviveText, reviveYes, reviveNo
+local boostLabel, chargeButton, reviveModal, reviveText, reviveYes, reviveNo, combatLabel
 local activeTab = "Forge"
 local displayShards = 0
 local chargeButtons = {}
@@ -239,6 +239,12 @@ function UI.Init()
 	reviveNo.Activated:Connect(function()
 		Remotes.RunRevive:FireServer(false)
 	end)
+
+	-- The planning read for fights (what this volley does to the Lurker / boss and to its wound-up attacks).
+	combatLabel = label(blastGroup, "", 15, Color3.fromRGB(255, 225, 190), { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.new(1, -440, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = Color3.fromRGB(40, 22, 22), BackgroundTransparency = 0.25, TextWrapped = true, Visible = false, TextStrokeTransparency = 1, Font = Enum.Font.GothamMedium })
+	corner(combatLabel, 10)
+	mk("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, combatLabel)
+	mk("UIStroke", { Color = Color3.fromRGB(255, 120, 90), Thickness = 1.5, Transparency = 0.4 }, combatLabel)
 
 	-- Between-floor choice: three cards and "Bank & leave". Covers the screen while choosing (blasting is paused anyway).
 	runModal = mk("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 20, Active = true }, gui)
@@ -524,6 +530,13 @@ function UI.SetPreview(text)
 end
 
 -- Second preview line (crystal description, legend). "" hides it.
+function UI.SetCombat(text)
+	if combatLabel then
+		combatLabel.Text = text or ""
+		combatLabel.Visible = text ~= nil and text ~= ""
+	end
+end
+
 function UI.SetInfo(text)
 	if infoLabel then
 		infoLabel.Text = text
@@ -558,8 +571,12 @@ function UI.SetChain(pops, mult)
 		return
 	end
 	chainLabel.Text = ("CHAIN %d   x%.1f"):format(pops, mult)
-	chainLabel.TextSize = 36
-	TweenService:Create(chainLabel, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextSize = 42 }):Play()
+	-- the combo meter heats up as the chain grows: white-orange, gold, red-hot, then magenta, and gets bigger
+	local heat = pops >= 35 and Color3.fromRGB(255, 90, 230) or (pops >= 20 and Color3.fromRGB(255, 70, 60) or (pops >= 10 and Color3.fromRGB(255, 205, 80) or Color3.fromRGB(255, 160, 90)))
+	chainLabel.TextColor3 = heat
+	local base = 36 + math.min(pops, 40) * 0.5
+	chainLabel.TextSize = base
+	TweenService:Create(chainLabel, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextSize = base + 8 }):Play()
 end
 
 function UI.ShowTier(name, bonus, total)

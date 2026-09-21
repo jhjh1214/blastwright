@@ -39,6 +39,7 @@ optional("music", AudioManager.StartMusic)
 UI.Init()
 Preview.OnText = UI.SetPreview
 Preview.OnInfo = UI.SetInfo
+Preview.OnCombat = UI.SetCombat
 CameraFeedback.Start()
 Input.Init()
 optional("cache visuals", CacheView.Init)

@@ -77,6 +77,24 @@ local function popEvent(run, ev)
 	if run.Own then
 		CameraFeedback.Shake(0.05 + math.min(run.Count, 30) * 0.004)
 		UI.SetChain(run.Count, ev.Mult)
+		-- Milestones land LIVE, the moment the chain reaches them, so a growing chain keeps escalating instead of waiting for the end.
+		for _, tier in Config.Tuning.ChainTiers do
+			if run.Count == tier.Pops then
+				run.ShownTier = tier.Name
+				UI.ShowTier(tier.Name, tier.Bonus, 0)
+				CameraFeedback.Punch(3 + tier.Bonus * 4)
+				VFX.Ring(view.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(255, 205, 90), view.Extent * (1 + tier.Bonus * 0.5), 0.6)
+			end
+		end
+		local delta = State.Run and State.Run.Modifiers and State.Run.Modifiers.CriticalPopsDelta or 0
+		if run.Count == math.max(1, Config.Bosses.Power.CriticalPops + delta) then
+			run.ShownCritical = true
+			UI.ShowTier("Critical Mass")
+			VFX.SetCritical(true)
+			CameraFeedback.Shake(1.2)
+			CameraFeedback.Punch(9)
+			VFX.Ring(view.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(255, 150, 40), view.Extent * 1.8, 0.9)
+		end
 	end
 end
 
@@ -112,12 +130,12 @@ local function step()
 			if run.Own then
 				State.Busy = false
 				UI.SetChain(0, 1)
-				if run.Result.CriticalStarted then
+				if run.Result.CriticalStarted and not run.ShownCritical then
 					UI.ShowTier("Critical Mass")
 					CameraFeedback.Shake(1.4)
 					CameraFeedback.Punch(9)
 					VFX.Ring(run.View.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(255, 150, 40), run.View.Extent * 1.8, 0.9)
-				elseif run.Result.Tier then
+				elseif run.Result.Tier and run.ShownTier ~= run.Result.Tier and not run.ShownCritical then
 					UI.ShowTier(run.Result.Tier, run.Result.Bonus, run.Result.Total)
 					CameraFeedback.Shake(0.9)
 					CameraFeedback.Punch(6)

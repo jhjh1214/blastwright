@@ -15,6 +15,10 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ChainSim = require(Shared.ChainSim)
 local Config = require(Shared.Config)
 local Geometry = require(Shared.Geometry)
+local Lurker = require(Shared.Lurker)
+local Boss = require(Shared.Boss)
+local BossRT = require(Shared.BossRT)
+local Power = require(Shared.Power)
 
 local CavernView = require(script.Parent.CavernView)
 local State = require(script.Parent.State)
@@ -197,12 +201,79 @@ local function setInfo(text)
 	end
 end
 
+-- The combat read (Lurker / boss / attacks) has its own label at the bottom centre so it never fights the boss bar.
+local function setCombat(text)
+	if Preview.OnCombat then
+		Preview.OnCombat(text)
+	end
+end
+
+-- What the planned volley would do to the Lurker and the boss (and to the boss's wound-up attacks), using the exact same
+-- pure rules the server uses. `res` = the chain result to judge by (the full chain with the Seismograph, direct hits only without).
+local function combatLines(res, full)
+	local data = State.Data
+	local lines = {}
+	local mctx = { Crystals = Config.Context.Crystals, Charges = Config.Context.Charges, BlastCells = ChainSim.BlastCells, Size = Config.Tuning.GridSize }
+	local mods = State.Run and State.Run.Modifiers
+	local power = Power.Multiplier(res.Pops, data.Critical or 0, Config.Bosses.Power)
+	if mods then
+		power *= mods.DamageMult
+		if (data.Hearts or 0) == 1 then
+			power *= mods.LastStandMult
+		end
+	end
+	if data.Monster then
+		local m = data.Monster
+		local dmg = Lurker.Damage({ Kind = m.Kind, X = m.X, Z = m.Z, HP = m.HP, MaxHP = m.MaxHP, Turn = 0 }, State.Placed, res, mctx, Config.Lurkers)
+		if dmg > 0 then
+			dmg = math.max(1, math.floor(dmg * power))
+		end
+		if dmg >= m.HP then
+			table.insert(lines, ("%s: ~%d damage, KILLS IT"):format(m.Name, dmg))
+		elseif dmg > 0 then
+			table.insert(lines, ("%s: ~%d damage (HP %d -> %d)"):format(m.Name, dmg, m.HP, m.HP - dmg))
+		else
+			table.insert(lines, ("%s: this volley does not reach it"):format(m.Name))
+		end
+	end
+	local boss = data.Boss
+	if boss then
+		local est = Boss.Estimate(boss, State.Placed, res, mctx, Config.Bosses, power)
+		if boss.Phase == "Armor" then
+			table.insert(lines, ("Armor: breaks %d node%s, %d left"):format(est.NodesBroken, est.NodesBroken == 1 and "" or "s", est.NodesLeft))
+		elseif boss.Phase == "Weak" then
+			table.insert(lines, ("Weak points hit: %d/2 -> ~%d damage%s"):format(est.WeakHit, est.Damage, est.WeakHit == 2 and "  MASSIVE" or ""))
+		elseif boss.Phase == "Finisher" then
+			table.insert(lines, est.Killed and "FINISHER: this volley kills it!" or ("Finisher needs %d+ pops (this is %d)"):format(Config.Bosses.Defs[boss.Kind].Finisher.Pops, res.Pops))
+		else
+			table.insert(lines, est.Killed and "This volley kills the boss!" or ("Core hit ~%d (HP %d -> %d)"):format(est.Damage, boss.HP, boss.HP - est.Damage))
+		end
+		if boss.RT and #boss.RT.Threats > 0 then
+			local sim = BossRT.Simulate(boss.RT.Threats, res.Events, { Crystals = Config.Context.Crystals }, boss.Kind, Config.Bosses)
+			for _, o in sim.Outcomes do
+				if o.Type == "Slam" then
+					table.insert(lines, o.Fully and "SLAM: cut" or "SLAM: not cut (pop 3+ crystals on the line, or Dodge)")
+				elseif o.Type == "Meteor" then
+					table.insert(lines, o.Fully and "METEORS: all deflected" or ("METEORS: %d/%d deflected (pop Lensglass)"):format(o.Stopped, o.Total))
+				else
+					table.insert(lines, o.Fully and "CORRUPTION: purified" or ("CORRUPTION: %d/%d marked crystals purified"):format(o.Stopped, o.Total))
+				end
+			end
+		end
+	end
+	if #lines > 0 and not full then
+		table.insert(lines, "(direct hits only: the Seismograph shows chain effects)")
+	end
+	return table.concat(lines, "\n")
+end
+
 local function refresh()
 	clear()
 	local view = CavernView.Get(State.UserId)
 	if not view or not State.Data or not State.Engaged or State.Busy then
 		setText("")
 		setInfo("")
+		setCombat("")
 		return
 	end
 	origin = view.Origin
@@ -250,6 +321,7 @@ local function refresh()
 
 	local crystalText = crystalInfo(view)
 	if #State.Placed == 0 then
+		setCombat("")
 		setText(("Tap a spot to plant a charge  |  Charges %d/%d"):format(available, maxCharges))
 		setInfo(crystalText or "Tap a planted charge again to remove it.")
 		return
@@ -294,10 +366,21 @@ local function refresh()
 			table.insert(parts, "refunds a charge")
 		end
 		table.insert(parts, "white = direct, gold = chain, cyan = beam")
+		local combat = combatLines(result, true)
 		setInfo((crystalText and (crystalText .. "\n") or "") .. table.concat(parts, "  |  "))
+		setCombat(combat)
 	else
 		setText(("Charges %d/%d  |  Direct hits: %d"):format(left, maxCharges, direct))
+		-- without the Seismograph the combat read uses only the crystals the charges hit directly
+		local directEvents = {}
+		for _, ev in result.Events do
+			if ev.Cause == "Charge" then
+				table.insert(directEvents, ev)
+			end
+		end
+		local combat = combatLines({ Pops = #directEvents, Events = directEvents }, false)
 		setInfo(crystalText or "Get the Seismograph in the Forge to preview whole chains.")
+		setCombat(combat)
 	end
 end
 

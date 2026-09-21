@@ -3405,5 +3405,87 @@ test("lurker: the pity chance never lowers a chance that is already higher", fun
 	eq(Lurker.SpawnChance(1, 0, cfg, true), 0.9, "keeps the higher chance")
 end)
 
+test("boss: the planning estimate matches what Apply really does, in every phase, for many volleys and powers", function()
+	local checked = 0
+	for _, kind in { "Titan", "Warden" } do
+		local def = BossCfg.Defs[kind]
+		for _, phase in { "Armor", "Attack", "Weak", "Enrage", "Finisher" } do
+			for seed = 1, 25 do
+				local rng = lcg(seed * 31 + #phase)
+				local g = fullGrid()
+				local b = Boss.New(kind, g, bctx, BossCfg, lcg(seed))
+				b.Phase = phase
+				if phase ~= "Armor" then b.Nodes = {} end
+				b.HP = math.max(2, math.floor(def.MaxHP * (0.2 + rng() * 0.7)))
+				if phase == "Weak" then b.Weak = { { X = 1 + seed % 9, Z = 1 }, { X = 9, Z = 1 + seed % 9 } } end
+				local events = {}
+				for i = 1, math.floor(rng() * 12) do events[#events + 1] = { X = 1 + math.floor(rng() * 9), Z = 1 + math.floor(rng() * 9), Kind = "Glimmerstone" } end
+				if phase == "Armor" and rng() < 0.6 then for _, n in b.Nodes do events[#events + 1] = { X = n.X, Z = n.Z, Kind = "Glimmerstone" } end end
+				if phase == "Weak" and rng() < 0.5 then events[#events + 1] = { X = b.Weak[1].X, Z = b.Weak[1].Z, Kind = "Glimmerstone" } end
+				local result = fakeResult(math.floor(rng() * 30), events)
+				local volley = rng() < 0.5 and { cap(5, 5) } or { { X = 5, Z = 9, Kind = "Cross" } }
+				local power = ({ 1, 1.25, 1.5, 2 })[1 + math.floor(rng() * 4)]
+				local before = b.HP
+				local view = Boss.View(b, BossCfg)
+				local est = Boss.Estimate(view, volley, result, bctx, BossCfg, power)
+				local real = Boss.Apply(b, volley, result, bctx, BossCfg, power, g, lcg(seed))
+				eq(est.Damage, math.min(real.Damage, before), ("%s %s seed %d damage"):format(kind, phase, seed))
+				eq(est.Killed, real.Killed, ("%s %s seed %d kill"):format(kind, phase, seed))
+				if phase == "Armor" then eq(est.NodesBroken, real.NodesBroken, "nodes broken") end
+				if phase == "Weak" then eq(est.WeakHit, real.WeakHit, "weak hit") end
+				checked += 1
+			end
+		end
+	end
+	eq(checked, 250, "all scenarios ran")
+end)
+
+test("boss: estimating never changes the boss it looks at", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(2))
+	local view = Boss.View(b, BossCfg)
+	local hp, nodes = view.HP, #view.Nodes
+	Boss.Estimate(view, { cap(5, 5) }, fakeResult(20, {}), bctx, BossCfg, 2)
+	eq(view.HP, hp, "hp untouched")
+	eq(#view.Nodes, nodes, "nodes untouched")
+	eq(b.HP, hp, "the real boss untouched")
+end)
+
+test("bossrt: simulating a volley reports exactly what Counter would do, and changes nothing", function()
+	for seed = 1, 30 do
+		local st = armedState()
+		local g = fullGrid()
+		local phase = ({ "Attack", "Weak", "Enrage" })[1 + seed % 3]
+		BossRT.Spawn(st, phase, "Titan", g, bctx, 1, lcg(seed), BossCfg)
+		if phase == "Enrage" then BossRT.Spawn(st, phase, "Titan", g, bctx, 1 + RT.Interval.Enrage, lcg(seed + 40), BossCfg) end
+		local events = {}
+		local rng = lcg(seed * 13)
+		for i = 1, 14 do
+			local t = st.Threats[1 + math.floor(rng() * #st.Threats)]
+			local kind = rng() < 0.3 and "Lensglass" or "Glimmerstone"
+			if t and t.Cells[1] and rng() < 0.7 then events[#events + 1] = { X = t.Cells[math.min(#t.Cells, 1 + i % 9)].X, Z = t.Cells[math.min(#t.Cells, 1 + i % 9)].Z, Kind = kind }
+			elseif t and t.Marks[1] and rng() < 0.7 then events[#events + 1] = { X = t.Marks[1 + i % #t.Marks].X, Z = t.Marks[1 + i % #t.Marks].Z, Kind = kind }
+			else events[#events + 1] = { X = 1 + i % 9, Z = 1 + (i * 3) % 9, Kind = kind } end
+		end
+		local view = BossRT.View(st, 1, BossCfg, "Titan")
+		local sim = BossRT.Simulate(view.Threats, events, bctx, "Titan", BossCfg)
+		for _, t in view.Threats do
+			eq(t.Cancelled, false, "the view's threats were not touched")
+		end
+		local real = BossRT.Counter(st, events, bctx, "Titan", BossCfg)
+		eq(sim.Cut, real.Cut, "cut seed " .. seed)
+		eq(sim.Deflected, real.Deflected, "deflected seed " .. seed)
+		eq(sim.Purified, real.Purified, "purified seed " .. seed)
+		for _, o in sim.Outcomes do
+			for _, t in st.Threats do
+				if t.Id == o.Id then
+					local fully = (t.Type == "Slam" and t.Cancelled) or (t.Type == "Meteor" and (function() for _, z in t.Zones do if not z.Cancelled then return false end end return true end)()) or (t.Type == "Corruption" and #t.Marks == 0)
+					eq(o.Fully, fully, "fully stopped agrees for " .. t.Type)
+				end
+			end
+		end
+	end
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

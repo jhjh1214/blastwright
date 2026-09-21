@@ -153,6 +153,52 @@ function BossRT.Counter(state: State, events: { any }, ctx: any, kind: string, c
 	return out
 end
 
+-- What a volley WOULD do to the boss's wound-up attacks, without changing anything (for the planning preview).
+-- `threats` is the list from BossRT.View. Returns per-threat outcomes and the same totals as Counter.
+function BossRT.Simulate(threats: { any }, events: { any }, ctx: any, kind: string, cfg: any)
+	local copy: State = { NextAt = 0, Threats = {}, ShieldUntil = 0, DodgeReadyAt = 0, NextId = 1 }
+	for _, t in threats do
+		local zones, marks = {}, {}
+		for _, z in t.Zones or {} do
+			table.insert(zones, { X = z.X, Z = z.Z, Cancelled = z.Cancelled })
+		end
+		for _, m in t.Marks or {} do
+			table.insert(marks, { X = m.X, Z = m.Z })
+		end
+		table.insert(copy.Threats, { Id = t.Id, Type = t.Type, LandsAt = 0, Cancelled = t.Cancelled, Cells = t.Cells or {}, Zones = zones, Marks = marks })
+	end
+	local before = {}
+	for _, t in copy.Threats do
+		before[t.Id] = { Marks = #t.Marks, Live = 0 }
+		for _, z in t.Zones do
+			if not z.Cancelled then
+				before[t.Id].Live += 1
+			end
+		end
+	end
+	local totals = BossRT.Counter(copy, events, ctx, kind, cfg)
+	local outcomes = {}
+	for _, t in copy.Threats do
+		local live = 0
+		for _, z in t.Zones do
+			if not z.Cancelled then
+				live += 1
+			end
+		end
+		local stopped, total
+		if t.Type == "Slam" then
+			stopped, total = t.Cancelled and 1 or 0, 1
+		elseif t.Type == "Meteor" then
+			stopped, total = before[t.Id].Live - live, before[t.Id].Live
+		else
+			stopped, total = before[t.Id].Marks - #t.Marks, before[t.Id].Marks
+		end
+		local fully = (t.Type == "Slam" and t.Cancelled) or (t.Type == "Meteor" and live == 0) or (t.Type == "Corruption" and #t.Marks == 0)
+		table.insert(outcomes, { Id = t.Id, Type = t.Type, Stopped = stopped, Total = total, Fully = fully })
+	end
+	return { Outcomes = outcomes, Cut = totals.Cut, Deflected = totals.Deflected, Purified = totals.Purified }
+end
+
 -- Threats whose time has come are removed from the state and returned.
 function BossRT.Due(state: State, now: number): { Threat }
 	local due, keep = {}, {}

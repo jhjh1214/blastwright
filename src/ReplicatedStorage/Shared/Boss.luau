@@ -155,6 +155,54 @@ local function coreDamage(state: State, volley: { any }, result: any, ctx: any, 
 	return total + math.min(near, def.SplashCap) * def.Splash + result.Pops // def.PopsPerBonus
 end
 
+-- What a volley WOULD do to a boss, without changing anything (for the planning preview). `view` is a State or Boss.View
+-- (Phase, HP, MaxHP, Nodes, Weak). Mirrors Boss.Apply's damage rules; a test keeps the two in step.
+-- Returns { Damage, Killed, NodesBroken, NodesLeft, WeakHit }.
+function Boss.Estimate(view: any, volley: { any }, result: any, ctx: any, cfg: any, power: number)
+	local def = cfg.Defs[view.Kind]
+	local out = { Damage = 0, Killed = false, NodesBroken = 0, NodesLeft = #view.Nodes, WeakHit = 0 }
+	if view.Phase == "Armor" then
+		local left = 0
+		for _, node in view.Nodes do
+			if popped(result.Events, node) then
+				out.NodesBroken += 1
+			else
+				left += 1
+			end
+		end
+		out.NodesLeft = left
+		if left == 0 then
+			out.Damage = math.floor(def.ArmorBreakDamage * power)
+		end
+	elseif view.Phase == "Attack" or view.Phase == "Enrage" then
+		out.Damage = math.floor(coreDamage(view, volley, result, ctx, def) * power)
+	elseif view.Phase == "Weak" then
+		local hit = 0
+		for _, w in view.Weak do
+			if popped(result.Events, w) then
+				hit += 1
+			end
+		end
+		out.WeakHit = hit
+		local base
+		if hit >= #view.Weak and hit > 0 then
+			base = def.Weak.Both
+		elseif hit > 0 then
+			base = def.Weak.One
+		else
+			base = result.Pops // def.Weak.PopsPerMiss
+		end
+		out.Damage = math.floor(base * power)
+	elseif view.Phase == "Finisher" then
+		if result.Pops >= def.Finisher.Pops or power >= 2 then
+			out.Damage = view.HP
+		end
+	end
+	out.Damage = math.min(out.Damage, view.HP)
+	out.Killed = view.Phase ~= "Armor" and out.Damage >= view.HP
+	return out
+end
+
 -- Resolve a volley against the boss. `power` multiplies damage (Power.Multiplier). Returns
 -- { Damage, NodesBroken, Refund, PhaseChanged, Killed, WeakHit } and mutates the state.
 function Boss.Apply(state: State, volley: { any }, result: any, ctx: any, cfg: any, power: number, grid: any, rng: () -> number)
