@@ -8,7 +8,7 @@
 | Daily | once per day | Three rotating objectives (pops, chains, seams, shards, volleys) with rising rewards. They reset at UTC midnight and never punish a missed day. |
 | Together | a few minutes | The Server Goal: pool pops with everyone online; reaching it pays every contributor and starts a server-wide frenzy. |
 | Weekly | once per week | Three larger challenges (Menu > Daily, below the dailies) that reset Monday 00:00 UTC. |
-| Milestones | days+ | 23 permanent Goals (Menu > Goals) with one-time shard rewards, so long-term play always has a next target. |
+| Milestones | days+ | 28 permanent Goals (Menu > Goals) with one-time shard rewards, so long-term play always has a next target. |
 | Long | hours+ | Strata (new crystal mechanics), charge types, rig upgrades, Codex completion, Prismatic hunting. |
 
 ## First 10 minutes

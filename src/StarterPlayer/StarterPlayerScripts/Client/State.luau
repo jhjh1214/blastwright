@@ -10,6 +10,7 @@ local State = {
 	Busy = false, -- true while our own volley is playing back
 	Engaged = false, -- true while at a blast site (fixed camera, blast HUD)
 	PanelOpen = false,
+	Run = nil, -- Expedition view from the server (nil when not on one)
 }
 
 State.Changed = Instance.new("BindableEvent") -- fires a string: "Data" | "Placed" | "Charge"

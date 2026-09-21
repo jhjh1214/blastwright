@@ -11,8 +11,8 @@
 | 7 World/content | Explorable mine built (hub, 4 biomes, 16 pads, 22 caches, terrain); **unseen in Studio** |
 | Social | Server Goal (co-op), hub leaderboard, shared caverns (unseen in Studio) |
 | Live ops | Calendar events (weekend, midweek, happy hour) with a HUD banner (unseen in Studio) |
-| Retention | Daily objectives, weekly challenges and 23 goals (unseen in Studio) |
-| 8 Collection | Codex, 23 milestone Goals and 7 blast colors (unseen in Studio) |
+| Retention | Daily objectives, weekly challenges and 28 goals (unseen in Studio) |
+| 8 Collection | Codex, 28 milestone Goals and 7 blast colors (unseen in Studio) |
 | 9 Economy | Simulated with real rules (tools/sim); prices and crystal mix rebalanced from it; not playtested |
 | 10 Monetization | Framework built (products, ProcessReceipt, shop tab); **no IDs, never tested live** |
 | 11 UI polish | Blast HUD moved to screen corners; roam HUD separate; further polish pending |

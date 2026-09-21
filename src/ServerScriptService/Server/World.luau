@@ -529,6 +529,18 @@ local function buildSites()
 		prompt.RequiresLineOfSight = false
 		prompt.Parent = plunger
 
+		-- Second prompt: an Expedition (roguelite dive) started from the same pad.
+		local expeditionPrompt = Instance.new("ProximityPrompt")
+		expeditionPrompt.ActionText = "Begin Expedition"
+		expeditionPrompt.ObjectText = "Roguelite dive"
+		expeditionPrompt.HoldDuration = 1
+		expeditionPrompt.KeyboardKeyCode = Enum.KeyCode.F
+		expeditionPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
+		expeditionPrompt.MaxActivationDistance = 12
+		expeditionPrompt.RequiresLineOfSight = false
+		expeditionPrompt.UIOffset = Vector2.new(0, -84)
+		expeditionPrompt.Parent = plunger
+
 		local gui = Instance.new("BillboardGui")
 		gui.Size = UDim2.fromOffset(260, 56)
 		gui.StudsOffsetWorldSpace = Vector3.new(0, 4.5, 0)
@@ -546,7 +558,7 @@ local function buildSites()
 		label.Text = site.Name .. "\nFree"
 		label.Parent = gui
 
-		World.Registry.Sites[site.Id] = { Station = plunger, Prompt = prompt, Label = label, Name = site.Name }
+		World.Registry.Sites[site.Id] = { Station = plunger, Prompt = prompt, ExpeditionPrompt = expeditionPrompt, Label = label, Name = site.Name }
 	end
 end
 

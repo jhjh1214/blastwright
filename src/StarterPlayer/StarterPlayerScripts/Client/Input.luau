@@ -59,7 +59,7 @@ end
 
 local function onTap(position)
 	local view = CavernView.Get(State.UserId)
-	if not view or not State.Engaged or State.Busy or State.PanelOpen or not State.Data then
+	if not view or not State.Engaged or State.Busy or State.PanelOpen or not State.Data or (State.Run and State.Run.Phase ~= "Blasting") then
 		return
 	end
 	local x, z = cellFromScreen(view, position)
@@ -72,7 +72,7 @@ local function onTap(position)
 end
 
 local function detonate()
-	if sending or State.Busy or #State.Placed == 0 then
+	if sending or State.Busy or #State.Placed == 0 or (State.Run and State.Run.Phase ~= "Blasting") then
 		return
 	end
 	sending = true

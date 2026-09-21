@@ -15,6 +15,7 @@ local Community = require(Shared.Community)
 local Cosmetics = require(Shared.Cosmetics)
 local Dailies = require(Shared.Dailies)
 local Events = require(Shared.Events)
+local Expedition = require(Shared.Expedition)
 local Data = require(script.Parent.Data)
 local Leaderboard = require(script.Parent.Leaderboard)
 local Purchases = require(script.Parent.Purchases)
@@ -35,6 +36,7 @@ local AchievementsConfig = Config.Achievements
 local CosmeticsConfig = Config.Cosmetics
 local EventsConfig = Config.Events
 local CommunityConfig = Config.Community
+local ExpeditionConfig = Config.Expedition
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -55,6 +57,7 @@ type SeamState = {
 	Popped: number,
 	Valuable: number,
 	InFlight: boolean,
+	Run: Expedition.Run?, -- set while this seam is a floor of an Expedition
 }
 
 local Game = {}
@@ -68,6 +71,10 @@ local seamCounter = 0
 local limiter = RateLimiter.new()
 local goal = Community.New(1, 1, CommunityConfig) -- the shared Server Goal for this server
 local goalDirty = true
+local runRandom = Random.new()
+local function runRng(): number
+	return runRandom:NextNumber()
+end
 
 -- Every remote and prompt handler goes through here: a per-player, per-remote token bucket drops floods (an exploiter
 -- spamming a remote) before any work is done. Legitimate play stays far below these limits.
@@ -229,16 +236,29 @@ local function finishGoal()
 	end)
 end
 
-local function startSeam(player: Player)
+-- Tell the client about the Expedition it is on (or that it is not on one).
+local function sendRunState(player: Player)
+	local seam = seams[player]
+	if seam and seam.Run then
+		local view = Expedition.View(seam.Run, ExpeditionConfig)
+		view.Active = true
+		Remotes.RunState:FireClient(player, view)
+	else
+		Remotes.RunState:FireClient(player, { Active = false })
+	end
+end
+
+-- run = nil starts a normal seam; otherwise the next floor of that Expedition.
+local function startSeam(player: Player, run: Expedition.Run?)
 	local data = Data.Get(player)
 	local siteId = playerSite[player]
 	if not data or not siteId then
 		return
 	end
 	seamCounter += 1
-	local stratum = WorldConfig.Sites[siteId].Stratum
+	local stratum = run and Expedition.FloorStratum(run.Floor, data.Progress.StrataUnlocked, ExpeditionConfig) or WorldConfig.Sites[siteId].Stratum
 	local fx = Events.Combine(activeEvents())
-	local chance = Tuning.MutationChance * (Purchases.Owns(player, "PrismaticLuck") and 2 or 1) * fx.MutationMult
+	local chance = Tuning.MutationChance * (Purchases.Owns(player, "PrismaticLuck") and 2 or 1) * fx.MutationMult * (run and Expedition.Modifiers(run, ExpeditionConfig).MutationChanceMult or 1)
 	local grid = Seam.Generate(Crystals, Tuning, stratum, seamCounter * 7919 + player.UserId % 100003 + os.time(), chance)
 	local max = Tuning.BaseCharges + upgradeLevel(data, "ExtraCharge") * Upgrades.Defs.ExtraCharge.PerLevel + fx.ChargeBonus
 	local seam: SeamState = {
@@ -246,8 +266,9 @@ local function startSeam(player: Player)
 		SiteId = siteId,
 		Grid = grid,
 		Stratum = stratum,
-		Charges = max,
-		ChargesMax = max,
+		Charges = run and run.Charges or max,
+		ChargesMax = run and run.StartCharges or max,
+		Run = run,
 		Earned = 0,
 		Popped = 0,
 		Valuable = Seam.CountValuable(grid, Crystals),
@@ -255,6 +276,7 @@ local function startSeam(player: Player)
 	}
 	seams[player] = seam
 	Remotes.SeamStart:FireAllClients(seamPayload(player, seam))
+	sendRunState(player)
 	sync(player)
 end
 
@@ -271,20 +293,74 @@ local function releaseSite(player: Player)
 	Remotes.SeamRemove:FireAllClients(player.UserId)
 end
 
-local function contextFor(data: any)
+local function contextFor(data: any, run: Expedition.Run?)
+	local mods = run and Expedition.Modifiers(run, ExpeditionConfig) or nil
 	return {
 		Crystals = Config.Context.Crystals,
 		Charges = Config.Context.Charges,
 		Tuning = Tuning,
 		RadiusBonus = upgradeLevel(data, "BlastRadius") * Upgrades.Defs.BlastRadius.PerLevel,
-		MomentumPops = Tuning.MomentumPops - upgradeLevel(data, "Momentum") * Upgrades.Defs.Momentum.PerLevel,
+		MomentumPops = math.max(3, Tuning.MomentumPops - upgradeLevel(data, "Momentum") * Upgrades.Defs.Momentum.PerLevel + (mods and mods.MomentumPopsDelta or 0)),
+		Modifiers = mods,
 	}
+end
+
+-- The Expedition is over (banked, collapsed or won): drop back to normal blasting on the same pad after a short pause.
+local function finishRun(player: Player, seam: SeamState)
+	if seam.Run then
+		seam.Run.Phase = "Ended"
+	end
+	seam.Run = nil
+	Remotes.RunState:FireClient(player, { Active = false })
+	task.delay(Tuning.SeamRegenDelay, function()
+		if seams[player] == seam and player.Parent then
+			startSeam(player)
+		end
+	end)
+end
+
+local function award(data: any, amount: number)
+	data.Shards += amount
+	data.Stats.TotalShards += amount
+end
+
+-- A floor of an Expedition ended (charges spent or grid cleared). The run decides what happens next.
+local function endFloor(player: Player, seam: SeamState)
+	local data = Data.Get(player)
+	local run = seam.Run
+	if not data or not run or seams[player] ~= seam then
+		return
+	end
+	local fraction = seam.Valuable > 0 and seam.Popped / seam.Valuable or 1
+	local outcome = Expedition.FloorEnded(run, seam.Earned, fraction, seam.Charges, runRng, ExpeditionConfig)
+	data.Stats.BestDepth = math.max(data.Stats.BestDepth, run.Floor)
+
+	if outcome == "Choose" then
+		notify(player, ("Floor %d cleared! Choose your next step, or bank your haul."):format(run.Floor), "Reward")
+		sendRunState(player)
+	elseif outcome == "Victory" then
+		local amount = Expedition.Bank(run, ExpeditionConfig, true)
+		award(data, amount)
+		data.Stats.ExpeditionsWon += 1
+		notify(player, ("EXPEDITION COMPLETE! +%d shards"):format(amount), "Reward")
+		finishRun(player, seam)
+	else
+		local amount = Expedition.Salvage(run, ExpeditionConfig)
+		award(data, amount)
+		notify(player, ("The tunnel collapsed! You salvaged %d shards from floor %d."):format(amount, run.Floor), "Error")
+		finishRun(player, seam)
+	end
+	announceGoals(player)
+	sync(player)
 end
 
 local function endSeam(player: Player, seam: SeamState)
 	local data = Data.Get(player)
 	if not data or seams[player] ~= seam then
 		return
+	end
+	if seam.Run then
+		return endFloor(player, seam)
 	end
 	local fraction = seam.Valuable > 0 and seam.Popped / seam.Valuable or 1
 	if fraction >= Tuning.ClearBonusMinFraction then
@@ -324,6 +400,10 @@ local function onDetonate(player: Player, payload: any)
 		last.Detonate = now
 	end
 
+	if seam.Run and seam.Run.Phase ~= "Blasting" then
+		return -- choosing a card or finished: no blasting
+	end
+
 	local volley, reason = Validate.Volley(payload, seam.Charges, data.UnlockedCharges, seam.Grid.Size, Tuning.MaxVolleyCharges)
 	if not volley then
 		warn(("[Game] Rejected Detonate from %s: %s"):format(player.Name, tostring(reason)))
@@ -332,7 +412,7 @@ local function onDetonate(player: Player, payload: any)
 
 	seam.InFlight = true
 	seam.Charges -= #volley
-	local result = ChainSim.Run(seam.Grid, volley, contextFor(data))
+	local result = ChainSim.Run(seam.Grid, volley, contextFor(data, seam.Run))
 
 	local valuablePops = 0
 	for _, ev in result.Events do
@@ -349,8 +429,9 @@ local function onDetonate(player: Player, payload: any)
 	local payout = math.floor(result.Total * multiplier + 0.5)
 	seam.Popped += valuablePops
 	seam.Earned += payout
-	data.Shards += payout
-	data.Stats.TotalShards += payout
+	if not seam.Run then
+		award(data, payout) -- on an Expedition the payout goes into the haul (banked later), not straight to shards
+	end
 	data.Stats.TotalPops += result.Pops
 	recordDaily(data, "Pops", result.Pops)
 	recordDaily(data, "Chain", result.Pops)
@@ -576,6 +657,11 @@ local function onSiteTriggered(player: Player, siteId: number)
 		return notify(player, "Someone else is using this site. Try another pad.", "Error")
 	end
 
+	local current = seams[player]
+	if current and current.Run and playerSite[player] ~= siteId then
+		return notify(player, "Finish or bank your expedition first.", "Error")
+	end
+
 	if playerSite[player] ~= siteId then
 		releaseSite(player)
 		siteOwner[siteId] = player
@@ -584,6 +670,67 @@ local function onSiteTriggered(player: Player, siteId: number)
 		startSeam(player)
 	end
 	Remotes.Engage:FireClient(player, siteId)
+end
+
+-- A player chose "Begin Expedition" at a pad station.
+local function onExpeditionTriggered(player: Player, siteId: number)
+	local data = Data.Get(player)
+	local site = WorldConfig.Sites[siteId]
+	if not data or not site then
+		return
+	end
+	if not isNear(player, Geometry.Station(siteId), PROMPT_LEASH) then
+		return
+	end
+	if data.Progress.StrataUnlocked < site.Stratum then
+		local s = Strata[site.Stratum]
+		return notify(player, ("%s is locked. Unlock it in the Forge (%d shards)."):format(s.Name, s.Cost), "Error")
+	end
+	local owner = siteOwner[siteId]
+	if owner and owner ~= player then
+		return notify(player, "Someone else is using this site. Try another pad.", "Error")
+	end
+
+	local current = seams[player]
+	if current and current.Run then
+		if playerSite[player] == siteId then
+			return Remotes.Engage:FireClient(player, siteId) -- already on an expedition here: just return to it
+		end
+		return notify(player, "Finish or bank your expedition first.", "Error")
+	end
+
+	if playerSite[player] ~= siteId then
+		releaseSite(player)
+		siteOwner[siteId] = player
+		playerSite[player] = siteId
+	end
+	World.SetSiteStatus(siteId, "Expedition: " .. player.DisplayName)
+	local fx = Events.Combine(activeEvents())
+	local charges = Tuning.BaseCharges + upgradeLevel(data, "ExtraCharge") * Upgrades.Defs.ExtraCharge.PerLevel + fx.ChargeBonus
+	startSeam(player, Expedition.New(ExpeditionConfig, charges))
+	Remotes.Engage:FireClient(player, siteId)
+end
+
+-- The player's choice between floors: a card number, or "bank" to take the haul and leave.
+local function onRunPick(player: Player, choice: any)
+	local data = Data.Get(player)
+	local seam = seams[player]
+	local run = seam and seam.Run
+	if not data or not seam or not run or seam.InFlight or run.Phase ~= "Choosing" then
+		return
+	end
+	if choice == "bank" then
+		local amount = Expedition.Bank(run, ExpeditionConfig, false)
+		award(data, amount)
+		notify(player, ("Banked %d shards from floor %d."):format(amount, run.Floor), "Reward")
+		announceGoals(player)
+		finishRun(player, seam)
+		sync(player)
+		return
+	end
+	if Expedition.Pick(run, choice, ExpeditionConfig) then
+		startSeam(player, run) -- descend: generates the next floor and tells everyone
+	end
 end
 
 local function onCacheTriggered(player: Player, cacheId: string)
@@ -700,6 +847,7 @@ function Game.Init()
 	Remotes.ClaimGoal.OnServerEvent:Connect(guarded("ClaimGoal", 5, 8, onClaimGoal))
 	Remotes.Equip.OnServerEvent:Connect(guarded("Equip", 5, 8, onEquip))
 	Remotes.Setting.OnServerEvent:Connect(guarded("Setting", 5, 8, onSetting))
+	Remotes.RunPick.OnServerEvent:Connect(guarded("RunPick", 5, 8, onRunPick))
 	optional("Purchases", function()
 		Purchases.Init({ Notify = notify, OnChanged = sync })
 	end)
@@ -710,6 +858,9 @@ function Game.Init()
 	for siteId, entry in World.Registry.Sites do
 		entry.Prompt.Triggered:Connect(guarded("Site", 3, 5, function(player)
 			onSiteTriggered(player, siteId)
+		end))
+		entry.ExpeditionPrompt.Triggered:Connect(guarded("Expedition", 3, 5, function(player)
+			onExpeditionTriggered(player, siteId)
 		end))
 	end
 	for cacheId, entry in World.Registry.Caches do

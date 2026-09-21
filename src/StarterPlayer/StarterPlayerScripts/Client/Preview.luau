@@ -261,7 +261,8 @@ local function refresh()
 		Charges = Config.Context.Charges,
 		Tuning = Config.Tuning,
 		RadiusBonus = State.UpgradeLevel("BlastRadius") * upgrades.BlastRadius.PerLevel,
-		MomentumPops = Config.Tuning.MomentumPops - State.UpgradeLevel("Momentum") * upgrades.Momentum.PerLevel,
+		MomentumPops = math.max(3, Config.Tuning.MomentumPops - State.UpgradeLevel("Momentum") * upgrades.Momentum.PerLevel + (State.Run and State.Run.Modifiers.MomentumPopsDelta or 0)),
+		Modifiers = State.Run and State.Run.Modifiers or nil, -- relics change the real rules, so the preview must too
 	}
 	local result = ChainSim.Run(view.Grid, State.Placed, ctx)
 	local seismograph = State.UpgradeLevel("Seismograph") > 0

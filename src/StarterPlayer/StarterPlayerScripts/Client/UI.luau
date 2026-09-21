@@ -91,6 +91,7 @@ local settingButtons = {}
 local tabButtons = {}
 local toastHolder, tierLabel, chargeColumn, panel, panelScroll, detonateButton
 local roamGroup, blastGroup
+local runLabel, runModal, runCards, runTitle, runBank
 local activeTab = "Forge"
 local displayShards = 0
 local chargeButtons = {}
@@ -169,6 +170,30 @@ function UI.Init()
 	local leave = button(blastGroup, "< Leave", THEME.Panel, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(110, 40) })
 	leave.Activated:Connect(function()
 		if UI.OnLeave then UI.OnLeave() end
+	end)
+
+	runLabel = label(blastGroup, "", 15, THEME.Gold, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.fromOffset(240, 54), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, Visible = false })
+
+	-- Between-floor choice: three cards and "Bank & leave". Covers the screen while choosing (blasting is paused anyway).
+	runModal = mk("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 20, Active = true }, gui)
+	runTitle = label(runModal, "", 26, THEME.Gold, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 40), Size = UDim2.new(1, -24, 0, 70), TextWrapped = true, Font = Enum.Font.GothamBlack, ZIndex = 21 })
+	local row = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -24, 0, 200), ZIndex = 21 }, runModal)
+	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 10) }, row)
+	runCards = {}
+	for i = 1, 3 do
+		local card = button(row, "", THEME.Panel, { Size = UDim2.fromOffset(190, 190), TextSize = 15, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 22, LayoutOrder = i })
+		mk("UIStroke", { Color = THEME.Gold, Thickness = 2, Transparency = 0.4 }, card)
+		mk("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, card)
+		card.Activated:Connect(function()
+			AudioManager.Play("Click")
+			Remotes.RunPick:FireServer(i)
+		end)
+		runCards[i] = card
+	end
+	runBank = button(runModal, "", THEME.Accent, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -40), Size = UDim2.fromOffset(300, 48), ZIndex = 22 })
+	runBank.Activated:Connect(function()
+		AudioManager.Play("Click")
+		Remotes.RunPick:FireServer("bank")
 	end)
 
 	seamLabel = label(blastGroup, "", 17, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 54), Size = UDim2.fromOffset(340, 24), Visible = false })
@@ -307,6 +332,31 @@ function UI.SetEngaged(engaged)
 end
 
 -- Objective card text (roaming). nil hides the card.
+-- Expedition HUD line and the between-floor choice. view = server run view, or nil when not on an expedition.
+function UI.SetRun(view)
+	if not runLabel then return end
+	if not view then
+		runLabel.Visible = false
+		runModal.Visible = false
+		return
+	end
+	runLabel.Text = ("EXPEDITION  floor %d / %d\nHaul %s  |  Relics %d"):format(view.Floor, view.Floors, commas(view.Haul), #view.Relics)
+	runLabel.Visible = true
+	local choosing = view.Phase == "Choosing"
+	runModal.Visible = choosing
+	if choosing then
+		runTitle.Text = ("Floor %d cleared!  Haul %s. Choose your next step."):format(view.Floor, commas(view.Haul))
+		for i, card in runCards do
+			local c = view.Choices[i]
+			card.Visible = c ~= nil
+			if c then
+				card.Text = ("%s\n%s\n\n+ %s\n%s"):format(c.RouteName, c.RouteDescription, c.RelicName ~= "" and c.RelicName or "(no relic)", c.RelicDescription)
+			end
+		end
+		runBank.Text = ("Bank %s shards & leave"):format(commas(view.BankNow))
+	end
+end
+
 function UI.SetObjective(text)
 	if not objectiveCard then return end
 	objectiveCard.Visible = text ~= nil and text ~= ""

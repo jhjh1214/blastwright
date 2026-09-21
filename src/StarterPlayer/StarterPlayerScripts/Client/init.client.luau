@@ -63,6 +63,12 @@ Remotes.SeamStart.OnClientEvent:Connect(function(payload)
 	end
 end)
 
+Remotes.RunState.OnClientEvent:Connect(function(view)
+	State.Run = view.Active and view or nil
+	UI.SetRun(State.Run)
+	State.Changed:Fire("Placed") -- refreshes the preview with the run's modifiers
+end)
+
 Remotes.Community.OnClientEvent:Connect(function(view)
 	State.Community, State.CommunityAt = view, os.clock()
 	UI.SetCommunity(view, State.CommunityAt)

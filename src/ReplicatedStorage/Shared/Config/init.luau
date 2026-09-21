@@ -20,6 +20,7 @@ return {
 	Cosmetics = require(script.Cosmetics),
 	Events = require(script.Events),
 	Community = require(script.Community),
+	Expedition = require(script.Expedition),
 	Tuning = Tuning,
 	Context = {
 		Crystals = Crystals.Defs,
