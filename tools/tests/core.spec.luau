@@ -4160,5 +4160,89 @@ test("schema: v17 saves migrate to v18 with specimens, track and streak records"
 	eq(d.Shards, 6, "kept")
 end)
 
+-- Ascension ------------------------------------------------------------------------------------------------------------
+local Ascension = require("../../src/ReplicatedStorage/Shared/Ascension")
+local AscCfg = require("../../src/ReplicatedStorage/Shared/Config/Ascension")
+
+test("ascension: config is coherent (every tier pays more, has a valid unique title, tiers are named)", function()
+	local titles = {}
+	for i, t in AscCfg.Tiers do
+		eq(t.RewardMult > 1, true, "tier " .. i .. " pays more")
+		eq(titles[t.Title], nil, "unique title")
+		titles[t.Title] = true
+		eq(require("../../src/ReplicatedStorage/Shared/Grants").Valid({ Kind = "Title", Title = t.Title }), true, "valid title")
+		eq(type(t.Name) == "string" and type(t.Description) == "string", true, "named")
+	end
+	local prev = 1
+	for i = 1, #AscCfg.Tiers do
+		local m = Ascension.Effects(i, AscCfg).RewardMult
+		eq(m > prev, true, "the combined reward rises with the tier")
+		prev = m
+	end
+end)
+
+test("ascension: effects accumulate up to the tier, clamp junk levels, and never take the rig below the minimum", function()
+	local none = Ascension.Effects(0, AscCfg)
+	eq(none.LurkerHP == 1 and none.BossHP == 1 and none.ChargeDelta == 0 and none.HeartsDelta == 0 and none.RewardMult == 1, true, "tier 0 changes nothing")
+	local one = Ascension.Effects(1, AscCfg)
+	eq(one.LurkerHP, 1.25, "tier 1")
+	local two = Ascension.Effects(2, AscCfg)
+	eq(two.LurkerHP, 1.25, "tier 2 keeps tier 1's rule")
+	eq(two.ChargeDelta, -1, "and adds its own")
+	local top = Ascension.Effects(#AscCfg.Tiers, AscCfg)
+	eq(top.HeartsDelta, -1, "hearts")
+	eq(top.ClearBonus, 0.15, "clear bonus")
+	eq(top.LurkerHP, 1.25 * 1.25, "lurker health stacks")
+	local over = Ascension.Effects(999, AscCfg)
+	eq(over.RewardMult, top.RewardMult, "a level past the top is the top")
+	eq(Ascension.Effects(-4, AscCfg).RewardMult, 1, "negative is normal")
+	eq(Ascension.StartCharges(1, #AscCfg.Tiers, AscCfg), AscCfg.MinCharges, "never below the minimum charges")
+	eq(Ascension.StartCharges(5, 2, AscCfg), 4, "one fewer charge at tier 2")
+end)
+
+test("ascension: you can pick any tier up to the highest unlocked, nothing else", function()
+	local st = Ascension.Default()
+	eq(Ascension.Select(st, 0, AscCfg), true, "normal is always allowed")
+	eq(Ascension.Select(st, 1, AscCfg), false, "tier 1 is locked at the start")
+	st.Unlocked = 2
+	eq(Ascension.Select(st, 2, AscCfg), true, "the highest unlocked")
+	eq(st.Selected, 2, "selected")
+	eq(Ascension.Select(st, 3, AscCfg), false, "one too high")
+	for _, junk in { -1, 1.5, "1", true, {}, 0 / 0, math.huge } do
+		eq(Ascension.Select(st, junk, AscCfg), false, "junk level")
+	end
+	eq(st.Selected, 2, "junk never changes the selection")
+	st.Unlocked = 999
+	eq(Ascension.Select(st, 999, AscCfg), false, "cannot pick a tier that does not exist")
+end)
+
+test("ascension: winning at your top tier unlocks the next and earns the title; winning lower does not", function()
+	local st = Ascension.Default()
+	local r = Ascension.OnWin(st, 0, AscCfg)
+	eq(r.Unlocked, 1, "the first normal win opens tier 1")
+	eq(r.Title, nil, "no title for a normal win")
+	r = Ascension.OnWin(st, 0, AscCfg)
+	eq(r.Unlocked, nil, "a second normal win unlocks nothing more")
+	r = Ascension.OnWin(st, 1, AscCfg)
+	eq(r.Unlocked == 2 and r.Title == AscCfg.Tiers[1].Title, true, "winning tier 1 opens tier 2 and pays its title")
+	r = Ascension.OnWin(st, 1, AscCfg)
+	eq(r.Unlocked, nil, "replaying a lower tier unlocks nothing")
+	st.Unlocked = #AscCfg.Tiers
+	r = Ascension.OnWin(st, #AscCfg.Tiers, AscCfg)
+	eq(r.Unlocked, nil, "nothing above the top tier")
+	eq(st.Unlocked, #AscCfg.Tiers, "unchanged")
+	eq(r.Title, AscCfg.Tiers[#AscCfg.Tiers].Title, "the top tier still pays its title")
+end)
+
+test("ascension: a run's hearts delta shifts the heart bonus, and the save migrates to v19", function()
+	local run = Expedition.New(ExpCfg, 4)
+	eq(Expedition.HeartsBonus(run, ExpCfg), 0, "no bonus")
+	run.HeartsDelta = -1
+	eq(Expedition.HeartsBonus(run, ExpCfg), -1, "one fewer heart")
+	local d = Schema.Migrate({ SchemaVersion = 18, Shards = 5 })
+	eq(d.Ascension.Unlocked, 0, "no tier unlocked")
+	eq(Schema.CURRENT_VERSION >= 19, true, "v19 exists")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

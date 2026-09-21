@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 18
+Schema.CURRENT_VERSION = 19
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -23,6 +23,7 @@ function Schema.Default(): { [string]: any }
 		Contract = { Day = 0, Active = 0, Progress = 0, Done = {} }, -- Notice Board, see Shared/Contracts.luau
 		Specimens = { Found = {}, Pity = { Epic = 0, Legendary = 0 }, Total = 0, Awarded = {} }, -- see Shared/Specimens.luau
 		Track = { Xp = 0, Claimed = {} }, -- see Shared/Track.luau
+		Ascension = { Unlocked = 0, Selected = 0 }, -- Expedition difficulty tiers, see Shared/Ascension.luau
 		Streak = { LastDay = 0, Count = 0 }, -- see Shared/Streak.luau
 		Traits = { Owned = {} }, -- charge trait tree, see Shared/Loadout.luau
 		Assay = { Pops = {}, Claimed = {} }, -- Assay Office, see Shared/Assay.luau

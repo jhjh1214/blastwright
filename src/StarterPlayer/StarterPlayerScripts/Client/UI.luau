@@ -28,6 +28,7 @@ local TrackLogic = require(Shared.Track)
 local Grants = require(Shared.Grants)
 local SpecimensLogic = require(Shared.Specimens)
 local Reveal = require(script.Parent.Reveal)
+local AscensionLogic = require(Shared.Ascension)
 local ChainSim = require(Shared.ChainSim)
 local Kit = require(script.Parent.Kit)
 local Icons = require(script.Parent.Icons)
@@ -804,6 +805,31 @@ local function rebuildPanel()
 		titleLabel.Text = "Loadout"
 		local order = 0
 		header(order, "Each charge has its own upgrade path: pick ONE fork per branch")
+		-- Expedition difficulty: opt-in tiers that add rules and pay a bigger haul. Unlocked by winning at your top tier.
+		if d.Ascension then
+			local asc = d.Ascension
+			order += 1
+			header(order, ("Expedition difficulty (Ascension)  -  highest unlocked: %d"):format(asc.Unlocked))
+			local tiers = Config.Ascension.Tiers
+			for tier = 0, math.min(asc.Unlocked + 1, #tiers) do
+				order += 1
+				local locked = tier > asc.Unlocked
+				local selected = asc.Selected == tier
+				local fx = AscensionLogic.Effects(tier, Config.Ascension)
+				local title = tier == 0 and "Normal" or ("Ascension %d: %s"):format(tier, tiers[tier].Name)
+				local desc
+				if locked then
+					desc = tier == 1 and "Win an Expedition on Normal to unlock." or ("Win an Expedition at Ascension %d to unlock."):format(tier - 1)
+				elseif tier == 0 then
+					desc = "The standard Expedition."
+				else
+					desc = ("%s  Total haul x%.2f."):format(tiers[tier].Description, fx.RewardMult)
+				end
+				row(order, title, desc, locked and "Locked" or (selected and "Selected" or "Select"), not locked and not selected, function()
+					Remotes.AscensionSet:FireServer(tier)
+				end, selected and THEME.Gold or nil, { Icon = tostring(tier), Accent = Color3.fromRGB(235, 90, 90), Dim = locked or not selected })
+			end
+		end
 		local state = { Owned = d.Traits or {} }
 		local charges = State.Charges()
 		for _, branch in Config.Traits.BranchOrder do

@@ -25,6 +25,7 @@ local Loadout = require(Shared.Loadout)
 local Specimens = require(Shared.Specimens)
 local Track = require(Shared.Track)
 local Streak = require(Shared.Streak)
+local Ascension = require(Shared.Ascension)
 local Farm = require(Shared.Farm)
 local Lurker = require(Shared.Lurker)
 local Power = require(Shared.Power)
@@ -62,6 +63,7 @@ local TraitsConfig = Config.Traits
 local SpecimensConfig = Config.Specimens
 local TrackConfig = Config.Track
 local StreakConfig = Config.Streak
+local AscensionConfig = Config.Ascension
 local FarmConfig = Config.Farm
 local LurkerConfig = Config.Lurkers
 local BossConfig = Config.Bosses
@@ -323,6 +325,7 @@ local function snapshot(player: Player): { [string]: any }?
 		AwaitRevive = seam ~= nil and seam.AwaitRevive == true,
 		Assay = Assay.View(data.Assay, Crystals.Order, AssayConfig),
 		Traits = data.Traits.Owned,
+		Ascension = { Unlocked = data.Ascension.Unlocked, Selected = data.Ascension.Selected },
 		Specimens = { Found = data.Specimens.Found, Total = data.Specimens.Total },
 		Track = { Xp = data.Track.Xp, Claimed = data.Track.Claimed },
 		Streak = Streak.View(data.Streak, Dailies.DayNumber(os.time()), Purchases.Owns(player, PlusConfig.Pass), StreakConfig),
@@ -549,7 +552,7 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 	local roomFx = run and Expedition.RoomEffects(run, ExpeditionConfig) or nil
 	seam.BountyMult = (roomFx and roomFx.BountyMult or 1) * (mods and mods.BountyMult or 1) * fx.BountyMult
 	seam.RelicReward = roomFx ~= nil and roomFx.RelicReward
-	seam.MonsterHPMult = (roomFx and roomFx.HPMult or 1) * (mods and mods.MonsterHPMult or 1)
+	seam.MonsterHPMult = (roomFx and roomFx.HPMult or 1) * (mods and mods.MonsterHPMult or 1) * (run and Ascension.Effects(run.Ascension or 0, AscensionConfig).LurkerHP or 1)
 	if run and run.Chaos then
 		local event = ExpeditionConfig.ChaosEvents[run.Chaos]
 		task.defer(function()
@@ -559,6 +562,8 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 	local bossKind = run and BossConfig.BossFloors[run.Floor]
 	if bossKind then
 		seam.Boss = Boss.New(bossKind, grid, { Crystals = Config.Context.Crystals }, BossConfig, runRng)
+		local bossHP = math.max(1, math.floor(seam.Boss.MaxHP * Ascension.Effects(run.Ascension or 0, AscensionConfig).BossHP + 0.5))
+		seam.Boss.HP, seam.Boss.MaxHP = bossHP, bossHP
 		seam.BossStats = { Volleys = 0, HeartsLost = 0 }
 		seam.BossRT = BossRT.New(os.clock(), bossKind, BossConfig)
 		seam.Valuable = Seam.CountValuable(grid, Crystals) -- the core was cleared
@@ -714,7 +719,13 @@ local function endFloor(player: Player, seam: SeamState)
 		end)
 		return
 	end
-	local outcome = Expedition.FloorEnded(run, seam.Earned, fraction, chargesLeft, runRng, ExpeditionConfig)
+	local floorCfg = ExpeditionConfig
+	local clearBonus = Ascension.Effects(run.Ascension or 0, AscensionConfig).ClearBonus
+	if clearBonus > 0 then
+		floorCfg = table.clone(ExpeditionConfig)
+		floorCfg.ClearToAdvance = math.min(0.95, ExpeditionConfig.ClearToAdvance + clearBonus)
+	end
+	local outcome = Expedition.FloorEnded(run, seam.Earned, fraction, chargesLeft, runRng, floorCfg)
 	data.Stats.BestDepth = math.max(data.Stats.BestDepth, run.Floor)
 	Leaderboard.Submit("Depth", player.UserId, data.Stats.BestDepth)
 
@@ -726,9 +737,16 @@ local function endFloor(player: Player, seam: SeamState)
 		notify(player, ("Floor %d cleared! Choose your next step, or bank your haul."):format(run.Floor), "Reward")
 		sendRunState(player)
 	elseif outcome == "Victory" then
-		local amount = Expedition.Bank(run, ExpeditionConfig, true)
+		local amount = math.floor(Expedition.Bank(run, ExpeditionConfig, true) * Ascension.Effects(run.Ascension or 0, AscensionConfig).RewardMult + 0.5)
 		award(data, amount)
 		data.Stats.ExpeditionsWon += 1
+		local won = Ascension.OnWin(data.Ascension, run.Ascension or 0, AscensionConfig)
+		if won.Title then
+			Grants.Apply(data, { { Kind = "Title", Title = won.Title } }, os.time(), data.Progress.StrataUnlocked)
+		end
+		if won.Unlocked then
+			notify(player, ("ASCENSION %d unlocked: %s. Pick it in the Loadout tab for harder, better-paid Expeditions."):format(won.Unlocked, AscensionConfig.Tiers[won.Unlocked].Name), "Achievement")
+		end
 		addTrackXp(player, data, TrackConfig.Xp.ExpeditionWin)
 		notify(player, ("EXPEDITION COMPLETE! +%d shards"):format(amount), "Reward")
 		finishRun(player, seam)
@@ -1558,6 +1576,18 @@ local function onStreakClaim(player: Player)
 	sync(player)
 end
 
+-- Pick the Ascension tier for the next Expedition (0 = normal, up to the highest unlocked). Not changeable mid-run: the
+-- run keeps the tier it started at.
+local function onAscensionSet(player: Player, level: any)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	if Ascension.Select(data.Ascension, level, AscensionConfig) then
+		sync(player)
+	end
+end
+
 local function onAssayClaim(player: Player, kind: any, tier: any)
 	local data = Data.Get(player)
 	if not data then
@@ -1683,7 +1713,15 @@ local function onExpeditionTriggered(player: Player, siteId: number)
 	World.SetSiteStatus(siteId, "Expedition: " .. player.DisplayName)
 	local fx = Events.Combine(activeEvents())
 	local charges = Tuning.BaseCharges + upgradeLevel(data, "ExtraCharge") * Upgrades.Defs.ExtraCharge.PerLevel + fx.ChargeBonus
-	startSeam(player, Expedition.New(ExpeditionConfig, charges))
+	local tier = data.Ascension.Selected
+	local asc = Ascension.Effects(tier, AscensionConfig)
+	local run = Expedition.New(ExpeditionConfig, Ascension.StartCharges(charges, tier, AscensionConfig))
+	run.Ascension = tier
+	run.HeartsDelta = asc.HeartsDelta
+	if tier > 0 then
+		notify(player, ("Ascension %d: %s"):format(tier, AscensionConfig.Tiers[tier].Description), "Warning")
+	end
+	startSeam(player, run)
 	Remotes.Engage:FireClient(player, siteId)
 end
 
@@ -1696,7 +1734,7 @@ local function onRunPick(player: Player, choice: any)
 		return
 	end
 	if choice == "bank" then
-		local amount = Expedition.Bank(run, ExpeditionConfig, false)
+		local amount = math.floor(Expedition.Bank(run, ExpeditionConfig, false) * Ascension.Effects(run.Ascension or 0, AscensionConfig).RewardMult + 0.5)
 		award(data, amount)
 		notify(player, ("Banked %d shards from floor %d."):format(amount, run.Floor), "Reward")
 		announceGoals(player)
@@ -1924,6 +1962,7 @@ function Game.Init()
 	Remotes.UseCharge.OnServerEvent:Connect(guarded("UseCharge", 3, 5, onUseCharge))
 	Remotes.EquipFinisher.OnServerEvent:Connect(guarded("EquipFinisher", 3, 5, onEquipFinisher))
 	Remotes.ContractAccept.OnServerEvent:Connect(guarded("ContractAccept", 4, 6, onContractAccept))
+	Remotes.AscensionSet.OnServerEvent:Connect(guarded("AscensionSet", 3, 5, onAscensionSet))
 	Remotes.TrackClaim.OnServerEvent:Connect(guarded("TrackClaim", 5, 8, onTrackClaim))
 	Remotes.StreakClaim.OnServerEvent:Connect(guarded("StreakClaim", 2, 3, onStreakClaim))
 	Remotes.TraitAction.OnServerEvent:Connect(guarded("TraitAction", 5, 8, onTraitAction))

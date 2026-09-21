@@ -31,6 +31,7 @@ return {
 	Specimens = require(script.Specimens),
 	Track = require(script.Track),
 	Streak = require(script.Streak),
+	Ascension = require(script.Ascension),
 	Lurkers = require(script.Lurkers),
 	Bosses = require(script.Bosses),
 	Mastery = require(script.Mastery),

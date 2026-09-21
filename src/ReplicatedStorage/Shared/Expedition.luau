@@ -18,6 +18,8 @@ export type Run = {
 	Room: string, -- what the current floor is (Mining, Combat, Elite, Treasure, Chaos, Boss)
 	Chaos: string?, -- the Chaos event rolled for the current floor
 	MutationMult: number, -- rare-crystal multiplier from the current room
+	HeartsDelta: number?, -- Ascension: rig hearts added (negative) for the whole run, set by the server
+	Ascension: number?, -- the Ascension tier this run was started at (0 or nil = normal)
 }
 
 local Expedition = {}
@@ -187,7 +189,7 @@ end
 
 -- Extra rig hearts from relics (added to the base hearts).
 function Expedition.HeartsBonus(run: Run, cfg: any): number
-	local n = 0
+	local n = run.HeartsDelta or 0
 	for _, id in run.Relics do
 		n += cfg.Relics[id].Modifiers.HeartsBonus or 0
 	end

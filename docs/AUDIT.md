@@ -55,7 +55,7 @@ Audit of the real project as it is in the repository (source read, tests and lin
 3. **Mastery and records:** Assay tiers to 4,000 pops per crystal, best chain, best depth, boss kills, the trophy hall, three leaderboards.
 4. **Recurring things:** the streak, dailies, weeklies, contracts, the half-hourly world boss and the event calendar.
 5. **The Track's free tail:** after level 30 every level still pays a free reward.
-What is honestly still missing for a *month*: an Expedition difficulty ladder (Ascension modifiers) and seasonal rotation of cabinet variants. Those are recommended future work, not built.
+What is honestly still missing for a *month*: seasonal rotation of cabinet variants. Those are recommended future work, not built.
 
 ## 3. Gameplay loops now
 - **Micro (seconds):** plan, plant, detonate, chain, floating numbers, camera feedback, possible specimen drop.
@@ -67,7 +67,7 @@ What is honestly still missing for a *month*: an Expedition difficulty ladder (A
 - **P0 (done in this pass):** none of the earlier work was broken enough to block; the P0 gap was "no random chase and no free reward habit".
 - **P1 (done):** Specimens + reveals, Track + Track Premium, Streak, UI QA tool, gem-animation performance fix.
 - **P2 (not done):** split `UI.luau` per tab; painted art; a small "Collection" dock entry; sound cues per rarity (currently reuses Tier/Reward sounds).
-- **P3 (future):** Expedition Ascension (opt-in difficulty modifiers with better rewards), rotating cabinet variants, seasonal Track (only if it stays optional), trading/showcase of specimens, cabinet display in the hub.
+- **P3 (future):** rotating cabinet variants, seasonal Track (only if it stays optional), trading/showcase of specimens, cabinet display in the hub.
 
 ## 4b. Ideas deliberately NOT added (and why)
 - **Prestige/rebirth:** the economy is not yet balanced from real play; a reset on top of an unverified curve would multiply the balance risk.
@@ -111,4 +111,5 @@ These need your playtest; `docs/TESTING.md` E25 says what to look at.
 | Daily streak | Implemented, logic tested; UI unseen |
 | UI QA tool | Implemented and run |
 | Painted art, real device QA, balance from play | **Requires you** |
-| UI.luau split, panel diffing, rarity-specific sounds, Ascension, shop "Free" section | Future work |
+| Ascension (5 opt-in Expedition difficulty tiers, `Shared/Ascension.luau`) | Implemented, logic tested and mutation-checked; UI unseen (added after the audit) |
+| UI.luau split, panel diffing, rarity-specific sounds, shop "Free" section | Future work |
