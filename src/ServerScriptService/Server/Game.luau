@@ -423,7 +423,7 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 	seam.Critical = 0
 	local mods = run and Expedition.Modifiers(run, ExpeditionConfig) or nil
 	local roomFx = run and Expedition.RoomEffects(run, ExpeditionConfig) or nil
-	seam.BountyMult = (roomFx and roomFx.BountyMult or 1) * (mods and mods.BountyMult or 1)
+	seam.BountyMult = (roomFx and roomFx.BountyMult or 1) * (mods and mods.BountyMult or 1) * fx.BountyMult
 	seam.RelicReward = roomFx ~= nil and roomFx.RelicReward
 	seam.MonsterHPMult = (roomFx and roomFx.HPMult or 1) * (mods and mods.MonsterHPMult or 1)
 	if run and run.Chaos then
@@ -458,7 +458,7 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 				notify(player, ("A %s is awake! %s"):format(LurkerConfig.Defs[m.Kind].Name, LurkerConfig.Defs[m.Kind].Description), "Error")
 			end)
 		end
-	elseif not noLurker and runRandom:NextNumber() < Lurker.SpawnChance(stratum, run and run.Floor or 0, LurkerConfig) then
+	elseif not noLurker and runRandom:NextNumber() < Lurker.SpawnChance(stratum, run and run.Floor or 0, LurkerConfig) * fx.LurkerMult then
 		seam.Hidden = Lurker.Hide(grid, { Crystals = Config.Context.Crystals }, Lurker.PickKind(stratum, runRandom:NextNumber(), LurkerConfig), runRandom:NextNumber())
 	end
 	seams[player] = seam
@@ -892,6 +892,7 @@ local function onDetonate(player: Player, payload: any)
 	local multiplier = (Purchases.Owns(player, "DoubleShards") and 2 or 1) * Events.Combine(activeEvents()).ShardMult * Community.Mult(goal, os.clock(), CommunityConfig) * Grants.BoostMult(data.Boosts, "Shards", os.time())
 	local power, powerName = Power.Multiplier(result.Pops, seam.Critical, PowerConfig), select(2, Power.Tier(result.Pops, PowerConfig))
 	local relicMods = seam.Run and Expedition.Modifiers(seam.Run, ExpeditionConfig) or nil
+	power *= Events.Combine(activeEvents()).DamageMult -- live events (Crystal Storm, Explosive Sunday)
 	if relicMods then
 		power *= relicMods.DamageMult
 		if seam.Hearts == 1 then

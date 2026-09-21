@@ -40,13 +40,16 @@ function Events.Active(now: number, cfg: any): { Active }
 end
 
 -- Rates multiply, charge bonuses add. With nothing active every value is neutral.
-function Events.Combine(active: { any }): { MutationMult: number, ShardMult: number, ChargeBonus: number }
-	local result = { MutationMult = 1, ShardMult = 1, ChargeBonus = 0 }
+function Events.Combine(active: { any }): { MutationMult: number, ShardMult: number, ChargeBonus: number, LurkerMult: number, DamageMult: number, BountyMult: number }
+	local result = { MutationMult = 1, ShardMult = 1, ChargeBonus = 0, LurkerMult = 1, DamageMult = 1, BountyMult = 1 }
 	for _, e in active do
 		local fx = e.Effects
 		result.MutationMult *= fx.MutationMult or 1
 		result.ShardMult *= fx.ShardMult or 1
 		result.ChargeBonus += fx.ChargeBonus or 0
+		result.LurkerMult *= fx.LurkerMult or 1
+		result.DamageMult *= fx.DamageMult or 1
+		result.BountyMult *= fx.BountyMult or 1
 	end
 	return result
 end

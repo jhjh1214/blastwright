@@ -1307,7 +1307,7 @@ end)
 
 test("events: config is valid (unique ids, real weekdays and hours, known positive effects)", function()
 	local seen = {}
-	local KNOWN = { MutationMult = true, ShardMult = true, ChargeBonus = true }
+	local KNOWN = { MutationMult = true, ShardMult = true, ChargeBonus = true, LurkerMult = true, DamageMult = true, BountyMult = true }
 	for _, d in EventsCfg.Defs do
 		if seen[d.Id] then error("duplicate event " .. d.Id) end
 		seen[d.Id] = true
@@ -3093,6 +3093,26 @@ test("grants: the month number changes exactly at the UTC month boundary", funct
 	eq(Grants.MonthNumber(feb1), Grants.MonthNumber(jan31) + 1, "next month")
 	eq(Grants.MonthNumber(jan31), Grants.MonthNumber(jan31 - 86400 * 20), "same month earlier")
 	eq(Grants.MonthNumber(1704067199) + 1, Grants.MonthNumber(1704067200), "year rollover (Dec 2023 to Jan 2024) is one step")
+end)
+
+test("events: the combat effects multiply across events and are neutral when nothing is active", function()
+	local none = Events.Combine({})
+	eq(none.LurkerMult == 1 and none.DamageMult == 1 and none.BountyMult == 1, true, "neutral")
+	local both = Events.Combine({ { Effects = { LurkerMult = 3, DamageMult = 1.5 } }, { Effects = { LurkerMult = 2, BountyMult = 1.5 } } })
+	eq(both.LurkerMult, 6, "spawn chances multiply")
+	eq(both.DamageMult, 1.5, "damage")
+	eq(both.BountyMult, 1.5, "bounty")
+	eq(both.MutationMult == 1 and both.ShardMult == 1 and both.ChargeBonus == 0, true, "other effects untouched")
+end)
+
+test("events: Lurker Swarm Friday is all Friday only, Explosive Sunday all Sunday, Crystal Storm is 20:00-21:00 every day", function()
+	local function has(now, id) for _, e in Events.Active(now, EventsCfg) do if e.Id == id then return true end end return false end
+	local FRIDAY, SUNDAY = MONDAY + 4 * DAY, MONDAY + 6 * DAY
+	eq(has(FRIDAY, "LurkerSwarmFriday") and has(FRIDAY + DAY - 1, "LurkerSwarmFriday"), true, "all Friday")
+	eq(has(FRIDAY - 1, "LurkerSwarmFriday") or has(FRIDAY + DAY, "LurkerSwarmFriday"), false, "not Thursday or Saturday")
+	eq(has(SUNDAY + 5 * HOUR, "ExplosiveSunday") and not has(SUNDAY + DAY, "ExplosiveSunday"), true, "Sunday only")
+	eq(has(MONDAY + 20 * HOUR, "CrystalStorm") and has(MONDAY + 21 * HOUR - 1, "CrystalStorm"), true, "inside the hour")
+	eq(has(MONDAY + 20 * HOUR - 1, "CrystalStorm") or has(MONDAY + 21 * HOUR, "CrystalStorm"), false, "outside it")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))
