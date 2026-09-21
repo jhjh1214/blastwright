@@ -56,4 +56,4 @@ Thumbnail, icon, 3 to 5 screenshots, description, tags. Hook text is in `docs/GA
 Persistence check in the published place, phone/emulator check, soft launch to friends, then public. Live events (`Config/Events.luau`) and the weekly challenges are the reasons to return; adjust numbers using the sims.
 
 ## Known gaps (not built)
-Rotating shop, analytics beyond Roblox's own, and real painted art. Everything visual and networked is unseen in Studio until step 1.
+Rotating shop, analytics beyond Roblox's own, painted art, and the balance pass. Built and listed for testing in docs/TESTING.md: Expeditions, bosses, Notice Board, world boss (Crystal Colossus), Assay Office, Blastwright Plus.
