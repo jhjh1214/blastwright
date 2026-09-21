@@ -5,6 +5,8 @@
 --  * the BANNER: one big plate in the upper middle for moments (chain tiers, Critical Mass, boss phases). One at a time, queued.
 -- Flat, dark plates with a coloured edge; display font for titles, clean body font. No glows, no strokes on text.
 local TweenService = game:GetService("TweenService")
+local Theme = require(script.Parent.Theme)
+local Icons = require(script.Parent.Icons)
 
 local Feed = {}
 
@@ -13,10 +15,10 @@ local BODY = Enum.Font.BuilderSans
 local BODY_BOLD = Enum.Font.BuilderSansBold
 
 local KINDS = {
-	Reward = { Color = Color3.fromRGB(240, 186, 60), Glyph = "★", Life = 4.5 },
-	Info = { Color = Color3.fromRGB(84, 160, 240), Glyph = "i", Life = 4 },
-	Warning = { Color = Color3.fromRGB(240, 100, 92), Glyph = "!", Life = 5 },
-	Achievement = { Color = Color3.fromRGB(176, 110, 240), Glyph = "★", Life = 6.5 },
+	Reward = { Color = Theme.Colors.Goals, Icon = "Gem", Life = 4.5 },
+	Info = { Color = Theme.Colors.Codex, Icon = "Codex", Life = 4 },
+	Warning = { Color = Theme.Colors.Danger, Icon = "Bomb", Life = 5 },
+	Achievement = { Color = Theme.Colors.Boost, Icon = "Goals", Life = 6.5 },
 }
 Feed.Kinds = KINDS
 
@@ -36,7 +38,7 @@ end
 
 function Feed.Init(screenGui)
 	gui = screenGui
-	holder = make("Frame", { Name = "Feed", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 64), Size = UDim2.fromOffset(300, 10), AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 30 }, gui)
+	holder = make("Frame", { Name = "Feed", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 84), Size = UDim2.fromOffset(320, 10), AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 30 }, gui)
 	make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, HorizontalAlignment = Enum.HorizontalAlignment.Right }, holder)
 	local fit = make("UIScale", { Scale = 1 }, holder)
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
@@ -74,8 +76,17 @@ function Feed.Classify(text, kind)
 	return "Info"
 end
 
+-- During a boss fight the middle and right of the screen belong to the boss HUD: only warnings and achievements get a card.
+local compact = false
+function Feed.SetCompact(on)
+	compact = on == true
+end
+
 function Feed.Push(kind, title, body)
 	if not holder then
+		return
+	end
+	if compact and kind ~= "Warning" and kind ~= "Achievement" then
 		return
 	end
 	local now = os.clock()
@@ -88,26 +99,29 @@ function Feed.Push(kind, title, body)
 	counter += 1
 
 	local wrapper = make("Frame", { Name = "Item", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = -counter, ZIndex = 30 }, holder)
-	local card = make("Frame", { BackgroundColor3 = Color3.fromRGB(24, 27, 42), BackgroundTransparency = 0.04, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Position = UDim2.fromOffset(320, 0), BorderSizePixel = 0, ZIndex = 31 }, wrapper)
-	make("UICorner", { CornerRadius = UDim.new(0, 12) }, card)
-	make("UIStroke", { Color = Color3.fromRGB(70, 78, 110), Thickness = 1, Transparency = 0.3 }, card)
-	make("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10), PaddingLeft = UDim.new(0, 60), PaddingRight = UDim.new(0, 12) }, card)
+	local card = make("Frame", { BackgroundColor3 = Theme.Shade(style.Color, 0.55), Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Position = UDim2.fromOffset(330, 0), BorderSizePixel = 0, ZIndex = 31 }, wrapper)
+	make("UICorner", { CornerRadius = UDim.new(0, 16) }, card)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 4, LineJoinMode = Enum.LineJoinMode.Round }, card)
+	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(style.Color, 0.05), Theme.Shade(style.Color, 0.5)), Rotation = 90 }, card)
+	make("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10), PaddingLeft = UDim.new(0, 72), PaddingRight = UDim.new(0, 14) }, card)
 
-	-- the colour edge on the left and the icon tile
-	local edge = make("Frame", { BackgroundColor3 = style.Color, Position = UDim2.new(0, -60, 0, -10), Size = UDim2.new(0, 5, 1, 20), BorderSizePixel = 0, ZIndex = 32 }, card)
-	make("UICorner", { CornerRadius = UDim.new(0, 12) }, edge)
-	local tile = make("Frame", { BackgroundColor3 = style.Color, Position = UDim2.fromOffset(-50, 0), Size = UDim2.fromOffset(34, 34), BorderSizePixel = 0, ZIndex = 32 }, card)
-	make("UICorner", { CornerRadius = UDim.new(0, 10) }, tile)
-	make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Font = DISPLAY, Text = style.Glyph, TextSize = 20, TextColor3 = Color3.fromRGB(28, 26, 40), ZIndex = 33 }, tile)
+	-- the icon tile: a chunky coloured square with a big drawn icon
+	local tile = make("Frame", { BackgroundColor3 = style.Color, Position = UDim2.fromOffset(-62, -2), Size = UDim2.fromOffset(52, 52), BorderSizePixel = 0, ZIndex = 32 }, card)
+	make("UICorner", { CornerRadius = UDim.new(0, 13) }, tile)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3.5, LineJoinMode = Enum.LineJoinMode.Round }, tile)
+	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(style.Color, 0.3), Theme.Shade(style.Color, 0.06)), Rotation = 90 }, tile)
+	Icons.Draw(style.Icon, tile, style.Color, 0.84)
 
 	local column = make("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 32 }, card)
 	make("UIListLayout", { Padding = UDim.new(0, 2) }, column)
-	make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Font = DISPLAY, Text = title, TextSize = 17, TextColor3 = Color3.fromRGB(246, 247, 252), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 33, LayoutOrder = 1 }, column)
+	local titleLabel = make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Font = DISPLAY, Text = title, TextSize = 21, TextColor3 = Color3.new(1, 1, 1), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 33, LayoutOrder = 1 }, column)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3, LineJoinMode = Enum.LineJoinMode.Round }, titleLabel)
 	if body and body ~= "" then
-		make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Font = BODY, Text = body, TextSize = 14, TextColor3 = Color3.fromRGB(180, 188, 210), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 33, LayoutOrder = 2 }, column)
+		local bodyLabel = make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Font = BODY_BOLD, Text = body, TextSize = 15, TextColor3 = Color3.fromRGB(240, 244, 255), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 33, LayoutOrder = 2 }, column)
+		make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 2, LineJoinMode = Enum.LineJoinMode.Round }, bodyLabel)
 	end
 
-	TweenService:Create(card, TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2.fromOffset(0, 0) }):Play()
+	TweenService:Create(card, TweenInfo.new(Theme.Anim.Popup, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromOffset(0, 0) }):Play()
 	table.insert(live, wrapper)
 	while #live > 4 do
 		local old = table.remove(live, 1)
@@ -134,19 +148,25 @@ end
 
 local bannerQueue = {}
 local bannerBusy = false
-local plate, bannerTitle, bannerSub, bannerRule
+local plate, bannerTitle, bannerSub, bannerRule, bannerStroke
 
 local function ensureBanner()
 	if plate then
 		return
 	end
-	plate = make("Frame", { Name = "Banner", BackgroundColor3 = Color3.fromRGB(16, 18, 30), BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.26), Size = UDim2.fromOffset(520, 96), Visible = false, BorderSizePixel = 0, ZIndex = 40 }, gui)
-	make("UICorner", { CornerRadius = UDim.new(0, 14) }, plate)
-	make("UISizeConstraint", { MaxSize = Vector2.new(560, 120) }, plate)
-	bannerRule = make("Frame", { BackgroundColor3 = Color3.fromRGB(240, 186, 60), Size = UDim2.new(1, 0, 0, 5), BorderSizePixel = 0, ZIndex = 41 }, plate)
-	make("UICorner", { CornerRadius = UDim.new(0, 14) }, bannerRule)
-	bannerTitle = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 12), Size = UDim2.new(1, 0, 0, 52), Font = DISPLAY, Text = "", TextSize = 42, TextColor3 = Color3.new(1, 1, 1), ZIndex = 41 }, plate)
-	bannerSub = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 62), Size = UDim2.new(1, 0, 0, 24), Font = BODY_BOLD, Text = "", TextSize = 17, TextColor3 = Color3.fromRGB(190, 198, 220), ZIndex = 41 }, plate)
+	plate = make("Frame", { Name = "Banner", BackgroundColor3 = Theme.Colors.Panel, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.26), Size = UDim2.fromOffset(560, 112), Visible = false, BorderSizePixel = 0, ZIndex = Theme.Z.Banner }, gui)
+	make("UICorner", { CornerRadius = UDim.new(0, 20) }, plate)
+	make("UISizeConstraint", { MaxSize = Vector2.new(600, 130) }, plate)
+	bannerStroke = make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 5, LineJoinMode = Enum.LineJoinMode.Round }, plate)
+	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(Theme.Colors.Panel, 0.12), Theme.Shade(Theme.Colors.Panel, 0.3)), Rotation = 90 }, plate)
+	bannerRule = make("Frame", { BackgroundColor3 = Color3.fromRGB(240, 186, 60), Size = UDim2.new(1, 0, 0, 16), BorderSizePixel = 0, ZIndex = Theme.Z.Banner + 1 }, plate)
+	make("UICorner", { CornerRadius = UDim.new(0, 20) }, bannerRule)
+	bannerTitle = make("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 20), Size = UDim2.new(0.94, 0, 0, 58), Font = DISPLAY, Text = "", TextSize = 50, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), ZIndex = Theme.Z.Banner + 2 }, plate)
+	make("UITextSizeConstraint", { MaxTextSize = 50, MinTextSize = 16 }, bannerTitle)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 5, LineJoinMode = Enum.LineJoinMode.Round }, bannerTitle)
+	bannerSub = make("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 80), Size = UDim2.new(0.9, 0, 0, 24), Font = BODY_BOLD, Text = "", TextSize = 19, TextScaled = true, TextColor3 = Color3.fromRGB(235, 240, 255), ZIndex = Theme.Z.Banner + 2 }, plate)
+	make("UITextSizeConstraint", { MaxTextSize = 19, MinTextSize = 10 }, bannerSub)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 2.5, LineJoinMode = Enum.LineJoinMode.Round }, bannerSub)
 end
 
 local function playNext()
@@ -159,21 +179,24 @@ local function playNext()
 	bannerTitle.Text = item.Title
 	bannerSub.Text = item.Subtitle or ""
 	bannerRule.BackgroundColor3 = item.Color
-	bannerTitle.TextColor3 = item.Color:Lerp(Color3.new(1, 1, 1), 0.55)
+	bannerTitle.TextColor3 = item.Color:Lerp(Color3.new(1, 1, 1), 0.35)
 	plate.Position = UDim2.fromScale(0.5, 0.22)
 	plate.BackgroundTransparency = 1
+	bannerStroke.Transparency = 1
 	plate.Visible = true
 	bannerRule.BackgroundTransparency = 1
 	bannerTitle.TextTransparency = 1
 	bannerSub.TextTransparency = 1
 	local slide = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-	TweenService:Create(plate, slide, { Position = UDim2.fromScale(0.5, 0.26), BackgroundTransparency = 0.08 }):Play()
+	TweenService:Create(plate, slide, { Position = UDim2.fromScale(0.5, 0.26), BackgroundTransparency = 0 }):Play()
+	TweenService:Create(bannerStroke, slide, { Transparency = 0 }):Play()
 	TweenService:Create(bannerRule, slide, { BackgroundTransparency = 0 }):Play()
 	TweenService:Create(bannerTitle, slide, { TextTransparency = 0 }):Play()
 	TweenService:Create(bannerSub, slide, { TextTransparency = 0 }):Play()
 	task.delay(item.Hold or 1.6, function()
 		local out = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		TweenService:Create(plate, out, { BackgroundTransparency = 1, Position = UDim2.fromScale(0.5, 0.24) }):Play()
+		TweenService:Create(bannerStroke, out, { Transparency = 1 }):Play()
 		TweenService:Create(bannerRule, out, { BackgroundTransparency = 1 }):Play()
 		TweenService:Create(bannerTitle, out, { TextTransparency = 1 }):Play()
 		TweenService:Create(bannerSub, out, { TextTransparency = 1 }):Play()

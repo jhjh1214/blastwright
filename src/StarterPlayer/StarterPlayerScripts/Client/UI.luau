@@ -20,22 +20,25 @@ local ShopArt = require(script.Parent.ShopArt)
 local Dock = require(script.Parent.Dock)
 local Feed = require(script.Parent.Feed)
 local BossHud = require(script.Parent.BossHud)
+local Theme = require(script.Parent.Theme)
+local Kit = require(script.Parent.Kit)
+local Icons = require(script.Parent.Icons)
 
 local UI = {}
 
 local THEME = {
-	Bg = Color3.fromRGB(20, 24, 36),
-	Panel = Color3.fromRGB(30, 36, 54),
-	Row = Color3.fromRGB(40, 48, 72),
-	Accent = Color3.fromRGB(90, 200, 255),
-	Gold = Color3.fromRGB(255, 205, 90),
-	Hot = Color3.fromRGB(255, 120, 50),
-	Text = Color3.fromRGB(235, 240, 255),
-	Dim = Color3.fromRGB(150, 160, 185),
-	Bad = Color3.fromRGB(255, 90, 100),
-	Good = Color3.fromRGB(110, 230, 150),
+	Bg = Theme.Colors.PanelDark,
+	Panel = Theme.Colors.Panel,
+	Row = Color3.fromRGB(58, 68, 120),
+	Accent = Theme.Colors.Info,
+	Gold = Theme.Colors.Premium,
+	Hot = Theme.Colors.Action,
+	Text = Color3.fromRGB(255, 255, 255),
+	Dim = Color3.fromRGB(200, 208, 236),
+	Bad = Theme.Colors.Danger,
+	Good = Theme.Colors.Success,
 }
-local FONT = Enum.Font.BuilderSansBold
+local FONT = Theme.Font.Display
 
 local function mk(class, props, parent)
 	local inst = Instance.new(class)
@@ -53,7 +56,7 @@ end
 local function label(parent, text, size, color, props)
 	local p = {
 		BackgroundTransparency = 1,
-		Font = FONT,
+		Font = size >= 18 and Theme.Font.Display or Theme.Font.Body,
 		Text = text,
 		TextSize = size,
 		TextColor3 = color or THEME.Text,
@@ -62,14 +65,20 @@ local function label(parent, text, size, color, props)
 	for k, v in props or {} do
 		p[k] = v
 	end
-	return mk("TextLabel", p, parent)
+	local l = mk("TextLabel", p, parent)
+	if size >= 16 and not (props and props.NoOutline) then
+		Kit.Outline(l, size >= 24 and 3 or 2.5)
+	end
+	return l
 end
 
+-- The quick chunky button used all over the menus: thick dark outline, outlined text, light top, and the shared
+-- hover / press / release feel (grow, squash, overshoot). Big primary actions use Kit.Button instead.
 local function button(parent, text, color, props)
 	local p = {
-		AutoButtonColor = true,
+		AutoButtonColor = false,
 		BackgroundColor3 = color,
-		Font = FONT,
+		Font = Theme.Font.Display,
 		Text = text,
 		TextSize = 18,
 		TextColor3 = THEME.Text,
@@ -79,9 +88,30 @@ local function button(parent, text, color, props)
 	end
 	local b = mk("TextButton", p, parent)
 	corner(b, 12)
-	Fx.Depth(b, 0.28) -- top light, bottom shade
-	Fx.Hover(b) -- grows on hover, squashes on press
+	mk("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, LineJoinMode = Enum.LineJoinMode.Round }, b)
+	Kit.Outline(b, 2.5)
+	mk("UIGradient", { Color = ColorSequence.new(Theme.Tint(color, 0.26), Theme.Shade(color, 0.08)), Rotation = 90 }, b)
+	local sc = mk("UIScale", { Scale = 1 }, b)
+	b.MouseEnter:Connect(function() Kit.Tween(sc, Theme.Anim.Hover, { Scale = 1.05 }) end)
+	b.MouseLeave:Connect(function() Kit.Tween(sc, Theme.Anim.Release, { Scale = 1 }, Enum.EasingStyle.Back) end)
+	b.MouseButton1Down:Connect(function() Kit.Tween(sc, Theme.Anim.Press, { Scale = 0.94 }) end)
+	b.MouseButton1Up:Connect(function() Kit.Tween(sc, Theme.Anim.Release, { Scale = 1 }, Enum.EasingStyle.Back) end)
 	return b
+end
+
+-- Lets code that reads/writes a plain button (.Text, .BackgroundColor3, .Visible) drive a Kit.Button.
+local function proxy(obj)
+	return setmetatable({}, {
+		__newindex = function(_, k, v)
+			if k == "Text" then obj.SetText(v) elseif k == "BackgroundColor3" then obj.SetColor(v) elseif k == "Visible" then obj.Root.Visible = v end
+		end,
+		__index = function(_, k)
+			if k == "Visible" then return obj.Root.Visible end
+			if k == "Root" then return obj.Root end
+			if k == "Face" then return obj.Face end
+			return nil
+		end,
+	})
 end
 
 local function commas(n)
@@ -91,6 +121,7 @@ local function commas(n)
 end
 
 local eventLabel, communityLabel
+local shardCur
 local gui, shardLabel, locationLabel, cacheLabel, objectiveCard, objectiveText, blastHint, seamLabel, chainLabel, previewFrame, previewLabel, infoLabel
 local welcomeFrame, detonateStroke
 local detonatePulse = false
@@ -117,14 +148,11 @@ end
 
 function UI.Init()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-	gui = mk("ScreenGui", { Name = "BlastwrightUI", ResetOnSpawn = false, IgnoreGuiInset = false, DisplayOrder = 5 }, playerGui)
+	gui = mk("ScreenGui", { Name = "BlastwrightUI", ResetOnSpawn = false, IgnoreGuiInset = false, DisplayOrder = 5, ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets }, playerGui)
 
 	-- Always visible: shards (top-left) and toasts / tier banner
-	local shardFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.2, Position = UDim2.new(0, 12, 0, 8), Size = UDim2.fromOffset(140, 40) }, gui)
-	corner(shardFrame, 12)
-	Fx.Depth(shardFrame, 0.3)
-	Fx.Glow(shardFrame, THEME.Gold, 2, 2)
-	shardLabel = label(shardFrame, "◆ 0", 24, THEME.Gold, { Size = UDim2.fromScale(1, 1) })
+	shardCur = Kit.Currency(gui, { Name = "Shards", Size = UDim2.fromOffset(196, 52), Position = UDim2.fromOffset(12, 8), Icon = "Gem", Color = Theme.Colors.Premium })
+	shardLabel = shardCur.Label
 
 	Feed.Init(gui) -- messages live in their own column on the right; big moments use the banner
 
@@ -134,30 +162,28 @@ function UI.Init()
 	-- Event and server-goal chips sit under the location, in the middle, so the right edge stays free for messages.
 	topCenter = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 40), Size = UDim2.fromOffset(420, 0), AutomaticSize = Enum.AutomaticSize.Y }, roamGroup)
 	mk("UIListLayout", { Padding = UDim.new(0, 4), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, topCenter)
-	local function chip(order, color)
-		local c = label(topCenter, "", 14, color, { Size = UDim2.new(0, 0, 0, 24), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = Color3.fromRGB(20, 22, 36), BackgroundTransparency = 0.2, LayoutOrder = order, Visible = false, Font = Enum.Font.BuilderSansBold })
-		corner(c, 12)
-		mk("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, c)
-		return c
+	local function chipProxy(order, color)
+		local c = Kit.Chip(topCenter, { Color = color, Visible = false, LayoutOrder = order, Height = 34 })
+		return setmetatable({}, { __newindex = function(_, k, v)
+			if k == "Text" then c.Label.Text = v elseif k == "Visible" then c.Root.Visible = v end
+		end })
 	end
-	eventLabel = chip(1, THEME.Gold)
-	communityLabel = chip(2, THEME.Accent)
-	cacheLabel = label(roamGroup, "", 16, THEME.Dim, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.fromOffset(170, 22), TextXAlignment = Enum.TextXAlignment.Left })
-	objectiveCard = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.2, Position = UDim2.new(0, 12, 0, 80), Size = UDim2.fromOffset(250, 0), AutomaticSize = Enum.AutomaticSize.Y, Visible = false }, roamGroup)
-	corner(objectiveCard, 12)
-	Fx.Depth(objectiveCard, 0.3)
-	Fx.Glow(objectiveCard, THEME.Gold, 2.5, 1.2) -- the objective breathes so it is easy to spot
-	mk("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, objectiveCard)
-	mk("UIListLayout", { Padding = UDim.new(0, 2) }, objectiveCard)
-	label(objectiveCard, "OBJECTIVE", 13, THEME.Gold, { Size = UDim2.new(1, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 1 })
-	objectiveText = label(objectiveCard, "", 16, THEME.Text, { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = 2 })
+	eventLabel = chipProxy(1, Theme.Colors.Boost)
+	communityLabel = chipProxy(2, Theme.Colors.Codex)
+	cacheLabel = label(roamGroup, "", 16, THEME.Text, { Position = UDim2.new(0, 16, 0, 66), Size = UDim2.fromOffset(200, 22), TextXAlignment = Enum.TextXAlignment.Left })
+	objectiveCard = Kit.Card(roamGroup, { Name = "Objective", Color = Theme.Colors.Panel, Position = UDim2.new(0, 12, 0, 96), Size = UDim2.fromOffset(250, 0) })
+	objectiveCard.AutomaticSize = Enum.AutomaticSize.Y
+	objectiveCard.Visible = false
+	mk("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 10), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, objectiveCard)
+	mk("UIListLayout", { Padding = UDim.new(0, 4) }, objectiveCard)
+	local tag = mk("Frame", { BackgroundColor3 = Theme.Colors.Warning, Size = UDim2.fromOffset(112, 24), BorderSizePixel = 0, LayoutOrder = 1 }, objectiveCard)
+	corner(tag, 8)
+	mk("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3 }, tag)
+	Kit.Label(tag, "OBJECTIVE", 16, { Size = UDim2.fromScale(0.92, 0.8), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5) })
+	objectiveText = label(objectiveCard, "", 17, THEME.Text, { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = 2, Font = Theme.Font.Body })
 
 	-- A small help button in the corner; every feature has its own button in the dock along the bottom.
-	local help = button(roamGroup, "?", THEME.Panel, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(40, 40), Font = Enum.Font.FredokaOne })
-	help.Activated:Connect(function()
-		AudioManager.Play("Click")
-		UI.ShowWelcome(true)
-	end)
+	Kit.Button(roamGroup, { Name = "Help", Size = UDim2.fromOffset(54, 60), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Color = Theme.Colors.Codex, Text = "?", TextSize = 34, Depth = 5, Corner = 12, OnClick = function() UI.ShowWelcome(true) end })
 	dock = Dock.Build(roamGroup, function(name)
 		AudioManager.Play("Click")
 		if State.PanelOpen and activeTab == name then
@@ -173,11 +199,19 @@ function UI.Init()
 	----------------------------------------------------------- blast HUD (corners only)
 	blastGroup = fullGroup("Blast")
 	blastGroup.Visible = false
+	local blastScale = mk("UIScale", { Scale = 1 }, blastGroup)
+	local function fitBlast()
+		local a = gui.AbsoluteSize
+		if a.X > 0 and a.Y > 0 then
+			local sc = math.clamp(math.min(a.Y / 640, a.X / 860), 0.55, 1)
+			blastScale.Scale = sc
+			blastGroup.Size = UDim2.fromScale(1 / sc, 1 / sc) -- (the frame grows as the content shrinks, so it still fills the screen)
+		end
+	end
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitBlast)
+	fitBlast()
 
-	local leave = button(blastGroup, "< Leave", THEME.Panel, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(110, 40) })
-	leave.Activated:Connect(function()
-		if UI.OnLeave then UI.OnLeave() end
-	end)
+	Kit.Button(blastGroup, { Name = "Leave", Size = UDim2.fromOffset(128, 60), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Color = Theme.Colors.Warning, Text = "LEAVE", TextSize = 26, Depth = 5, Corner = 12, OnClick = function() if UI.OnLeave then UI.OnLeave() end end })
 
 	-- Left column: status cards that stack (Critical Mass, run / puzzle, rig hearts and the monster) instead of overlapping.
 	leftCol = mk("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 12, 0, 56), Size = UDim2.fromOffset(290, 0), AutomaticSize = Enum.AutomaticSize.Y }, blastGroup)
@@ -197,10 +231,7 @@ function UI.Init()
 	-- Boss HUD: a header plate (health, the five phases, the one thing to do) and a row of threat cards.
 	bossHud = BossHud.Build(blastGroup, Config.Bosses)
 
-	dodgeButton = button(blastGroup, "DODGE (Q)", THEME.Panel, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -84), Size = UDim2.fromOffset(190, 48), TextSize = 20, Visible = false })
-	dodgeButton.Activated:Connect(function()
-		Remotes.Dodge:FireServer()
-	end)
+	dodgeButton = proxy(Kit.Button(blastGroup, { Name = "Dodge", Size = UDim2.fromOffset(190, 76), AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -118), Color = Theme.Colors.Codex, Icon = "Bolt", Text = "DODGE (Q)", TextSize = 24, Layout = "Horizontal", Visible = false, OnClick = function() Remotes.Dodge:FireServer() end }))
 	-- The Dodge button counts down between server updates (the server only sends a snapshot when something happens).
 	local tickAccumulator = 0
 	RunService.Heartbeat:Connect(function(dt)
@@ -215,22 +246,20 @@ function UI.Init()
 				dodgeButton.Text = "SHIELD UP"
 			elseif boss.RT.DodgeLeft - passed > 0 then
 				dodgeButton.Text = ("Dodge %ds"):format(math.ceil(boss.RT.DodgeLeft - passed))
-				dodgeButton.BackgroundColor3 = THEME.Panel
+				dodgeButton.BackgroundColor3 = Theme.Colors.Neutral
 			else
 				dodgeButton.Text = "DODGE (Q)"
-				dodgeButton.BackgroundColor3 = Fx.Tab.Codex
+				dodgeButton.BackgroundColor3 = Theme.Colors.Codex
 			end
 		end
 	end)
 	-- Active boosts (top, beside the shard count), the emergency-charge button, and the Revive offer.
 	-- (boosts are shown next to the shards), the emergency-charge button, and the Revive offer.
-	boostLabel = label(gui, "", 14, THEME.Gold, { Position = UDim2.new(0, 162, 0, 8), Size = UDim2.new(0, 0, 0, 40), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = Color3.fromRGB(20, 22, 36), BackgroundTransparency = 0.2, Visible = false, Font = Enum.Font.BuilderSansBold })
-	corner(boostLabel, 12)
-	mk("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, boostLabel)
-	chargeButton = button(blastGroup, "", THEME.Panel, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -140), Size = UDim2.fromOffset(190, 40), TextSize = 16, Visible = false })
-	chargeButton.Activated:Connect(function()
-		Remotes.UseCharge:FireServer()
-	end)
+	local boostChip = Kit.Chip(gui, { Name = "Boosts", Color = Theme.Colors.Boost, Visible = false, Position = UDim2.fromOffset(218, 12), Height = 44, TextSize = 20 })
+	boostLabel = setmetatable({}, { __newindex = function(_, k, v)
+		if k == "Text" then boostChip.Label.Text = v elseif k == "Visible" then boostChip.Root.Visible = v end
+	end })
+	chargeButton = proxy(Kit.Button(blastGroup, { Name = "EmergencyCharge", Size = UDim2.fromOffset(190, 64), AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -204), Color = Theme.Colors.Boost, Icon = "Bolt", Text = "+1 CHARGE", TextSize = 20, Layout = "Horizontal", Visible = false, OnClick = function() Remotes.UseCharge:FireServer() end }))
 	reviveModal = mk("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.4, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 30, Active = true }, gui)
 	reviveText = label(reviveModal, "", 24, THEME.Gold, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.4), Size = UDim2.new(1, -40, 0, 120), TextWrapped = true, Font = Enum.Font.FredokaOne, ZIndex = 31 })
 	reviveYes = button(reviveModal, "", THEME.Accent, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.58), Size = UDim2.fromOffset(320, 52), ZIndex = 31 })
@@ -312,27 +341,18 @@ function UI.Init()
 		if UI.OnClear then UI.OnClear() end
 	end)
 
-	detonateButton = button(blastGroup, "DETONATE", THEME.Hot, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -12), Size = UDim2.fromOffset(190, 62), TextSize = 26, Font = Enum.Font.FredokaOne })
-	Fx.Shimmer(detonateButton, 2.2, 0.55) -- a light band sweeps across the button
-	detonateStroke = mk("UIStroke", { Color = THEME.Gold, Thickness = 4, Enabled = false }, detonateButton)
-	detonateButton.Activated:Connect(function()
-		if UI.OnDetonate then UI.OnDetonate() end
-	end)
+	local detonate = Kit.ActionButton(blastGroup, { Name = "Detonate", Size = UDim2.fromOffset(260, 96), AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -12), Color = Theme.Colors.Action, Icon = "Bomb", Text = "DETONATE", TextSize = 38, OnClick = function() if UI.OnDetonate then UI.OnDetonate() end end })
+	detonateButton = proxy(detonate)
+	detonateStroke = mk("UIStroke", { Color = Color3.fromRGB(255, 244, 150), Thickness = 7, Enabled = false, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, LineJoinMode = Enum.LineJoinMode.Round }, detonate.Face)
 
 	----------------------------------------------------------- Forge / Codex panel
-	panel = mk("Frame", { BackgroundColor3 = Color3.fromRGB(21, 24, 39), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.45), Size = UDim2.new(0.92, 0, 0.7, 0), Visible = false, ZIndex = 10 }, gui)
-	corner(panel, 16)
-	mk("UISizeConstraint", { MaxSize = Vector2.new(560, 460) }, panel)
-	mk("UIStroke", { Color = Color3.fromRGB(78, 86, 120), Thickness = 1.5, Transparency = 0.2 }, panel)
-	panelRule = mk("Frame", { BackgroundColor3 = THEME.Accent, Size = UDim2.new(1, 0, 0, 6), BorderSizePixel = 0, ZIndex = 11 }, panel)
-	corner(panelRule, 16)
-	label(panel, "", 30, THEME.Text, { Name = "Title", Position = UDim2.fromOffset(18, 12), Size = UDim2.new(1, -90, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11, Font = Enum.Font.FredokaOne })
-	local close = button(panel, "X", THEME.Row, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), Size = UDim2.fromOffset(48, 48), ZIndex = 11 })
-	close.Activated:Connect(function()
-		UI.SetPanel(false)
-	end)
+	local kitPanel = Kit.Panel(gui, { Name = "MenuPanel", Size = UDim2.new(0.74, 0, 0.7, 0), Position = UDim2.fromScale(0.58, 0.5), Color = THEME.Accent, Title = "", Visible = false, OnClose = function() UI.SetPanel(false) end })
+	panel = kitPanel.Root
+	mk("UISizeConstraint", { MaxSize = Vector2.new(620, 480) }, panel)
+	panelRule = kitPanel.Ribbon
+	kitPanel.Title.Name = "Title"
 	-- (the dock along the bottom is the navigation now; this in-panel tab bar stays hidden but keeps the tab buttons wired)
-	local tabBar = mk("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 42), ZIndex = 11, Visible = false }, panel)
+	local tabBar = mk("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 42), ZIndex = 11, Visible = false }, kitPanel.Body)
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, tabBar)
 	for i, name in { "Forge", "Daily", "Farm", "Goals", "Shop", "Codex" } do
 		local tab = button(tabBar, name, THEME.Row, { Size = UDim2.new(1 / 6, -5, 1, 0), TextSize = 14, LayoutOrder = i, ZIndex = 12 })
@@ -349,23 +369,23 @@ function UI.Init()
 	end
 	panelScroll = mk("ScrollingFrame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(12, 62),
-		Size = UDim2.new(1, -24, 1, -74),
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(1, 0, 1, 0),
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 6,
 		BorderSizePixel = 0,
 		ZIndex = 11,
-	}, panel)
+	}, kitPanel.Body)
 	mk("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, panelScroll)
 
 	-- Welcome / how-to-play panel
 	welcomeFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.92, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Visible = false, ZIndex = 20 }, gui)
 	corner(welcomeFrame, 16)
 	mk("UISizeConstraint", { MaxSize = Vector2.new(460, 9999) }, welcomeFrame)
-	Fx.AnimatedBorder(welcomeFrame, { THEME.Gold, Color3.fromRGB(255, 100, 200), THEME.Accent, THEME.Gold }, 3, 6)
-	welcomeFrame.BackgroundColor3 = Color3.new(1, 1, 1)
-	Fx.Gradient(welcomeFrame, Color3.fromRGB(36, 34, 66), Color3.fromRGB(16, 18, 30), 90)
+	mk("UIStroke", { Color = Theme.Colors.Outline, Thickness = 5, LineJoinMode = Enum.LineJoinMode.Round }, welcomeFrame)
+	welcomeFrame.BackgroundColor3 = Theme.Colors.Panel
+	mk("UIGradient", { Color = ColorSequence.new(Theme.Tint(Theme.Colors.Panel, 0.12), Theme.Shade(Theme.Colors.Panel, 0.3)), Rotation = 90 }, welcomeFrame)
 	mk("UIPadding", { PaddingTop = UDim.new(0, 16), PaddingBottom = UDim.new(0, 16), PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18) }, welcomeFrame)
 	mk("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, HorizontalAlignment = Enum.HorizontalAlignment.Center }, welcomeFrame)
 	label(welcomeFrame, "Welcome to Blastwright", 26, THEME.Gold, { Size = UDim2.new(1, 0, 0, 34), LayoutOrder = 1, ZIndex = 21 })
@@ -417,15 +437,10 @@ function UI.Init()
 		end
 	end)
 
-	-- Shard count-up
+	-- Shard count-up and bounce
 	RunService.Heartbeat:Connect(function(dt)
-		local target = State.Data and State.Data.Shards or 0
-		if math.abs(target - displayShards) < 0.5 then
-			displayShards = target
-		else
-			displayShards += (target - displayShards) * math.min(1, dt * 5)
-		end
-		shardLabel.Text = "◆ " .. commas(displayShards)
+		shardCur.Set(State.Data and State.Data.Shards or 0, shardCur.Shown == 0 and shardCur.Value == 0)
+		shardCur.Step(dt)
 	end)
 end
 
@@ -620,12 +635,21 @@ function UI.ShowTier(name, bonus, total)
 end
 
 -- Messages go to the feed on the right. "Threat" messages (boss wind-ups) are shown by the boss panel instead, so they only make a sound.
+function UI.ShowReward(title, text, icon, color, sub)
+	Kit.Popup(gui, { Title = title, Text = text, Icon = icon, Color = color, Sub = sub })
+end
+
 function UI.Toast(text, kind)
 	if kind == "Threat" then
 		AudioManager.Play("Error")
 		return
 	end
 	local style = Feed.Classify(text, kind)
+	-- the big moments also get a reward popup
+	if style == "Achievement" and (text:find("^MASTERY") or text:find("^EXPEDITION COMPLETE") or text:find("^ELITE REWARD")) then
+		local title, body = Feed.Split(text)
+		UI.ShowReward(text:find("^MASTERY") and "MASTERY!" or (text:find("^ELITE") and "RELIC FOUND!" or "VICTORY!"), title, text:find("^MASTERY") and "Goals" or (text:find("^ELITE") and "Gem" or "Goals"), Theme.Colors.Boost, body)
+	end
 	local title, body = Feed.Split(text)
 	Feed.Push(style, title, body)
 	AudioManager.Play(kind == "Error" and "Error" or "Reward")
@@ -641,11 +665,10 @@ local function row(order, titleText, desc, buttonText, enabled, onClick, titleCo
 	local hasBar = opts.Progress ~= nil
 	local height = hasBar and 90 or 78
 	local f = mk("Frame", { BackgroundColor3 = THEME.Row, Size = UDim2.new(1, -8, 0, height), LayoutOrder = order, ZIndex = 11 }, panelScroll)
-	corner(f, 12)
-	Fx.Depth(f, 0.25)
-	mk("UIStroke", { Color = opts.Dim and THEME.Dim or accent, Thickness = 1.5, Transparency = opts.Dim and 0.85 or 0.5 }, f)
-	local strip = mk("Frame", { BackgroundColor3 = opts.Dim and THEME.Dim or accent, Position = UDim2.fromOffset(6, 10), Size = UDim2.new(0, 4, 1, -20), BorderSizePixel = 0, ZIndex = 12 }, f)
-	corner(strip, 2)
+	corner(f, 14)
+	Fx.Depth(f, 0.2)
+	mk("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3.5, LineJoinMode = Enum.LineJoinMode.Round }, f)
+	f.BackgroundColor3 = opts.Dim and Color3.fromRGB(52, 58, 92) or Theme.Shade(accent, 0.62)
 	local iconY = (height - 56) // 2
 	if opts.Gem then
 		local holder = mk("Frame", { BackgroundColor3 = Fx.Darken(opts.Gem, 0.78), Position = UDim2.fromOffset(16, iconY), Size = UDim2.fromOffset(56, 56), BorderSizePixel = 0, ZIndex = 12 }, f)
@@ -654,12 +677,23 @@ local function row(order, titleText, desc, buttonText, enabled, onClick, titleCo
 		local gem = Fx.Gem(holder, opts.Gem, 56, opts.Dim)
 		gem.ZIndex = 13
 	else
-		Fx.Icon(f, opts.Icon or TAB_GLYPH[activeTab] or "◆", opts.Dim and Color3.fromRGB(70, 76, 96) or (opts.IconColor or accent), 52, { Position = UDim2.fromOffset(18, iconY + 2), ZIndex = 12 })
+		local tileColor = opts.Dim and Color3.fromRGB(96, 104, 140) or (opts.IconColor or accent)
+		if opts.Icon then
+			Fx.Icon(f, opts.Icon, tileColor, 54, { Position = UDim2.fromOffset(16, iconY + 1), ZIndex = 12 })
+		else
+			-- no specific icon: draw this page's own icon big on a coloured tile
+			local tile = mk("Frame", { BackgroundColor3 = tileColor, Position = UDim2.fromOffset(16, iconY + 1), Size = UDim2.fromOffset(54, 54), BorderSizePixel = 0, ZIndex = 12 }, f)
+			corner(tile, 14)
+			mk("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3, LineJoinMode = Enum.LineJoinMode.Round }, tile)
+			mk("UIGradient", { Color = ColorSequence.new(Theme.Tint(tileColor, 0.28), Theme.Shade(tileColor, 0.08)), Rotation = 90 }, tile)
+			Icons.Draw(activeTab, tile, tileColor, 0.86)
+		end
 	end
 	label(f, titleText, 19, titleColor or THEME.Text, { Position = UDim2.fromOffset(82, 6), Size = UDim2.new(1, -212, 0, 26), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
 	label(f, desc, 14, THEME.Dim, { Position = UDim2.fromOffset(82, 32), Size = UDim2.new(1, -212, 0, hasBar and 32 or 40), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 12 })
 	if hasBar then
-		Fx.Progress(f, opts.Progress, accent, { Position = UDim2.new(0, 82, 0, height - 20), Size = UDim2.new(1, -212, 0, 10), ZIndex = 12 })
+		local bar = Kit.Bar(f, { Position = UDim2.new(0, 82, 0, height - 24), Size = UDim2.new(1, -212, 0, 16), Color = opts.Progress >= 1 and Theme.Colors.Success or accent, ZIndex = 12 })
+		bar.Set(opts.Progress, nil, true)
 	end
 	if buttonText then
 		local ready = enabled and string.sub(buttonText, 1, 5) == "Claim"
@@ -677,12 +711,13 @@ end
 
 local function header(order, text)
 	local c = Fx.Tab[activeTab] or THEME.Accent
-	local f = mk("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.new(1, -8, 0, 30), LayoutOrder = order, ZIndex = 11 }, panelScroll)
-	corner(f, 8)
-	Fx.Gradient(f, Fx.Darken(c, 0.4), Color3.fromRGB(24, 28, 44), 0)
-	mk("UIStroke", { Color = c, Thickness = 1, Transparency = 0.6 }, f)
-	local t = label(f, "◆  " .. text, 16, Fx.Lighten(c, 0.55), { Position = UDim2.fromOffset(10, 0), Size = UDim2.new(1, -20, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, TextScaled = true, ZIndex = 12 })
-	mk("UITextSizeConstraint", { MaxTextSize = 16, MinTextSize = 9 }, t)
+	local f = mk("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.new(1, -8, 0, 34), LayoutOrder = order, ZIndex = 11 }, panelScroll)
+	corner(f, 10)
+	f.BackgroundColor3 = c
+	Fx.Depth(f, 0.25)
+	mk("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3.5, LineJoinMode = Enum.LineJoinMode.Round }, f)
+	local t = label(f, string.upper(text), 18, Color3.new(1, 1, 1), { Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -24, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, TextScaled = true, ZIndex = 12 })
+	mk("UITextSizeConstraint", { MaxTextSize = 20, MinTextSize = 9 }, t)
 end
 
 local function rebuildPanel()
@@ -691,8 +726,8 @@ local function rebuildPanel()
 		if c:IsA("GuiObject") then c:Destroy() end
 	end
 	local d = State.Data
-	local titleLabel = panel:FindFirstChild("Title")
-	titleLabel.TextColor3 = Fx.Lighten(Fx.Tab[activeTab] or THEME.Accent, 0.35)
+	local titleLabel = panel:FindFirstChild("Title", true)
+	titleLabel.TextColor3 = THEME.Text
 	panelRule.BackgroundColor3 = Fx.Tab[activeTab] or THEME.Accent
 	for name, tab in tabButtons do
 		local selected = name == activeTab
@@ -826,7 +861,7 @@ local function rebuildPanel()
 			header(order, title)
 			order += 1
 			local grid = mk("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = order, ZIndex = 11 }, panelScroll)
-			mk("UIGridLayout", { CellSize = UDim2.new(1 / cols, cols == 2 and -4 or 0, 0, 214), CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder }, grid)
+			mk("UIGridLayout", { CellSize = UDim2.new(1 / cols, cols == 2 and -4 or 0, 0, 238), CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder }, grid)
 			return grid
 		end
 		local function priceHint(n)
@@ -1084,7 +1119,7 @@ function UI.Refresh()
 	boostLabel.Visible = #boostBits > 0
 	local stock = d.Inventory and d.Inventory.Charge or 0
 	chargeButton.Visible = stock > 0 and not (d.Puzzle and d.Puzzle.Active) and (d.ChargesLeft - #State.Placed) <= 1
-	chargeButton.Text = ("+1 emergency charge (%d)"):format(stock)
+	chargeButton.Text = ("+1 CHARGE  (%d)"):format(stock)
 	reviveModal.Visible = d.AwaitRevive == true
 	if d.AwaitRevive then
 		reviveText.Text = "THE TUNNEL IS COLLAPSING!\nUse a Revive to keep fighting?"
@@ -1092,11 +1127,12 @@ function UI.Refresh()
 	end
 	local boss = d.Boss
 	bossHud.Update(boss)
+	Feed.SetCompact(boss ~= nil)
 	dodgeButton.Visible = boss ~= nil
 	if boss then
 		local shielded = boss.RT and boss.RT.Shielded
 		dodgeButton.Text = shielded and "SHIELD UP" or (boss.DodgeReady and "DODGE (Q)" or ("Dodge %ds"):format(math.ceil(boss.DodgeCooldown or 0)))
-		dodgeButton.BackgroundColor3 = shielded and THEME.Accent or (boss.DodgeReady and Fx.Tab.Codex or THEME.Panel)
+		dodgeButton.BackgroundColor3 = shielded and Theme.Colors.Success or (boss.DodgeReady and Theme.Colors.Codex or Theme.Colors.Neutral)
 	end
 	criticalLabel.Visible = (d.Critical or 0) > 0
 	if (d.Critical or 0) > 0 then

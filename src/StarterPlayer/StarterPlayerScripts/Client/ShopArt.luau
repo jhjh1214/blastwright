@@ -3,6 +3,8 @@
 -- spinning gem piles for shards, ringed "x2" badges for boosts, a beating heart for revives, an exploding rings preview in
 -- the finisher's own colours, glowing orbs for blast colours, a fanned stack of icons for bundles. Cosmetic only.
 local Fx = require(script.Parent.Fx)
+local Kit = require(script.Parent.Kit)
+local Theme = require(script.Parent.Theme)
 
 local ShopArt = {}
 
@@ -27,11 +29,13 @@ local function make(class, props, parent)
 end
 
 local function text(parent, str, size, color, props)
-	local p = { BackgroundTransparency = 1, Font = FONT, Text = str, TextSize = size, TextColor3 = color, TextStrokeTransparency = 0.35, ZIndex = (parent.ZIndex or 1) + 3 }
+	local p = { BackgroundTransparency = 1, Font = FONT, Text = str, TextSize = size, TextColor3 = color, TextStrokeTransparency = 1, ZIndex = (parent.ZIndex or 1) + 3 }
 	for k, v in props or {} do
 		p[k] = v
 	end
-	return make("TextLabel", p, parent)
+	local l = make("TextLabel", p, parent)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = size >= 24 and 3.5 or 2.5, LineJoinMode = Enum.LineJoinMode.Round }, l)
+	return l
 end
 
 local function centred(parent, size, extra)
@@ -228,68 +232,53 @@ function ShopArt.Crown()
 	return { Kind = "Crown" }
 end
 
--- A product card in a grid: art on top, name, description, a price hint and the buy button.
+-- A product card in a grid: art on top, big name, description, a price chip and a chunky buy button.
 -- spec = { Name, Description, Art, Tier, Badge, Hint = "≈ R$ 49", Button, Enabled, OnClick, Order }
 function ShopArt.Card(parent, spec)
 	local color = ShopArt.TierColor[spec.Tier] or Color3.fromRGB(120, 200, 255)
-	local card = make("Frame", { BackgroundColor3 = Color3.fromRGB(34, 40, 62), LayoutOrder = spec.Order or 0, ClipsDescendants = true, ZIndex = 12 }, parent)
-	make("UICorner", { CornerRadius = UDim.new(0, 14) }, card)
-	Fx.Depth(card, 0.25)
-	Fx.AnimatedBorder(card, { color, Fx.Lighten(color, 0.5), color }, 2.5, 5)
+	local card = make("Frame", { BackgroundColor3 = Theme.Colors.Panel, LayoutOrder = spec.Order or 0, ClipsDescendants = false, ZIndex = 12 }, parent)
+	make("UICorner", { CornerRadius = UDim.new(0, 18) }, card)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 4.5, LineJoinMode = Enum.LineJoinMode.Round }, card)
+	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(Theme.Colors.Panel, 0.12), Theme.Shade(Theme.Colors.Panel, 0.3)), Rotation = 90 }, card)
 
-	local art = make("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.new(1, 0, 0, 108), ClipsDescendants = true, ZIndex = 12 }, card)
-	Fx.Gradient(art, Fx.Darken(color, 0.55), Fx.Darken(color, 0.85), 90)
-	make("UICorner", { CornerRadius = UDim.new(0, 14) }, art)
+	-- the art window, coloured by tier, with its own outline
+	local art = make("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), Position = UDim2.fromOffset(8, 8), Size = UDim2.new(1, -16, 0, 104), ClipsDescendants = true, ZIndex = 12 }, card)
+	Fx.Gradient(art, Theme.Tint(color, 0.05), Theme.Shade(color, 0.55), 90)
+	make("UICorner", { CornerRadius = UDim.new(0, 12) }, art)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3.5, LineJoinMode = Enum.LineJoinMode.Round }, art)
 	local build = BUILD[spec.Art.Kind]
 	if build then
 		pcall(build, art, spec.Art)
 	end
 
-	-- tier ribbon (top left) and badge (top right)
-	local ribbon = make("Frame", { BackgroundColor3 = color, Position = UDim2.fromOffset(8, 8), Size = UDim2.fromOffset(64, 20), BorderSizePixel = 0, ZIndex = 20 }, card)
-	make("UICorner", { CornerRadius = UDim.new(0, 6) }, ribbon)
-	text(ribbon, string.upper(spec.Tier or ""), 11, Color3.fromRGB(20, 22, 34), { Size = UDim2.fromScale(1, 1), TextStrokeTransparency = 1, ZIndex = 21 })
+	-- tier tag (top left) and badge (top right), each a small outlined sticker
+	local tag = make("Frame", { BackgroundColor3 = color, Position = UDim2.fromOffset(12, 12), Size = UDim2.fromOffset(72, 24), BorderSizePixel = 0, ZIndex = 20 }, card)
+	make("UICorner", { CornerRadius = UDim.new(0, 8) }, tag)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3, LineJoinMode = Enum.LineJoinMode.Round }, tag)
+	text(tag, string.upper(spec.Tier or ""), 15, Color3.new(1, 1, 1), { Size = UDim2.fromScale(1, 1), ZIndex = 21 })
 	if spec.Badge then
-		local badge = make("Frame", { AnchorPoint = Vector2.new(1, 0), BackgroundColor3 = Color3.fromRGB(255, 70, 110), Position = UDim2.new(1, -8, 0, 8), Size = UDim2.fromOffset(#spec.Badge * 8 + 16, 20), BorderSizePixel = 0, ZIndex = 20 }, card)
-		make("UICorner", { CornerRadius = UDim.new(0, 6) }, badge)
-		text(badge, spec.Badge, 11, Color3.new(1, 1, 1), { Size = UDim2.fromScale(1, 1), ZIndex = 21 })
-		Fx.Shimmer(badge, 1.8, 0.7)
-		Fx.Pulse(badge, 0.06, 3)
+		local badge = make("Frame", { AnchorPoint = Vector2.new(1, 0), BackgroundColor3 = Theme.Colors.Danger, Position = UDim2.new(1, -12, 0, 12), Size = UDim2.fromOffset(#spec.Badge * 9 + 22, 26), BorderSizePixel = 0, ZIndex = 20, Rotation = 3 }, card)
+		make("UICorner", { CornerRadius = UDim.new(0, 8) }, badge)
+		make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3, LineJoinMode = Enum.LineJoinMode.Round }, badge)
+		text(badge, spec.Badge, 15, Color3.new(1, 1, 1), { Size = UDim2.fromScale(1, 1), ZIndex = 21 })
 	end
 
-	text(card, spec.Name, 17, Color3.fromRGB(240, 244, 255), { Position = UDim2.fromOffset(10, 112), Size = UDim2.new(1, -20, 0, 22), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 14, TextTruncate = Enum.TextTruncate.AtEnd })
-	text(card, spec.Description, 12, Color3.fromRGB(160, 170, 195), { Font = Enum.Font.BuilderSansMedium, Position = UDim2.fromOffset(10, 134), Size = UDim2.new(1, -20, 0, 34), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, TextStrokeTransparency = 1, ZIndex = 14 })
+	text(card, spec.Name, 22, Color3.new(1, 1, 1), { Position = UDim2.fromOffset(12, 116), Size = UDim2.new(1, -24, 0, 28), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 14, TextTruncate = Enum.TextTruncate.AtEnd })
+	local desc = text(card, spec.Description, 13, Color3.fromRGB(226, 232, 250), { Font = Enum.Font.BuilderSansBold, Position = UDim2.fromOffset(12, 146), Size = UDim2.new(1, -24, 0, 34), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 14 })
+	desc:FindFirstChildOfClass("UIStroke").Thickness = 2
 
 	if spec.Hint then
-		local chip = make("Frame", { AnchorPoint = Vector2.new(0, 1), BackgroundColor3 = Color3.fromRGB(20, 24, 38), Position = UDim2.new(0, 10, 1, -8), Size = UDim2.fromOffset(74, 30), BorderSizePixel = 0, ZIndex = 14 }, card)
-		make("UICorner", { CornerRadius = UDim.new(0, 8) }, chip)
-		make("UIStroke", { Color = color, Thickness = 1.5, Transparency = 0.5 }, chip)
-		text(chip, spec.Hint, 14, Fx.Lighten(color, 0.3), { Size = UDim2.fromScale(1, 1), ZIndex = 15 })
+		local chip = make("Frame", { AnchorPoint = Vector2.new(0, 1), BackgroundColor3 = Theme.Colors.PanelDark, Position = UDim2.new(0, 10, 1, -12), Size = UDim2.fromOffset(86, 40), BorderSizePixel = 0, ZIndex = 14 }, card)
+		make("UICorner", { CornerRadius = UDim.new(0, 10) }, chip)
+		make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3, LineJoinMode = Enum.LineJoinMode.Round }, chip)
+		text(chip, spec.Hint, 16, Theme.Tint(color, 0.45), { Size = UDim2.new(0.92, 0, 0.8, 0), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 15, TextScaled = true })
 	end
-	local button = make("TextButton", {
-		AnchorPoint = Vector2.new(1, 1),
-		BackgroundColor3 = spec.Enabled and Fx.Lighten(color, 0.1) or Color3.fromRGB(44, 50, 74),
-		Position = UDim2.new(1, -8, 1, -8),
-		Size = UDim2.new(1, -100, 0, 30),
-		Font = FONT,
-		Text = spec.Button,
-		TextSize = 15,
-		TextColor3 = spec.Enabled and Color3.fromRGB(20, 22, 34) or Color3.fromRGB(150, 160, 185),
-		AutoButtonColor = true,
-		ZIndex = 15,
-	}, card)
-	make("UICorner", { CornerRadius = UDim.new(0, 8) }, button)
-	Fx.Depth(button, 0.28)
-	Fx.Hover(button)
-	if spec.Enabled then
-		Fx.Shimmer(button, 2.4, 0.6)
-		Fx.Glow(button, Fx.Lighten(color, 0.5), 2, 1.1)
-	end
-	button.Activated:Connect(function()
-		if spec.OnClick then
+	local buy = Kit.Button(card, { Name = "Buy", Size = UDim2.new(1, spec.Hint and -112 or -20, 0, 50), AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -10, 1, -8), Color = spec.Enabled and Theme.Colors.Success or Theme.Colors.Neutral, Text = string.upper(spec.Button or ""), TextSize = 24, Depth = 6, Corner = 12, Sound = spec.Enabled and "Reward" or "Error", OnClick = function()
+		if spec.Enabled and spec.OnClick then
 			spec.OnClick()
 		end
-	end)
+	end })
+	buy.Root.ZIndex = 16
 	return card
 end
 

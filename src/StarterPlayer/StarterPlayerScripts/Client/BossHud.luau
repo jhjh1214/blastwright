@@ -5,6 +5,9 @@
 --      ("pop 3+ crystals on the red line", "pop a Lensglass", "pop the purple crystals"), turning green once it is stopped.
 -- Flat dark plates, display font for names and numbers, plain body text. The boss's attacks are ALSO drawn on the grid
 -- (CavernView); this is the place that explains them.
+local Theme = require(script.Parent.Theme)
+local Kit = require(script.Parent.Kit)
+
 local BossHud = {}
 
 local DISPLAY = Enum.Font.FredokaOne
@@ -54,34 +57,37 @@ BossHud.Objective = objective
 
 -- parent: the blast HUD group. config: Config.Bosses.
 function BossHud.Build(parent, config)
-	local plate = make("Frame", { Name = "BossHeader", BackgroundColor3 = Color3.fromRGB(18, 20, 33), BackgroundTransparency = 0.05, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 56), Size = UDim2.fromOffset(460, 98), Visible = false, BorderSizePixel = 0, ZIndex = 8 }, parent)
+	local plate = make("Frame", { Name = "BossHeader", BackgroundColor3 = Theme.Colors.Panel, BackgroundTransparency = 0, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 64), Size = UDim2.fromOffset(480, 136), Visible = false, BorderSizePixel = 0, ZIndex = 8 }, parent)
 	make("UICorner", { CornerRadius = UDim.new(0, 14) }, plate)
-	make("UIStroke", { Color = Color3.fromRGB(70, 78, 110), Thickness = 1, Transparency = 0.3 }, plate)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 5, LineJoinMode = Enum.LineJoinMode.Round }, plate)
+	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(Theme.Colors.Panel, 0.12), Theme.Shade(Theme.Colors.Panel, 0.3)), Rotation = 90 }, plate)
 	local scale = make("UIScale", { Scale = 1 }, plate)
-	local rule = make("Frame", { BackgroundColor3 = PHASE_COLOR.Attack, Size = UDim2.new(1, 0, 0, 5), BorderSizePixel = 0, ZIndex = 9 }, plate)
+	local rule = make("Frame", { BackgroundColor3 = PHASE_COLOR.Attack, Size = UDim2.new(1, 0, 0, 12), BorderSizePixel = 0, ZIndex = 9 }, plate)
 	make("UICorner", { CornerRadius = UDim.new(0, 14) }, rule)
 
-	local nameLabel = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 9), Size = UDim2.new(0.6, 0, 0, 26), Font = DISPLAY, Text = "", TextSize = 23, TextColor3 = Color3.fromRGB(246, 247, 252), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9 }, plate)
-	local phaseTag = make("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 13), Size = UDim2.new(0.4, 0, 0, 20), Font = BODY_BOLD, Text = "", TextSize = 15, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 9 }, plate)
+	local nameLabel = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 14), Size = UDim2.new(0.6, 0, 0, 32), Font = DISPLAY, Text = "", TextSize = 30, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9 }, plate)
+	Kit.Outline(nameLabel, 3.5)
+	local phaseTag = make("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 20), Size = UDim2.new(0.4, 0, 0, 22), Font = DISPLAY, Text = "", TextSize = 17, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 9 }, plate)
+	Kit.Outline(phaseTag, 2.5)
 
-	local back = make("Frame", { BackgroundColor3 = Color3.fromRGB(38, 42, 62), Position = UDim2.fromOffset(16, 40), Size = UDim2.new(1, -32, 0, 16), BorderSizePixel = 0, ZIndex = 9 }, plate)
-	make("UICorner", { CornerRadius = UDim.new(0, 8) }, back)
-	local fill = make("Frame", { BackgroundColor3 = PHASE_COLOR.Attack, Size = UDim2.fromScale(1, 1), BorderSizePixel = 0, ZIndex = 10 }, back)
-	make("UICorner", { CornerRadius = UDim.new(0, 8) }, fill)
-	local hpText = make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Font = BODY_BOLD, Text = "", TextSize = 13, TextColor3 = Color3.new(1, 1, 1), ZIndex = 11 }, back)
+	local hpBar = Kit.Bar(plate, { Name = "Health", Position = UDim2.fromOffset(16, 50), Size = UDim2.new(1, -32, 0, 24), Color = PHASE_COLOR.Attack, ZIndex = 9 })
+	local fill, hpText = hpBar.Fill, nil
 
 	local pips = {}
-	local pipRow = make("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 62), Size = UDim2.new(1, -32, 0, 16), ZIndex = 9 }, plate)
+	local pipRow = make("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 80), Size = UDim2.new(1, -32, 0, 22), ZIndex = 9 }, plate)
 	make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, pipRow)
 	for i, name in PHASES do
-		local pip = make("TextLabel", { BackgroundColor3 = Color3.fromRGB(38, 42, 62), Size = UDim2.new(0.2, -3.2, 1, 0), Font = BODY_BOLD, Text = string.upper(name), TextSize = 11, TextColor3 = Color3.fromRGB(120, 128, 155), BorderSizePixel = 0, LayoutOrder = i, ZIndex = 10 }, pipRow)
-		make("UICorner", { CornerRadius = UDim.new(0, 6) }, pip)
+		local pip = make("TextLabel", { BackgroundColor3 = Theme.Colors.PanelDark, Size = UDim2.new(0.2, -3.2, 1, 0), Font = DISPLAY, Text = string.upper(name), TextSize = 13, TextColor3 = Color3.fromRGB(150, 158, 190), BorderSizePixel = 0, LayoutOrder = i, ZIndex = 10 }, pipRow)
+		make("UICorner", { CornerRadius = UDim.new(0, 7) }, pip)
+		make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 2.5, LineJoinMode = Enum.LineJoinMode.Round }, pip)
 		pips[name] = pip
 	end
 
-	local goal = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 78), Size = UDim2.new(1, -32, 0, 16), Font = BODY_BOLD, Text = "", TextSize = 14, TextColor3 = Color3.fromRGB(214, 220, 238), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9 }, plate)
+	local goal = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 106), Size = UDim2.new(1, -32, 0, 0), Font = BODY_BOLD, Text = "", TextSize = 16, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9 }, plate)
+	Kit.Outline(goal, 2)
+	goal.Visible = false
 
-	local row = make("Frame", { Name = "Threats", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 162), Size = UDim2.new(0, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.XY, Visible = false, ZIndex = 8 }, parent)
+	local row = make("Frame", { Name = "Threats", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 184), Size = UDim2.new(0, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.XY, Visible = false, ZIndex = 8 }, parent)
 	make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, row)
 
 	local function fit()
@@ -98,21 +104,26 @@ function BossHud.Build(parent, config)
 
 	local function makeCard(threat)
 		local info = THREATS[threat.Type]
-		local card = make("Frame", { BackgroundColor3 = Color3.fromRGB(18, 20, 33), BackgroundTransparency = 0.05, Size = UDim2.fromOffset(214, 82), BorderSizePixel = 0, LayoutOrder = threat.Id, ZIndex = 8 }, row)
+		local card = make("Frame", { BackgroundColor3 = Theme.Colors.Panel, BackgroundTransparency = 0, Size = UDim2.fromOffset(226, 94), BorderSizePixel = 0, LayoutOrder = threat.Id, ZIndex = 8 }, row)
 		make("UICorner", { CornerRadius = UDim.new(0, 12) }, card)
-		make("UIStroke", { Color = Color3.fromRGB(70, 78, 110), Thickness = 1, Transparency = 0.3 }, card)
-		local bar = make("Frame", { Name = "Edge", BackgroundColor3 = info.Color, Size = UDim2.new(0, 5, 1, 0), BorderSizePixel = 0, ZIndex = 9 }, card)
+		make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 4.5, LineJoinMode = Enum.LineJoinMode.Round }, card)
+		make("UIGradient", { Color = ColorSequence.new(Theme.Tint(Theme.Colors.Panel, 0.1), Theme.Shade(Theme.Colors.Panel, 0.3)), Rotation = 90 }, card)
+		local bar = make("Frame", { Name = "Edge", BackgroundColor3 = info.Color, Size = UDim2.new(1, 0, 0, 8), BorderSizePixel = 0, ZIndex = 9 }, card)
 		make("UICorner", { CornerRadius = UDim.new(0, 12) }, bar)
-		local tile = make("Frame", { BackgroundColor3 = info.Color, Position = UDim2.fromOffset(14, 9), Size = UDim2.fromOffset(32, 32), BorderSizePixel = 0, ZIndex = 9 }, card)
-		make("UICorner", { CornerRadius = UDim.new(0, 9) }, tile)
-		make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Font = DISPLAY, Text = info.Glyph, TextSize = 19, TextColor3 = Color3.fromRGB(26, 24, 38), ZIndex = 10 }, tile)
-		local title = make("TextLabel", { Name = "Title", BackgroundTransparency = 1, Position = UDim2.fromOffset(54, 8), Size = UDim2.new(1, -110, 0, 18), Font = DISPLAY, Text = info.Title, TextSize = 16, TextColor3 = Color3.fromRGB(246, 247, 252), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9 }, card)
-		local count = make("TextLabel", { Name = "Count", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 4), Size = UDim2.fromOffset(56, 28), Font = DISPLAY, Text = "", TextSize = 24, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 9 }, card)
-		local track = make("Frame", { BackgroundColor3 = Color3.fromRGB(38, 42, 62), Position = UDim2.fromOffset(54, 30), Size = UDim2.new(1, -66, 0, 6), BorderSizePixel = 0, ZIndex = 9 }, card)
-		make("UICorner", { CornerRadius = UDim.new(0, 3) }, track)
+		local tile = make("Frame", { BackgroundColor3 = info.Color, Position = UDim2.fromOffset(10, 16), Size = UDim2.fromOffset(40, 40), BorderSizePixel = 0, ZIndex = 9 }, card)
+		make("UICorner", { CornerRadius = UDim.new(0, 10) }, tile)
+		make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3, LineJoinMode = Enum.LineJoinMode.Round }, tile)
+		make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Font = DISPLAY, Text = info.Glyph, TextSize = 24, TextColor3 = Color3.new(1, 1, 1), ZIndex = 10 }, tile)
+		local title = make("TextLabel", { Name = "Title", BackgroundTransparency = 1, Position = UDim2.fromOffset(58, 14), Size = UDim2.new(1, -124, 0, 22), Font = DISPLAY, Text = info.Title, TextSize = 19, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 9 }, card)
+		Kit.Outline(title, 3)
+		local count = make("TextLabel", { Name = "Count", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 10), Size = UDim2.fromOffset(64, 32), Font = DISPLAY, Text = "", TextSize = 28, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 9 }, card)
+		Kit.Outline(count, 3.5)
+		local track = make("Frame", { BackgroundColor3 = Color3.fromRGB(38, 42, 62), Position = UDim2.fromOffset(58, 42), Size = UDim2.new(1, -70, 0, 12), BorderSizePixel = 0, ZIndex = 9 }, card)
+		make("UICorner", { CornerRadius = UDim.new(0, 6) }, track)
+		make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 2.5 }, track)
 		local fillBar = make("Frame", { Name = "Fill", BackgroundColor3 = info.Color, Size = UDim2.fromScale(1, 1), BorderSizePixel = 0, ZIndex = 10 }, track)
-		make("UICorner", { CornerRadius = UDim.new(0, 3) }, fillBar)
-		local answer = make("TextLabel", { Name = "Answer", BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 46), Size = UDim2.new(1, -24, 0, 30), Font = BODY, Text = info.Answer, TextSize = 13, TextColor3 = Color3.fromRGB(190, 198, 220), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 9 }, card)
+		make("UICorner", { CornerRadius = UDim.new(0, 6) }, fillBar)
+		local answer = make("TextLabel", { Name = "Answer", BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 58), Size = UDim2.new(1, -22, 0, 30), Font = BODY_BOLD, Text = info.Answer, TextSize = 14, TextColor3 = Color3.fromRGB(236, 240, 255), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 9 }, card)
 		return { Frame = card, Count = count, Fill = fillBar, Title = title, Edge = bar, Answer = answer, Info = info }
 	end
 
@@ -130,27 +141,28 @@ function BossHud.Build(parent, config)
 		plate.Visible = true
 		local color = PHASE_COLOR[boss.Phase] or PHASE_COLOR.Attack
 		rule.BackgroundColor3 = color
-		fill.BackgroundColor3 = color
+		hpBar.SetColor(color)
 		nameLabel.Text = boss.Name
 		local index = table.find(PHASES, boss.Phase) or 1
 		phaseTag.Text = ("PHASE %d OF %d"):format(index, #PHASES)
 		phaseTag.TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.35)
-		fill.Size = UDim2.fromScale(math.clamp(boss.HP / boss.MaxHP, 0, 1), 1)
-		hpText.Text = ("%d / %d"):format(boss.HP, boss.MaxHP)
+		hpBar.Set(boss.HP / boss.MaxHP, ("%d / %d"):format(boss.HP, boss.MaxHP))
 		for i, name in PHASES do
 			local pip = pips[name]
 			if i == index then
 				pip.BackgroundColor3 = color
-				pip.TextColor3 = Color3.fromRGB(24, 22, 36)
+				pip.TextColor3 = Color3.new(1, 1, 1)
 			elseif i < index then
 				pip.BackgroundColor3 = color:Lerp(Color3.fromRGB(38, 42, 62), 0.7)
 				pip.TextColor3 = Color3.fromRGB(170, 178, 200)
 			else
-				pip.BackgroundColor3 = Color3.fromRGB(38, 42, 62)
-				pip.TextColor3 = Color3.fromRGB(120, 128, 155)
+				pip.BackgroundColor3 = Theme.Colors.PanelDark
+				pip.TextColor3 = Color3.fromRGB(150, 158, 190)
 			end
 		end
 		goal.Text = objective(boss, config)
+		goal.Visible = goal.Text ~= ""
+		goal.Size = UDim2.new(1, -32, 0, 22)
 
 		-- threat cards
 		local threats = boss.RT and boss.RT.Threats or {}
@@ -186,7 +198,7 @@ function BossHud.Build(parent, config)
 			c.Edge.BackgroundColor3 = stateColor
 			c.Fill.BackgroundColor3 = stateColor
 			c.Answer.Text = stopped and "Stopped." or c.Info.Answer
-			c.Answer.TextColor3 = stopped and Color3.fromRGB(150, 230, 180) or Color3.fromRGB(190, 198, 220)
+			c.Answer.TextColor3 = stopped and Color3.fromRGB(150, 240, 180) or Color3.fromRGB(236, 240, 255)
 		end
 		for id, c in cards do
 			if not seen[id] then

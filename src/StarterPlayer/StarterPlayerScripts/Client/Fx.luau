@@ -110,7 +110,7 @@ function Fx.Icon(parent, glyph, color, size, props)
 	end
 	make("UICorner", { CornerRadius = UDim.new(0, math.floor(size * 0.28)) }, tile)
 	make("UIGradient", { Color = ColorSequence.new(lighten(Color3.new(1, 1, 1), 0), darken(Color3.new(1, 1, 1), 0.35)), Rotation = 60 }, tile)
-	make("UIStroke", { Color = lighten(color, 0.45), Thickness = 2, Transparency = 0.25 }, tile)
+	make("UIStroke", { Color = Color3.fromRGB(26, 18, 40), Thickness = 3, LineJoinMode = Enum.LineJoinMode.Round }, tile)
 	make("TextLabel", {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
@@ -118,9 +118,10 @@ function Fx.Icon(parent, glyph, color, size, props)
 		Text = glyph,
 		TextSize = math.floor(size * 0.5),
 		TextColor3 = Color3.new(1, 1, 1),
-		TextStrokeTransparency = 0.5,
+		TextStrokeTransparency = 1,
 		ZIndex = (tile.ZIndex or 1) + 1,
 	}, tile)
+	make("UIStroke", { Color = Color3.fromRGB(26, 18, 40), Thickness = 2.5 }, tile:FindFirstChildOfClass("TextLabel"))
 	return tile
 end
 
