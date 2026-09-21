@@ -13,6 +13,7 @@ local Remotes = require(Shared.Remotes)
 local Achievements = require(Shared.Achievements)
 local Cosmetics = require(Shared.Cosmetics)
 local Dailies = require(Shared.Dailies)
+local Events = require(Shared.Events)
 local Data = require(script.Parent.Data)
 local Leaderboard = require(script.Parent.Leaderboard)
 local Purchases = require(script.Parent.Purchases)
@@ -30,6 +31,7 @@ local DailiesConfig = Config.Dailies
 local WeekliesConfig = Config.Weeklies
 local AchievementsConfig = Config.Achievements
 local CosmeticsConfig = Config.Cosmetics
+local EventsConfig = Config.Events
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -68,6 +70,11 @@ end
 
 local function upgradeLevel(data: any, id: string): number
 	return data.Upgrades[id] or 0
+end
+
+-- What the calendar currently changes for everyone (see Config/Events.luau).
+local function activeEvents()
+	return Events.Active(os.time(), EventsConfig)
 end
 
 -- Today's objectives (same for everyone) and this player's record, reset if the UTC day rolled over.
@@ -131,6 +138,13 @@ local function snapshot(player: Player): { [string]: any }?
 	end
 	return {
 		Passes = passes,
+		Events = (function()
+			local list = {}
+			for _, e in activeEvents() do
+				table.insert(list, { Name = e.Name, Description = e.Description, EndsIn = e.EndsIn })
+			end
+			return list
+		end)(),
 		Goals = Achievements.View(data, AchievementsConfig),
 		Styles = Cosmetics.View(data, CosmeticsConfig, AchievementsConfig),
 		ActiveStyle = Cosmetics.Active(data, CosmeticsConfig).Id,
@@ -181,9 +195,10 @@ local function startSeam(player: Player)
 	end
 	seamCounter += 1
 	local stratum = WorldConfig.Sites[siteId].Stratum
-	local chance = Tuning.MutationChance * (Purchases.Owns(player, "PrismaticLuck") and 2 or 1)
+	local fx = Events.Combine(activeEvents())
+	local chance = Tuning.MutationChance * (Purchases.Owns(player, "PrismaticLuck") and 2 or 1) * fx.MutationMult
 	local grid = Seam.Generate(Crystals, Tuning, stratum, seamCounter * 7919 + player.UserId % 100003 + os.time(), chance)
-	local max = Tuning.BaseCharges + upgradeLevel(data, "ExtraCharge") * Upgrades.Defs.ExtraCharge.PerLevel
+	local max = Tuning.BaseCharges + upgradeLevel(data, "ExtraCharge") * Upgrades.Defs.ExtraCharge.PerLevel + fx.ChargeBonus
 	local seam: SeamState = {
 		Id = seamCounter,
 		SiteId = siteId,
@@ -288,8 +303,8 @@ local function onDetonate(player: Player, payload: any)
 			data.Codex.Mutated[ev.Kind] = true
 		end
 	end
-	local multiplier = Purchases.Owns(player, "DoubleShards") and 2 or 1
-	local payout = result.Total * multiplier
+	local multiplier = (Purchases.Owns(player, "DoubleShards") and 2 or 1) * Events.Combine(activeEvents()).ShardMult
+	local payout = math.floor(result.Total * multiplier + 0.5)
 	seam.Popped += valuablePops
 	seam.Earned += payout
 	data.Shards += payout

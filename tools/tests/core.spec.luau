@@ -1243,5 +1243,87 @@ test("balance: one charge never clears the grid on average (planning matters) an
 	end
 end)
 
+local Events = require("../../src/ReplicatedStorage/Shared/Events")
+local EventsCfg = require("../../src/ReplicatedStorage/Shared/Config/Events")
+
+local MONDAY = 1704067200 -- 2024-01-01 00:00:00 UTC
+local DAY, HOUR = 86400, 3600
+
+local function ids(list)
+	local out = {}
+	for _, e in list do out[e.Id] = true end
+	return out
+end
+
+test("events: day of week is Monday-based and rolls over at UTC midnight", function()
+	eq(Events.DayOfWeek(MONDAY), 0, "Monday")
+	eq(Events.DayOfWeek(MONDAY + DAY - 1), 0, "still Monday one second before midnight")
+	eq(Events.DayOfWeek(MONDAY + DAY), 1, "Tuesday")
+	eq(Events.DayOfWeek(MONDAY + 5 * DAY), 5, "Saturday")
+	eq(Events.DayOfWeek(MONDAY + 6 * DAY), 6, "Sunday")
+	eq(Events.DayOfWeek(MONDAY + 7 * DAY), 0, "Monday again")
+end)
+
+test("events: the weekend event covers Saturday and Sunday exactly", function()
+	local weekend = EventsCfg.Defs[1]
+	eq(weekend.Id, "PrismaticWeekend", "first event is the weekend one")
+	eq(ids(Events.Active(MONDAY + 4 * DAY + 23 * HOUR + 3599, EventsCfg)).PrismaticWeekend, nil, "Friday 23:59:59 is not the weekend")
+	eq(ids(Events.Active(MONDAY + 5 * DAY, EventsCfg)).PrismaticWeekend, true, "Saturday 00:00:00 starts it")
+	eq(ids(Events.Active(MONDAY + 6 * DAY + 23 * HOUR + 3599, EventsCfg)).PrismaticWeekend, true, "Sunday 23:59:59 is still in it")
+	eq(ids(Events.Active(MONDAY + 7 * DAY, EventsCfg)).PrismaticWeekend, nil, "Monday 00:00:00 ends it")
+end)
+
+test("events: a daily window includes its start, excludes its end, and reports time left", function()
+	local hh
+	for _, d in EventsCfg.Defs do if d.Id == "HappyHour" then hh = d end end
+	local startAt = MONDAY + hh.StartHour * HOUR
+	eq(ids(Events.Active(startAt - 1, EventsCfg)).HappyHour, nil, "one second before")
+	eq(ids(Events.Active(startAt, EventsCfg)).HappyHour, true, "at the start")
+	local endAt = MONDAY + hh.EndHour * HOUR
+	eq(ids(Events.Active(endAt - 1, EventsCfg)).HappyHour, true, "one second before the end")
+	eq(ids(Events.Active(endAt, EventsCfg)).HappyHour, nil, "at the end")
+	for _, e in Events.Active(startAt + 1800, EventsCfg) do
+		if e.Id == "HappyHour" then eq(e.EndsIn, (hh.EndHour - hh.StartHour) * HOUR - 1800, "time left counts down to the end of the window") end
+	end
+end)
+
+test("events: effects combine (multiply rates, add charges) and nothing active means no change", function()
+	local none = Events.Combine({})
+	eq(none.MutationMult, 1, "no mutation change")
+	eq(none.ShardMult, 1, "no shard change")
+	eq(none.ChargeBonus, 0, "no extra charges")
+	local saturdayHappyHour
+	for _, d in EventsCfg.Defs do if d.Id == "HappyHour" then saturdayHappyHour = MONDAY + 5 * DAY + d.StartHour * HOUR + 60 end end
+	local both = Events.Combine(Events.Active(saturdayHappyHour, EventsCfg))
+	eq(both.MutationMult > 1, true, "weekend raises Prismatic chance")
+	eq(both.ShardMult > 1, true, "happy hour raises payouts")
+	local wednesday = Events.Combine(Events.Active(MONDAY + 2 * DAY + 12 * HOUR, EventsCfg))
+	eq(wednesday.ChargeBonus >= 1, true, "midweek event gives an extra charge")
+	local manual = Events.Combine({ { Effects = { ShardMult = 2 } }, { Effects = { ShardMult = 3, ChargeBonus = 1 } }, { Effects = { ChargeBonus = 2 } } })
+	eq(manual.ShardMult, 6, "shard multipliers multiply")
+	eq(manual.ChargeBonus, 3, "charge bonuses add")
+end)
+
+test("events: config is valid (unique ids, real weekdays and hours, known positive effects)", function()
+	local seen = {}
+	local KNOWN = { MutationMult = true, ShardMult = true, ChargeBonus = true }
+	for _, d in EventsCfg.Defs do
+		if seen[d.Id] then error("duplicate event " .. d.Id) end
+		seen[d.Id] = true
+		if type(d.Name) ~= "string" or d.Name == "" or type(d.Description) ~= "string" or d.Description == "" then error(d.Id .. " needs a name and description") end
+		if #d.Weekdays == 0 then error(d.Id .. " never happens") end
+		for _, w in d.Weekdays do if w < 0 or w > 6 or w % 1 ~= 0 then error(d.Id .. " has an invalid weekday") end end
+		if not (d.StartHour >= 0 and d.EndHour <= 24 and d.StartHour < d.EndHour) then error(d.Id .. " has an invalid time window") end
+		local any = false
+		for k, v in d.Effects do
+			if not KNOWN[k] then error(d.Id .. " has unknown effect " .. k) end
+			if type(v) ~= "number" or v <= 0 then error(d.Id .. " effect " .. k .. " must be positive") end
+			any = true
+		end
+		if not any then error(d.Id .. " has no effect") end
+		if d.Effects.ShardMult and d.Effects.ShardMult > 3 then error(d.Id .. " shard bonus is too generous") end
+	end
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

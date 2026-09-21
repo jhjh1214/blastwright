@@ -83,6 +83,7 @@ local function commas(n)
 	return (out:gsub("^,", ""))
 end
 
+local eventLabel
 local gui, shardLabel, locationLabel, cacheLabel, objectiveCard, objectiveText, blastHint, seamLabel, chainLabel, previewFrame, previewLabel, infoLabel
 local welcomeFrame, menuDot, detonateStroke
 local detonatePulse = false
@@ -132,6 +133,7 @@ function UI.Init()
 	----------------------------------------------------------- roaming HUD
 	roamGroup = fullGroup("Roam")
 	locationLabel = label(roamGroup, "", 20, THEME.Text, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(320, 28) })
+	eventLabel = label(roamGroup, "", 13, THEME.Gold, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 52), Size = UDim2.fromOffset(200, 34), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Right, TextYAlignment = Enum.TextYAlignment.Top, Visible = false })
 	cacheLabel = label(roamGroup, "", 16, THEME.Dim, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.fromOffset(170, 22), TextXAlignment = Enum.TextXAlignment.Left })
 	objectiveCard = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.2, Position = UDim2.new(0, 12, 0, 80), Size = UDim2.fromOffset(250, 0), AutomaticSize = Enum.AutomaticSize.Y, Visible = false }, roamGroup)
 	corner(objectiveCard, 12)
@@ -633,6 +635,18 @@ function UI.Refresh()
 		end
 	end
 	menuDot.Visible = claimable
+
+	-- Live event banner (first active event; "+N" if there are more).
+	local events = d.Events or {}
+	if #events > 0 then
+		local first = events[1]
+		local left = math.max(0, first.EndsIn - (os.clock() - (State.EventsAt or os.clock())))
+		local when = left >= 3600 and ("%dh %02dm"):format(left // 3600, (left % 3600) // 60) or ("%dm"):format(math.ceil(left / 60))
+		eventLabel.Text = ("★ %s: %s (ends in %s)%s"):format(first.Name, first.Description, when, #events > 1 and (" +" .. (#events - 1) .. " more") or "")
+		eventLabel.Visible = true
+	else
+		eventLabel.Visible = false
+	end
 	UI.RefreshSettings()
 
 	rebuildCharges()

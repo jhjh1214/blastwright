@@ -9,6 +9,7 @@
 | 5 Game feel | Hooks exist (VFX, shake, tiers); tuning needs playtest |
 | 6 Progression | Basic (upgrades, charges, strata, Codex) |
 | 7 World/content | Explorable mine built (hub, 4 biomes, 16 pads, 22 caches, terrain); **unseen in Studio** |
+| Live ops | Calendar events (weekend, midweek, happy hour) with a HUD banner (unseen in Studio) |
 | Retention | Daily objectives, weekly challenges and 23 goals (unseen in Studio) |
 | 8 Collection | Codex, 23 milestone Goals and 7 blast colors (unseen in Studio) |
 | 9 Economy | Simulated with real rules (tools/sim); prices and crystal mix rebalanced from it; not playtested |
