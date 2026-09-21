@@ -1,6 +1,6 @@
 # Manual Actions
 
-See `docs/PUBLISH_GUIDE.md` for the single ordered list, `docs/PAID_ITEMS_GUIDE.md` for creating the paid items and `docs/SHOP_ART_GUIDE.md` for painted shop art. The blocks below are the detailed versions.
+See `docs/MANUAL_TODO.md` for the master checklist (with all art prompts), `docs/PUBLISH_GUIDE.md` for the short ordered list, `docs/PAID_ITEMS_GUIDE.md` for creating the paid items and `docs/SHOP_ART_GUIDE.md` for painted shop art. The blocks below are the detailed versions.
 
 ```
 ========================================

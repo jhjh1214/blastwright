@@ -1,5 +1,7 @@
 # Publish guide: everything only you can do
 
+**The complete checklist, including every image to make with ready-to-paste prompts, is `docs/MANUAL_TODO.md`. Start there.** This file is the shorter ordered version.
+
 Single ordered list of every manual step, so you can finish and publish the game without Claude. Code-side work is done; these steps need your Roblox account, Studio, or your own taste. Tick them off in order. Details for each live in the linked docs.
 
 ## 1. Run it once (30 min)

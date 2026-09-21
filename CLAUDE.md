@@ -18,6 +18,7 @@
 - Not started: mobile testing.
 - Stratum 3 (Slowburn delayed-fuse crystal) added and unit-tested; its visuals, fuse flash and Codex entry are **not yet seen in Studio**.
 - Playtest 2026-09-21: world build died on an invalid `SurfaceGui` property (fixed; API checker added). Lighting/crystal glow retuned after "too dark / too bright" feedback; guide system (objective card, marker, trail, edge arrow, welcome panel) added. **Both unseen in Studio.**
+- Manual work and asset prompts: docs/MANUAL_TODO.md.
 - Next: developer runs the first full playtest (docs/TESTING.md), then follows docs/PUBLISH_GUIDE.md (the single ordered list of every manual step: balance, publish, products, assets, presentation).
 
 ## Environment (Windows, PowerShell)
