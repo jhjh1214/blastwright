@@ -704,6 +704,47 @@ local function rebuildPanel()
 				if style.Owned and not style.Equipped then Remotes.Equip:FireServer(style.Id) end
 			end, Color3.fromRGB(c[1], c[2], c[3]))
 		end
+		-- Monsters, bosses, relics and boss mastery: the long-term "I have not seen everything yet" list.
+		local col = d.Collection
+		if col then
+			order += 1
+			header(order, "Lurkers (kills)")
+			for _, r in col.Lurkers do
+				order += 1
+				row(order, r.Found and ("%s  x%d"):format(r.Name, r.Kills) or "???", r.Found and r.Description or "Not met yet", nil, false, nil, r.Found and THEME.Text or THEME.Dim)
+			end
+			order += 1
+			header(order, "Bosses")
+			for _, r in col.Bosses do
+				order += 1
+				row(order, r.Found and ("%s  x%d"):format(r.Name, r.Kills) or "???", r.Found and r.Description or "Reach floor 4 of an Expedition", nil, false, nil, r.Found and THEME.Gold or THEME.Dim)
+			end
+			order += 1
+			header(order, ("Relics found %d/%d"):format(col.RelicsFound, col.RelicsTotal))
+			for _, r in col.Relics do
+				order += 1
+				row(order, r.Found and ("%s  [%s]"):format(r.Name, r.Family) or "???", r.Found and r.Description or "Find it in an Expedition", nil, false, nil, r.Found and THEME.Text or THEME.Dim)
+			end
+		end
+		local mastery = d.Mastery
+		if mastery then
+			order += 1
+			header(order, "Boss mastery (each one gives a title to wear)")
+			for _, obj in mastery.Objectives do
+				order += 1
+				local worn = mastery.Title == obj.Title
+				local btnText = not obj.Done and "Locked" or (worn and "Worn" or "Wear")
+				row(order, obj.Name .. "  [" .. obj.Title .. "]", obj.Description .. ("  Reward: %s"):format(commas(obj.Reward)), btnText, obj.Done and not worn, function()
+					if obj.Done and not worn then Remotes.EquipTitle:FireServer(obj.Title) end
+				end, obj.Done and THEME.Gold or THEME.Dim)
+			end
+			if mastery.Title ~= "" then
+				order += 1
+				row(order, "Take off title", "Remove the title above your head.", "Remove", true, function()
+					Remotes.EquipTitle:FireServer("")
+				end)
+			end
+		end
 		titleLabel.Text = ("Codex  %d/%d"):format(found, #Config.Crystals.Order)
 	end
 end

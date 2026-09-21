@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 11
+Schema.CURRENT_VERSION = 12
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -21,6 +21,8 @@ function Schema.Default(): { [string]: any }
 		Achievements = { Claimed = {} }, -- [goalId] = true once the reward was taken (see Shared/Achievements.luau)
 		Puzzle = { Day = 0, Score = 0, Par = 0, Medal = "", Streak = 0, LastDay = 0, BestStreak = 0 }, -- see Shared/Puzzle.luau
 		Farm = { Level = 1, LastCollect = 0 }, -- see Shared/Farm.luau (LastCollect 0 = stamped with the time on first load)
+		Collection = { Lurkers = {}, Bosses = {}, Relics = {} }, -- see Shared/Mastery.luau: kill counts and relics found
+		Mastery = { Done = {}, Title = "" }, -- boss mastery objectives done and the title worn
 		Purchases = {}, -- receipt ids, reserved for monetization
 	}
 end
@@ -90,6 +92,15 @@ local Migrations: { [number]: (data: { [string]: any }) -> () } = {
 	[11] = function(data)
 		if type(data.Stats) == "table" and type(data.Stats.BossesSlain) ~= "number" then
 			data.Stats.BossesSlain = 0
+		end
+	end,
+	-- v12: collection log and boss mastery. Missing records are filled from defaults by reconcile; nothing to convert.
+	[12] = function(data)
+		if type(data.Collection) ~= "table" then
+			data.Collection = { Lurkers = {}, Bosses = {}, Relics = {} }
+		end
+		if type(data.Mastery) ~= "table" then
+			data.Mastery = { Done = {}, Title = "" }
 		end
 	end,
 }

@@ -25,6 +25,7 @@ return {
 	Farm = require(script.Farm),
 	Lurkers = require(script.Lurkers),
 	Bosses = require(script.Bosses),
+	Mastery = require(script.Mastery),
 	Tuning = Tuning,
 	Context = {
 		Crystals = Crystals.Defs,

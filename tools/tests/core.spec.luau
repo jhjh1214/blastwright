@@ -2526,7 +2526,7 @@ test("schema: v10 saves migrate to v11 with a bosses counter and keep every othe
 	eq(d.Stats.BossesSlain, 0, "defaults to 0")
 	eq(d.Stats.LurkersSlain, 7, "existing stat kept")
 	eq(d.Stats.TotalPops, 20, "existing stat kept")
-	eq(Schema.CURRENT_VERSION, 11, "version")
+	eq(Schema.CURRENT_VERSION >= 11, true, "version")
 end)
 
 local BossFloorsCfg = require("../../src/ReplicatedStorage/Shared/Config/Bosses").BossFloors
@@ -2777,6 +2777,118 @@ test("lurker: a Skitter stops after eating, and one boxed in by hazards simply s
 	local b = Lurker.New("Skitter", 5, 5, LurkerCfg)
 	local act = Lurker.Act(b, boxed, lctx, LurkerCfg)
 	eq(b.X == 5 and b.Z == 5 and act.Moved == false, true, "nowhere to step")
+end)
+
+local Mastery = require("../../src/ReplicatedStorage/Shared/Mastery")
+local MasteryCfg = require("../../src/ReplicatedStorage/Shared/Config/Mastery")
+local function fresh() return { Done = {}, Title = "" } end
+local function perfect() return { HeartsLost = 0, Volleys = 6, FinalPops = 25, HeartsLeft = 3 } end
+local function ids(list) local out = {} for _, o in list do out[#out + 1] = o.Id end return table.concat(out, ",") end
+
+test("mastery: a flawless, fast, big-finish fight completes those three but not Iron Will", function()
+	local got = Mastery.Evaluate("Titan", perfect(), {}, MasteryCfg)
+	eq(ids(got), "TitanFlawless,TitanSwift,TitanBigFinish", "config order, iron will needs exactly 1 heart")
+end)
+
+test("mastery: every check kind is inclusive at its boundary and fails just outside", function()
+	local function has(metrics, id) for _, o in Mastery.Evaluate("Titan", metrics, {}, MasteryCfg) do if o.Id == id then return true end end return false end
+	local base = { HeartsLost = 1, Volleys = 99, FinalPops = 0, HeartsLeft = 2 }
+	local function with(k, v) local m = table.clone(base) m[k] = v return m end
+	eq(has(with("HeartsLost", 0), "TitanFlawless"), true, "0 hearts lost")
+	eq(has(with("HeartsLost", 1), "TitanFlawless"), false, "1 heart lost")
+	eq(has(with("Volleys", 8), "TitanSwift"), true, "exactly 8 volleys")
+	eq(has(with("Volleys", 9), "TitanSwift"), false, "9 volleys")
+	eq(has(with("FinalPops", 20), "TitanBigFinish"), true, "exactly 20 pops")
+	eq(has(with("FinalPops", 19), "TitanBigFinish"), false, "19 pops")
+	eq(has(with("HeartsLeft", 1), "TitanIronWill"), true, "exactly 1 heart")
+	eq(has(with("HeartsLeft", 2), "TitanIronWill"), false, "2 hearts is too safe")
+	eq(has(with("HeartsLeft", 0), "TitanIronWill"), false, "0 hearts is not a win")
+end)
+
+test("mastery: objectives already done are not offered again, and other bosses' objectives are ignored", function()
+	eq(ids(Mastery.Evaluate("Titan", perfect(), { TitanFlawless = true }, MasteryCfg)), "TitanSwift,TitanBigFinish", "flawless already done")
+	eq(ids(Mastery.Evaluate("Nobody", perfect(), {}, MasteryCfg)), "", "no objectives for an unknown boss")
+end)
+
+test("mastery: granting marks objectives done, pays once, and a repeat pays nothing", function()
+	local m = fresh()
+	local got = Mastery.Evaluate("Titan", perfect(), m.Done, MasteryCfg)
+	local reward = Mastery.Grant(m, got)
+	local expected = 0
+	for _, o in got do expected += o.Reward end
+	eq(reward, expected, "the sum of the rewards")
+	eq(m.Done.TitanFlawless, true, "marked")
+	eq(Mastery.Grant(m, got), 0, "a second grant pays nothing")
+end)
+
+test("mastery: titles come only from completed objectives and only earned titles can be worn", function()
+	local m = fresh()
+	eq(#Mastery.Titles(m, MasteryCfg), 0, "none yet")
+	eq(Mastery.Equip(m, "Untouchable", MasteryCfg), false, "not earned")
+	eq(m.Title, "", "unchanged")
+	Mastery.Grant(m, Mastery.Evaluate("Titan", perfect(), m.Done, MasteryCfg))
+	eq(Mastery.Equip(m, "Untouchable", MasteryCfg), true, "earned")
+	eq(m.Title, "Untouchable", "worn")
+	eq(Mastery.Equip(m, "Cataclysm", MasteryCfg), false, "Iron Will not done")
+	eq(m.Title, "Untouchable", "still the old one")
+	eq(Mastery.Equip(m, "", MasteryCfg), true, "can take it off")
+	eq(m.Title, "", "removed")
+	eq(Mastery.Equip(m, 5, MasteryCfg), false, "junk")
+	eq(Mastery.Equip(m, nil, MasteryCfg), false, "nil")
+	eq(Mastery.Equip(m, { "Untouchable" }, MasteryCfg), false, "a table is not a title")
+end)
+
+test("mastery: the view lists every objective with its state", function()
+	local m = fresh()
+	m.Done.TitanSwift = true
+	local v = Mastery.View(m, MasteryCfg)
+	eq(#v, #MasteryCfg.Objectives, "all objectives")
+	for _, row in v do eq(row.Done, row.Id == "TitanSwift", row.Id) end
+end)
+
+test("mastery: config is valid (unique ids and titles, known checks, positive values, existing bosses)", function()
+	local seen, titles = {}, {}
+	local KNOWN = { HeartsLostAtMost = true, VolleysAtMost = true, FinalPopsAtLeast = true, EndedWithHearts = true }
+	for _, o in MasteryCfg.Objectives do
+		eq(seen[o.Id], nil, "duplicate id " .. o.Id) seen[o.Id] = true
+		eq(titles[o.Title], nil, "duplicate title " .. o.Title) titles[o.Title] = true
+		eq(KNOWN[o.Check], true, o.Id .. " uses a known check")
+		eq(o.Reward > 0 and o.Value >= 0, true, o.Id .. " numbers")
+		eq(BossCfg.Defs[o.Boss] ~= nil, true, o.Id .. " names a real boss")
+		eq(o.Title ~= "" and #o.Title <= 24, true, o.Id .. " title fits above a head")
+	end
+end)
+
+test("collection: kills and relics are recorded and the view marks what has been found", function()
+	local col = { Lurkers = {}, Bosses = {}, Relics = {} }
+	Mastery.RecordLurker(col, "Gnasher") Mastery.RecordLurker(col, "Gnasher") Mastery.RecordLurker(col, "Brute")
+	Mastery.RecordBoss(col, "Titan")
+	Mastery.RecordRelic(col, "IronRig") Mastery.RecordRelic(col, "IronRig")
+	eq(col.Lurkers.Gnasher, 2, "two kills")
+	local v = Mastery.CollectionView(col, LurkerCfg, BossCfg, ExpCfg)
+	eq(#v.Lurkers, #LurkerCfg.Order, "every lurker has a row")
+	local found = 0
+	for _, r in v.Lurkers do if r.Found then found += 1 end end
+	eq(found, 2, "two kinds found")
+	eq(v.Lurkers[1].Kills, 2, "the count shows")
+	eq(v.Bosses[1].Found, true, "boss found")
+	eq(v.RelicsFound, 1, "one distinct relic")
+	local n = 0 for _ in ExpCfg.Relics do n += 1 end
+	eq(v.RelicsTotal, n, "total relics")
+	eq(#v.Relics, n, "a row per relic")
+end)
+
+test("schema: v11 saves migrate to v12 with a collection log and mastery record and keep everything else", function()
+	local d = Schema.Migrate({ SchemaVersion = 11, Shards = 9 })
+	eq(d.Shards, 9, "shards kept")
+	eq(next(d.Collection.Lurkers), nil, "empty lurker log")
+	eq(next(d.Collection.Relics), nil, "empty relic log")
+	eq(next(d.Mastery.Done), nil, "nothing mastered")
+	eq(d.Mastery.Title, "", "no title")
+	eq(Schema.CURRENT_VERSION, 12, "version")
+	local bad = Schema.Migrate({ SchemaVersion = 12, Mastery = "junk", Collection = 5 })
+	eq(type(bad.Mastery), "table", "junk mastery replaced")
+	eq(type(bad.Collection.Lurkers), "table", "junk collection replaced")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

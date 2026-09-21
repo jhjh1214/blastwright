@@ -21,6 +21,7 @@ local Farm = require(Shared.Farm)
 local Lurker = require(Shared.Lurker)
 local Power = require(Shared.Power)
 local Boss = require(Shared.Boss)
+local Mastery = require(Shared.Mastery)
 local Data = require(script.Parent.Data)
 local Leaderboard = require(script.Parent.Leaderboard)
 local Purchases = require(script.Parent.Purchases)
@@ -47,6 +48,7 @@ local FarmConfig = Config.Farm
 local LurkerConfig = Config.Lurkers
 local BossConfig = Config.Bosses
 local PowerConfig = Config.Bosses.Power
+local MasteryConfig = Config.Mastery
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -74,6 +76,7 @@ type SeamState = {
 	BountyMult: number?, -- room and relic scaling of a Lurker's bounty
 	RelicReward: boolean?, -- an Elite room: killing its Lurker grants a relic
 	MonsterHPMult: number?,
+	BossStats: { Volleys: number, HeartsLost: number }?, -- metrics for boss mastery
 	Hidden: { Kind: string, X: number, Z: number }?, -- a Lurker hiding under a crystal: SECRET, never sent to clients
 	Monster: Lurker.Monster?, -- an awake Lurker on the grid
 	Defeated: boolean?, -- the rig was knocked out
@@ -153,6 +156,39 @@ local function notify(player: Player, text: string, kind: string)
 end
 
 -- Tell the player the moment a goal becomes claimable (not for ones that were already done when they joined).
+-- The worn title floats above the player's head (visible to everyone: a cosmetic flex, never a stat).
+local function applyTitle(player: Player)
+	local data = Data.Get(player)
+	local character = player.Character
+	local head = character and character:FindFirstChild("Head")
+	if not data or not head then
+		return
+	end
+	local old = head:FindFirstChild("TitleTag")
+	if old then
+		old:Destroy()
+	end
+	local title = data.Mastery.Title
+	if title == "" then
+		return
+	end
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "TitleTag"
+	gui.Size = UDim2.fromOffset(200, 26)
+	gui.StudsOffset = Vector3.new(0, 2.8, 0)
+	gui.MaxDistance = 70
+	gui.Parent = head
+	local text = Instance.new("TextLabel")
+	text.BackgroundTransparency = 1
+	text.Size = UDim2.fromScale(1, 1)
+	text.Font = Enum.Font.GothamBold
+	text.TextSize = 16
+	text.TextColor3 = Color3.fromRGB(255, 205, 90)
+	text.TextStrokeTransparency = 0.4
+	text.Text = title
+	text.Parent = gui
+end
+
 local function announceGoals(player: Player)
 	local data = Data.Get(player)
 	local seen = seenGoals[player]
@@ -210,6 +246,8 @@ local function snapshot(player: Player): { [string]: any }?
 		ChargesLeft = seam and seam.Charges or 0,
 		ChargesMax = seam and seam.ChargesMax or 0,
 		Hearts = seam and seam.Hearts or 0,
+		Collection = Mastery.CollectionView(data.Collection, LurkerConfig, BossConfig, ExpeditionConfig),
+		Mastery = { Objectives = Mastery.View(data.Mastery, MasteryConfig), Titles = Mastery.Titles(data.Mastery, MasteryConfig), Title = data.Mastery.Title },
 		Critical = seam and seam.Critical or 0,
 		DodgeArmed = seam and seam.DodgeArmed or false,
 		Boss = seam and seam.Boss and Boss.View(seam.Boss, BossConfig) or nil,
@@ -365,6 +403,7 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 	local bossKind = run and BossConfig.BossFloors[run.Floor]
 	if bossKind then
 		seam.Boss = Boss.New(bossKind, grid, { Crystals = Config.Context.Crystals }, BossConfig, runRng)
+		seam.BossStats = { Volleys = 0, HeartsLost = 0 }
 		seam.Valuable = Seam.CountValuable(grid, Crystals) -- the core was cleared
 		seam.Charges = math.max(seam.Charges, run.StartCharges) -- a boss fight always starts with a full rig
 		seam.ChargesMax = math.max(seam.ChargesMax, run.StartCharges)
@@ -589,6 +628,7 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 				seam.Earned += bounty
 			end
 			data.Stats.LurkersSlain += 1
+			Mastery.RecordLurker(data.Collection, m.Kind)
 			local slayMods = seam.Run and Expedition.Modifiers(seam.Run, ExpeditionConfig) or nil
 			if slayMods and slayMods.KillRefund > 0 then
 				seam.Charges = math.min(seam.ChargesMax, seam.Charges + slayMods.KillRefund)
@@ -600,6 +640,7 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 				local beforeStart = run.StartCharges
 				local id = Expedition.GrantRelic(run, runRng, ExpeditionConfig)
 				if id then
+					Mastery.RecordRelic(data.Collection, id)
 					seam.Hearts = run.Hearts or seam.Hearts
 					seam.HeartsMax = LurkerConfig.Hearts + Expedition.HeartsBonus(run, ExpeditionConfig)
 					local extra = run.StartCharges - beforeStart
@@ -662,6 +703,9 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 	local mctx = { Crystals = Config.Context.Crystals, Charges = Config.Context.Charges, BlastCells = ChainSim.BlastCells, Size = seam.Grid.Size }
 	local turn = { UserId = player.UserId, Eaten = {}, Hearts = seam.Hearts }
 	local out = Boss.Apply(boss, volley, result, mctx, BossConfig, power, seam.Grid, runRng)
+	local stats = seam.BossStats or { Volleys = 0, HeartsLost = 0 }
+	seam.BossStats = stats
+	stats.Volleys += 1
 	turn.BossDamage = out.Damage
 	if out.NodesBroken > 0 then
 		notify(player, ("Armor node broken! %d left."):format(#boss.Nodes), "Reward")
@@ -673,6 +717,14 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 		seam.BossDefeated = true
 		seam.Boss = nil
 		data.Stats.BossesSlain += 1
+		Mastery.RecordBoss(data.Collection, boss.Kind)
+		local newly = Mastery.Evaluate(boss.Kind, { HeartsLost = stats.HeartsLost, Volleys = stats.Volleys, FinalPops = result.Pops, HeartsLeft = seam.Hearts }, data.Mastery.Done, MasteryConfig)
+		if #newly > 0 then
+			award(data, Mastery.Grant(data.Mastery, newly))
+			for _, obj in newly do
+				notify(player, ("MASTERY: %s! Title unlocked: %s (+%d shards)"):format(obj.Name, obj.Title, obj.Reward), "Reward")
+			end
+		end
 		turn.BossSlain = true
 		notify(player, ("%s DEFEATED! +%d shards to the haul"):format(def.Name, reward), "Reward")
 		announceGoals(player)
@@ -693,6 +745,7 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 		elseif act.HeartsLost > 0 then
 			seam.Hearts = math.max(0, seam.Hearts - act.HeartsLost)
 			turn.HeartsLost = act.HeartsLost
+			stats.HeartsLost += act.HeartsLost
 			notify(player, ("The Titan's slam hit your rig! Hearts left: %d"):format(seam.Hearts), "Error")
 			if seam.Hearts <= 0 then
 				seam.Defeated = true
@@ -960,6 +1013,17 @@ local function onFarmAction(player: Player, action: any)
 	sync(player)
 end
 
+local function onEquipTitle(player: Player, title: any)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	if Mastery.Equip(data.Mastery, title, MasteryConfig) then
+		applyTitle(player)
+		sync(player)
+	end
+end
+
 local function onSetting(player: Player, name: any, value: any)
 	local data = Data.Get(player)
 	local key, enabled = Validate.Setting(name, value)
@@ -1148,7 +1212,11 @@ local function onRunPick(player: Player, choice: any)
 		sync(player)
 		return
 	end
+	local pickedRelic = type(choice) == "number" and run.Choices[choice] and run.Choices[choice].Relic or nil
 	if Expedition.Pick(run, choice, ExpeditionConfig, runRng) then
+		if pickedRelic then
+			Mastery.RecordRelic(data.Collection, pickedRelic)
+		end
 		local cap = LurkerConfig.Hearts + Expedition.HeartsBonus(run, ExpeditionConfig)
 		run.Hearts = math.min(cap, (run.Hearts or cap) + 1) -- a breather between floors
 		startSeam(player, run) -- descend: generates the next floor and tells everyone
@@ -1239,6 +1307,10 @@ end
 
 local function onPlayerAdded(player: Player)
 	player.CharacterAdded:Connect(function(character)
+		task.spawn(function()
+			character:WaitForChild("Head", 5)
+			applyTitle(player)
+		end)
 		local humanoid = character:WaitForChild("Humanoid", 5)
 		if humanoid then
 			(humanoid :: Humanoid).Died:Connect(function()
@@ -1324,6 +1396,7 @@ function Game.Init()
 	Remotes.Equip.OnServerEvent:Connect(guarded("Equip", 5, 8, onEquip))
 	Remotes.Setting.OnServerEvent:Connect(guarded("Setting", 5, 8, onSetting))
 	Remotes.RunPick.OnServerEvent:Connect(guarded("RunPick", 5, 8, onRunPick))
+	Remotes.EquipTitle.OnServerEvent:Connect(guarded("EquipTitle", 3, 5, onEquipTitle))
 	Remotes.Dodge.OnServerEvent:Connect(guarded("Dodge", 4, 6, onDodge))
 	Remotes.FarmAction.OnServerEvent:Connect(guarded("FarmAction", 3, 5, onFarmAction))
 	Remotes.PuzzleStart.OnServerEvent:Connect(guarded("PuzzleStart", 2, 3, onPuzzleStart))
