@@ -6,6 +6,7 @@
 -- Flat, dark plates with a coloured edge; display font for titles, clean body font. No glows, no strokes on text.
 local TweenService = game:GetService("TweenService")
 local Theme = require(script.Parent.Theme)
+local Calm = require(script.Parent.Calm)
 local Icons = require(script.Parent.Icons)
 
 local Feed = {}
@@ -148,7 +149,7 @@ end
 
 local bannerQueue = {}
 local bannerBusy = false
-local plate, bannerTitle, bannerSub, bannerRule, bannerStroke
+local plate, bannerTitle, bannerSub, bannerRule, bannerStroke, plateScale
 
 local function ensureBanner()
 	if plate then
@@ -156,6 +157,7 @@ local function ensureBanner()
 	end
 	plate = make("Frame", { Name = "Banner", BackgroundColor3 = Theme.Colors.Panel, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.26), Size = UDim2.fromOffset(560, 112), Visible = false, BorderSizePixel = 0, ZIndex = Theme.Z.Banner }, gui)
 	make("UICorner", { CornerRadius = UDim.new(0, 20) }, plate)
+	plateScale = make("UIScale", { Scale = 1 }, plate)
 	make("UISizeConstraint", { MaxSize = Vector2.new(600, 130) }, plate)
 	bannerStroke = make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 5, LineJoinMode = Enum.LineJoinMode.Round }, plate)
 	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(Theme.Colors.Panel, 0.12), Theme.Shade(Theme.Colors.Panel, 0.3)), Rotation = 90 }, plate)
@@ -180,7 +182,9 @@ local function playNext()
 	bannerSub.Text = item.Subtitle or ""
 	bannerRule.BackgroundColor3 = item.Color
 	bannerTitle.TextColor3 = item.Color:Lerp(Color3.new(1, 1, 1), 0.35)
-	plate.Position = UDim2.fromScale(0.5, 0.22)
+	local shownY = item.Calm and 0.2 or 0.26
+	plateScale.Scale = item.Calm and 0.62 or 1
+	plate.Position = UDim2.fromScale(0.5, shownY - 0.04)
 	plate.BackgroundTransparency = 1
 	bannerStroke.Transparency = 1
 	plate.Visible = true
@@ -188,14 +192,14 @@ local function playNext()
 	bannerTitle.TextTransparency = 1
 	bannerSub.TextTransparency = 1
 	local slide = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-	TweenService:Create(plate, slide, { Position = UDim2.fromScale(0.5, 0.26), BackgroundTransparency = 0 }):Play()
+	TweenService:Create(plate, slide, { Position = UDim2.fromScale(0.5, shownY), BackgroundTransparency = 0 }):Play()
 	TweenService:Create(bannerStroke, slide, { Transparency = 0 }):Play()
 	TweenService:Create(bannerRule, slide, { BackgroundTransparency = 0 }):Play()
 	TweenService:Create(bannerTitle, slide, { TextTransparency = 0 }):Play()
 	TweenService:Create(bannerSub, slide, { TextTransparency = 0 }):Play()
 	task.delay(item.Hold or 1.6, function()
 		local out = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		TweenService:Create(plate, out, { BackgroundTransparency = 1, Position = UDim2.fromScale(0.5, 0.24) }):Play()
+		TweenService:Create(plate, out, { BackgroundTransparency = 1, Position = UDim2.fromScale(0.5, shownY - 0.02) }):Play()
 		TweenService:Create(bannerStroke, out, { Transparency = 1 }):Play()
 		TweenService:Create(bannerRule, out, { BackgroundTransparency = 1 }):Play()
 		TweenService:Create(bannerTitle, out, { TextTransparency = 1 }):Play()
@@ -209,14 +213,19 @@ local function playNext()
 end
 
 -- Queue a banner. Long backlogs are trimmed so a chain does not replay stale moments.
-function Feed.Banner(title, subtitle, color, hold)
+-- important = true for banners that must show even in calm mode (boss intro, phases, boss defeated). In calm mode (boss or
+-- Expedition) other banners are dropped, and the ones that show are smaller and sit higher so the field stays readable.
+function Feed.Banner(title, subtitle, color, hold, important)
 	if not gui then
+		return
+	end
+	if Calm.On and not important then
 		return
 	end
 	if #bannerQueue >= 2 then
 		table.remove(bannerQueue, 1)
 	end
-	table.insert(bannerQueue, { Title = title, Subtitle = subtitle, Color = color or KINDS.Reward.Color, Hold = hold })
+	table.insert(bannerQueue, { Title = title, Subtitle = subtitle, Color = color or KINDS.Reward.Color, Hold = hold, Calm = Calm.On })
 	playNext()
 end
 

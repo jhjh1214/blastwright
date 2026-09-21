@@ -4,6 +4,8 @@ local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Calm = require(script.Parent.Calm)
+
 local CameraFeedback = {}
 
 local BASE_FOV = 60
@@ -50,12 +52,18 @@ function CameraFeedback.Shake(amount)
 	if not shakeEnabled then
 		return
 	end
+	if Calm.On then
+		amount *= 0.3
+	end
 	shake = math.max(shake, math.min(amount, 1.2))
 end
 
 function CameraFeedback.Punch(degrees)
 	if not shakeEnabled then
 		return
+	end
+	if Calm.On then
+		degrees *= 0.3
 	end
 	punch = math.max(punch, math.min(degrees, 10))
 end

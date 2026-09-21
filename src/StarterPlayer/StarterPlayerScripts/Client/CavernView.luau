@@ -450,16 +450,19 @@ function CavernView.SetBoss(view, boss)
 	sigil.Parent = view.BossFx
 	model.PrimaryPart:FindFirstChildOfClass("BillboardGui").Text.Text = ("%s  %d/%d"):format(boss.Name, boss.HP, boss.MaxHP)
 	for _, cell in boss.Nodes do
-		marker(view, cell, Color3.fromRGB(255, 200, 60), 5, 3.2, 0.25) -- armor node: break these
+		-- armor node: break these (a flat tile plus a thin marker beam, never a wide pillar that hides the crystals behind it)
+		marker(view, cell, Color3.fromRGB(255, 200, 60), 0.3, CellSize * 0.9, 0.35)
+		marker(view, cell, Color3.fromRGB(255, 200, 60), 5, 0.5, 0.45)
 	end
 	for _, cell in boss.Weak do
-		marker(view, cell, Color3.fromRGB(255, 70, 230), 6, 3.4, 0.2) -- weak point: chain through BOTH
+		marker(view, cell, Color3.fromRGB(255, 70, 230), 0.3, CellSize * 0.9, 0.3) -- weak point: chain through BOTH
+		marker(view, cell, Color3.fromRGB(255, 70, 230), 6, 0.5, 0.4)
 	end
 	-- real-time threats: every wound-up attack is drawn on the grid with a live countdown
 	view.ThreatLabels = {}
 	local function pulse(part, speed)
 		pcall(function()
-			TweenService:Create(part, TweenInfo.new(speed, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.15 }):Play()
+			TweenService:Create(part, TweenInfo.new(speed, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.4 }):Play()
 		end)
 	end
 	local function countdown(centre, text, color, landsAt)
@@ -500,7 +503,8 @@ function CavernView.SetBoss(view, boss)
 			end
 		elseif threat.Type == "Corruption" then
 			for _, cell in threat.Marks do
-				pulse(marker(view, cell, Color3.fromRGB(190, 70, 255), 7, 3.0, 0.3), speed)
+				pulse(marker(view, cell, Color3.fromRGB(190, 70, 255), 0.3, CellSize * 0.9, 0.4), speed)
+				marker(view, cell, Color3.fromRGB(190, 70, 255), 7, 0.5, 0.5)
 			end
 			if threat.Marks[1] then
 				countdown(Geometry.CellPosition(view.Origin, threat.Marks[1].X, threat.Marks[1].Z), "CORRUPTION", Color3.fromRGB(215, 130, 255), landsAt)

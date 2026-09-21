@@ -19,6 +19,7 @@ local Fx = require(script.Parent.Fx)
 local ShopArt = require(script.Parent.ShopArt)
 local Dock = require(script.Parent.Dock)
 local StatusDock = require(script.Parent.StatusDock)
+local Calm = require(script.Parent.Calm)
 local Feed = require(script.Parent.Feed)
 local BossHud = require(script.Parent.BossHud)
 local Theme = require(script.Parent.Theme)
@@ -452,6 +453,7 @@ end
 -- Objective card text (roaming). nil hides the card.
 -- Expedition HUD line and the between-floor choice. view = server run view, or nil when not on an expedition.
 function UI.SetRun(view)
+	Calm.Set(view ~= nil)
 	if not runLabel then return end
 	if not view then
 		runLabel.Visible = false
@@ -613,12 +615,12 @@ end
 function UI.ShowBossIntro(boss)
 	AudioManager.Play("Tier")
 	local def = Config.Bosses.Defs[boss.Kind]
-	Feed.Banner(string.upper(boss.Name), def and def.Description or nil, Color3.fromRGB(214, 70, 78), 3.2)
+	Feed.Banner(string.upper(boss.Name), def and def.Description or nil, Color3.fromRGB(214, 70, 78), 3.2, true)
 end
 
 function UI.ShowPhase(phase, boss)
 	AudioManager.Play("Tier")
-	Feed.Banner(string.upper(phase) .. " PHASE", boss and BossHud.Objective(boss, Config.Bosses) or nil, BossHud.PhaseColor[phase] or THEME.Gold, 2.2)
+	Feed.Banner(string.upper(phase) .. " PHASE", boss and BossHud.Objective(boss, Config.Bosses) or nil, BossHud.PhaseColor[phase] or THEME.Gold, 2.2, true)
 end
 
 -- Big moments (chain tiers, Critical Mass, boss phases) use the banner: one plate at a time, no glow.
@@ -641,7 +643,7 @@ function UI.ShowTier(name, bonus, total)
 	elseif key == "boss defeated" then
 		subtitle = "Final blast!"
 	end
-	Feed.Banner(string.upper(name), subtitle, color)
+	Feed.Banner(string.upper(name), subtitle, color, nil, key == "boss defeated")
 end
 
 -- Messages go to the feed on the right. "Threat" messages (boss wind-ups) are shown by the boss panel instead, so they only make a sound.
@@ -1198,6 +1200,7 @@ function UI.Refresh()
 	local boss = d.Boss
 	bossHud.Update(boss)
 	Feed.SetCompact(boss ~= nil)
+	Calm.Set(boss ~= nil or State.Run ~= nil)
 	dodgeButton.Visible = boss ~= nil
 	if boss then
 		local shielded = boss.RT and boss.RT.Shielded
