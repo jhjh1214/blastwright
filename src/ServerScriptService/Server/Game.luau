@@ -557,7 +557,7 @@ end
 
 -- After a volley has played out: wake a hidden Lurker whose crystal popped, hurt the awake one, then let it act.
 -- Everything is decided here on the server; the client only receives the outcome (MonsterTurn).
-local function resolveMonster(player: Player, seam: SeamState, volley: any, result: any, power: number)
+local function resolveMonster(player: Player, seam: SeamState, volley: any, result: any, power: number, payout: number)
 	local data = Data.Get(player)
 	if not data or (not seam.Hidden and not seam.Monster) then
 		return
@@ -616,6 +616,17 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 			local act = Lurker.Act(m, seam.Grid, mctx, LurkerConfig)
 			for _, e in act.Eaten do
 				table.insert(turn.Eaten, { X = e.X, Z = e.Z })
+			end
+			if act.Stolen and act.Stolen > 0 then
+				local stolen = math.floor(payout * act.Stolen)
+				if stolen > 0 then
+					if not seam.Run then
+						data.Shards = math.max(0, data.Shards - stolen) -- already paid out: take it back
+					end
+					seam.Earned = math.max(0, seam.Earned - stolen)
+					turn.Stolen = stolen
+					notify(player, ("The %s stole %d shards!"):format(LurkerConfig.Defs[m.Kind].Name, stolen), "Error")
+				end
 			end
 			if act.ChargesDrained > 0 then
 				seam.Charges = math.max(0, seam.Charges - act.ChargesDrained)
@@ -842,7 +853,7 @@ local function onDetonate(player: Player, payload: any)
 		if seams[player] ~= seam then
 			return
 		end
-		resolveMonster(player, seam, volley, result, power)
+		resolveMonster(player, seam, volley, result, power, payout)
 		resolveBoss(player, seam, volley, result, power)
 		seam.InFlight = false
 		local remaining = Seam.CountValuable(seam.Grid, Crystals)

@@ -8,6 +8,8 @@ Why: the game was "blast, collect, repeat" with no way to lose. Lurkers add dang
 3. **Fight (turn-based).** Every volley you fire is your turn. Each charge whose blast covers the Lurker's cell hits it (Basic 2, Shaft 3, Cross 3); crystals popping right next to it add splash (1 each, up to 3). Armor cuts each direct hit (never below 1); a weakness doubles it. Then it acts.
 4. **Kinds** (all data in `Config/Lurkers.luau`):
    - **Gnasher** (area 1+, 6 HP): eats up to 2 adjacent valuable crystals per turn, or walks toward the nearest one. The threat is to your payout.
+   - **Skitter** (area 1+, 3 HP): runs two cells a turn to gobble a crystal. Fragile: bait it into a blast rather than chase it.
+   - **Leech** (area 2+, 7 HP): steals 15% of every volley's payout while it lives, so ignoring it is a slow tax.
    - **Sapper** (area 2+, 8 HP, weak to Shaft): drains one charge every turn. The threat is to your tempo.
    - **Brute** (area 3+, 14 HP, armor 1, weak to Cross): smashes the rig every other turn, with a warning the turn before. The threat is to your life.
 5. **Stakes.** The rig has 3 hearts. At 0 the rig is knocked out:

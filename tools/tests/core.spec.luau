@@ -1998,7 +1998,7 @@ test("lurker: a kind is only picked from monsters allowed in that area", functio
 	local seen = {}
 	for i = 1, 30 do seen[Lurker.PickKind(4, i / 31, LurkerCfg)] = true end
 	local n = 0 for _ in seen do n += 1 end
-	eq(n, 3, "all three appear deep down")
+	eq(n, #LurkerCfg.Order, "every kind appears deep down")
 end)
 
 test("lurker: it hides under a valuable crystal, never under an empty cell or a hazard", function()
@@ -2720,6 +2720,63 @@ test("power: a relic can lower the Critical Mass threshold, never below one pop"
 	local left, started = Power.Advance(0, PowerCfg.CriticalPops - 2, PowerCfg, -2)
 	eq(left, PowerCfg.CriticalVolleys, "advance honours the shift")
 	eq(started, true, "and reports it")
+end)
+
+test("lurker: a Skitter runs two cells a turn, eats on arrival, and is fragile", function()
+	local g = grid(function(x, z) if x == 8 and z == 5 then return "Glimmerstone" end end)
+	local m = Lurker.New("Skitter", 4, 5, LurkerCfg)
+	local a = Lurker.Act(m, g, lctx, LurkerCfg)
+	eq(m.X, 6, "two steps east")
+	eq(#a.Eaten, 0, "not there yet")
+	local b = Lurker.Act(m, g, lctx, LurkerCfg)
+	eq(#b.Eaten, 1, "arrives next to it and eats within the same turn")
+	eq(m.X, 7, "one step then the meal")
+	eq(g.Cells[ChainSim.Key(N, 8, 5)], nil, "the crystal is gone")
+	local far = Lurker.New("Skitter", 1, 1, LurkerCfg)
+	local gg = grid(function(x, z) if x == 9 and z == 9 then return "Glimmerstone" end end)
+	Lurker.Act(far, gg, lctx, LurkerCfg)
+	eq(far.X == 3 and far.Z == 3, true, "diagonal dash of two cells")
+	eq(LurkerCfg.Defs.Skitter.HP < LurkerCfg.Defs.Gnasher.HP, true, "fragile")
+	eq(LurkerCfg.Defs.Skitter.Stratum, 1, "appears in the first area")
+end)
+
+test("lurker: a Skitter with nothing to run to stays put, and never eats more than its appetite in one turn", function()
+	local empty = grid(function() return nil end)
+	local m = Lurker.New("Skitter", 5, 5, LurkerCfg)
+	local a = Lurker.Act(m, empty, lctx, LurkerCfg)
+	eq(m.X == 5 and m.Z == 5 and #a.Eaten == 0 and a.Moved == false, true, "idle")
+	local crowd = grid(function(x, z) if math.abs(x - 5) <= 1 and math.abs(z - 5) <= 1 and not (x == 5 and z == 5) then return "Glimmerstone" end end)
+	local b = Lurker.Act(Lurker.New("Skitter", 5, 5, LurkerCfg), crowd, lctx, LurkerCfg)
+	eq(#b.Eaten, LurkerCfg.Defs.Skitter.Params.PerTurn, "one crystal per turn")
+end)
+
+test("lurker: a Leech steals a fixed share of the payout every turn and does nothing else", function()
+	local g = grid(function(x, z) if x == 6 and z == 5 then return "Glimmerstone" end end)
+	local m = Lurker.New("Leech", 5, 5, LurkerCfg)
+	local a = Lurker.Act(m, g, lctx, LurkerCfg)
+	eq(a.Stolen, LurkerCfg.Defs.Leech.Params.Fraction, "steals its share")
+	eq(#a.Eaten == 0 and a.ChargesDrained == 0 and a.HeartsLost == 0 and a.Moved == false, true, "nothing else")
+	eq(g.Cells[ChainSim.Key(N, 6, 5)] ~= nil, true, "leaves the crystals alone")
+	eq(Lurker.Act(Lurker.New("Gnasher", 5, 5, LurkerCfg), g, lctx, LurkerCfg).Stolen, 0, "other kinds steal nothing")
+	eq(LurkerCfg.Defs.Leech.Params.Fraction > 0 and LurkerCfg.Defs.Leech.Params.Fraction < 1, true, "a fraction")
+end)
+
+test("lurker: a Skitter stops after eating, and one boxed in by hazards simply stays where it is", function()
+	local g = grid(function(x, z)
+		if x == 6 and z == 5 then return "Glimmerstone" end
+		if x == 9 and z == 9 then return "Glimmerstone" end
+	end)
+	local m = Lurker.New("Skitter", 5, 5, LurkerCfg)
+	local a = Lurker.Act(m, g, lctx, LurkerCfg)
+	eq(#a.Eaten, 1, "ate the neighbour")
+	eq(m.X == 5 and m.Z == 5 and a.Moved == false, true, "and did not keep running")
+	local boxed = grid(function(x, z)
+		if math.abs(x - 5) <= 1 and math.abs(z - 5) <= 1 and not (x == 5 and z == 5) then return "Dreadgeode" end
+		if x == 9 and z == 9 then return "Glimmerstone" end
+	end)
+	local b = Lurker.New("Skitter", 5, 5, LurkerCfg)
+	local act = Lurker.Act(b, boxed, lctx, LurkerCfg)
+	eq(b.X == 5 and b.Z == 5 and act.Moved == false, true, "nowhere to step")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

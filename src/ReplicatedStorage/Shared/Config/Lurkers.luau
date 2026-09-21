@@ -9,7 +9,7 @@ export type Def = {
 	Armor: number?, -- subtracted from each direct hit (never below 1)
 	Weak: string?, -- charge kind that does double damage
 	Bounty: number,
-	Behavior: string, -- Eat | Drain | Smash
+	Behavior: string, -- Eat | Dash | Steal | Drain | Smash
 	Params: { [string]: number },
 }
 
@@ -31,6 +31,24 @@ return {
 			Bounty = 400,
 			Behavior = "Eat",
 			Params = { PerTurn = 2 },
+		},
+		Skitter = {
+			Name = "Skitter",
+			Description = "Fast: it runs two cells a turn to gobble a crystal. Small and fragile: bait it into a blast.",
+			HP = 3,
+			Stratum = 1,
+			Bounty = 250,
+			Behavior = "Dash",
+			Params = { PerTurn = 1, Steps = 2 },
+		},
+		Leech = {
+			Name = "Leech",
+			Description = "Steals 15% of every volley's payout while it lives. Kill it before it drains the haul.",
+			HP = 7,
+			Stratum = 2,
+			Bounty = 800,
+			Behavior = "Steal",
+			Params = { Fraction = 0.15 },
 		},
 		Sapper = {
 			Name = "Sapper",
@@ -54,5 +72,5 @@ return {
 			Params = { EveryTurns = 2 },
 		},
 	} :: { [string]: Def },
-	Order = { "Gnasher", "Sapper", "Brute" },
+	Order = { "Gnasher", "Skitter", "Leech", "Sapper", "Brute" },
 }

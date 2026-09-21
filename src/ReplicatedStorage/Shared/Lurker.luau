@@ -121,11 +121,11 @@ local function inBounds(size: number, x: number, z: number): boolean
 end
 
 -- The monster's turn. Mutates the monster and the grid. Returns what happened so the server can apply the rig effects:
--- { Eaten = { {X, Z} }, ChargesDrained = n, HeartsLost = n, Moved = bool }
+-- { Eaten = { {X, Z} }, ChargesDrained = n, HeartsLost = n, Moved = bool, Stolen = fraction of the volley payout }
 function Lurker.Act(m: Monster, grid: any, ctx: any, cfg: any)
 	local def = cfg.Defs[m.Kind]
 	local size = grid.Size
-	local act = { Eaten = {}, ChargesDrained = 0, HeartsLost = 0, Moved = false }
+	local act = { Eaten = {}, ChargesDrained = 0, HeartsLost = 0, Moved = false, Stolen = 0 }
 	m.Turn += 1
 	if def.Behavior == "Drain" then
 		act.ChargesDrained = def.Params.Amount
@@ -133,20 +133,27 @@ function Lurker.Act(m: Monster, grid: any, ctx: any, cfg: any)
 		if m.Turn % def.Params.EveryTurns == 0 then
 			act.HeartsLost = 1
 		end
-	elseif def.Behavior == "Eat" then
-		-- Scan row by row so ties always resolve the same way.
-		for dz = -1, 1 do
-			for dx = -1, 1 do
-				local x, z = m.X + dx, m.Z + dz
-				if (dx ~= 0 or dz ~= 0) and inBounds(size, x, z) and #act.Eaten < def.Params.PerTurn and isValuable(grid, ctx, x, z) then
-					table.insert(act.Eaten, { X = x, Z = z })
+	elseif def.Behavior == "Steal" then
+		act.Stolen = def.Params.Fraction -- the server takes this share of the volley's payout
+	elseif def.Behavior == "Eat" or def.Behavior == "Dash" then
+		local perTurn = def.Params.PerTurn
+		local steps = def.Behavior == "Dash" and def.Params.Steps or 1
+		for _ = 1, steps do
+			-- Scan row by row so ties always resolve the same way.
+			for dz = -1, 1 do
+				for dx = -1, 1 do
+					local x, z = m.X + dx, m.Z + dz
+					if (dx ~= 0 or dz ~= 0) and inBounds(size, x, z) and #act.Eaten < perTurn and isValuable(grid, ctx, x, z) then
+						table.insert(act.Eaten, { X = x, Z = z })
+					end
 				end
 			end
-		end
-		for _, e in act.Eaten do
-			grid.Cells[key(size, e.X, e.Z)] = nil
-		end
-		if #act.Eaten == 0 then
+			for _, e in act.Eaten do
+				grid.Cells[key(size, e.X, e.Z)] = nil
+			end
+			if #act.Eaten > 0 then
+				break
+			end
 			-- Nothing to eat next to it: step toward the nearest valuable crystal, onto an empty cell.
 			local target, best = nil, math.huge
 			for z = 1, size do
@@ -159,25 +166,27 @@ function Lurker.Act(m: Monster, grid: any, ctx: any, cfg: any)
 					end
 				end
 			end
-			if target then
-				local stepTo, stepScore = nil, math.huge
-				for dz = -1, 1 do
-					for dx = -1, 1 do
-						local x, z = m.X + dx, m.Z + dz
-						if (dx ~= 0 or dz ~= 0) and inBounds(size, x, z) and grid.Cells[key(size, x, z)] == nil then
-							local cheb = math.max(math.abs(x - target.X), math.abs(z - target.Z))
-							local score = cheb * 1000 + (x - target.X) ^ 2 + (z - target.Z) ^ 2
-							if score < stepScore then
-								stepTo, stepScore = { X = x, Z = z }, score
-							end
+			if not target then
+				break
+			end
+			local stepTo, stepScore = nil, math.huge
+			for dz = -1, 1 do
+				for dx = -1, 1 do
+					local x, z = m.X + dx, m.Z + dz
+					if (dx ~= 0 or dz ~= 0) and inBounds(size, x, z) and grid.Cells[key(size, x, z)] == nil then
+						local cheb = math.max(math.abs(x - target.X), math.abs(z - target.Z))
+						local score = cheb * 1000 + (x - target.X) ^ 2 + (z - target.Z) ^ 2
+						if score < stepScore then
+							stepTo, stepScore = { X = x, Z = z }, score
 						end
 					end
 				end
-				if stepTo then
-					m.X, m.Z = stepTo.X, stepTo.Z
-					act.Moved = true
-				end
 			end
+			if not stepTo then
+				break
+			end
+			m.X, m.Z = stepTo.X, stepTo.Z
+			act.Moved = true
 		end
 	end
 	return act
