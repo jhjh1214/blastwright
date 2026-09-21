@@ -16,6 +16,7 @@ local Cosmetics = require(Shared.Cosmetics)
 local Dailies = require(Shared.Dailies)
 local Events = require(Shared.Events)
 local Expedition = require(Shared.Expedition)
+local Puzzle = require(Shared.Puzzle)
 local Data = require(script.Parent.Data)
 local Leaderboard = require(script.Parent.Leaderboard)
 local Purchases = require(script.Parent.Purchases)
@@ -37,6 +38,7 @@ local CosmeticsConfig = Config.Cosmetics
 local EventsConfig = Config.Events
 local CommunityConfig = Config.Community
 local ExpeditionConfig = Config.Expedition
+local PuzzleConfig = Config.Puzzle
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -58,6 +60,7 @@ type SeamState = {
 	Valuable: number,
 	InFlight: boolean,
 	Run: Expedition.Run?, -- set while this seam is a floor of an Expedition
+	Puzzle: { Day: number, Par: number }?, -- set while this seam is the Daily Puzzle
 }
 
 local Game = {}
@@ -186,6 +189,20 @@ local function snapshot(player: Player): { [string]: any }?
 		Stats = data.Stats,
 		ChargesLeft = seam and seam.Charges or 0,
 		ChargesMax = seam and seam.ChargesMax or 0,
+		Puzzle = (function()
+			local today = Dailies.DayNumber(os.time())
+			local p = data.Puzzle
+			local done = p.Day == today
+			return {
+				Done = done,
+				Medal = done and p.Medal or "",
+				Score = done and p.Score or 0,
+				Par = done and p.Par or 0,
+				Streak = p.LastDay >= today - 1 and p.Streak or 0, -- a missed day already broke it
+				BestStreak = p.BestStreak,
+				Active = seam ~= nil and seam.Puzzle ~= nil,
+			}
+		end)(),
 	}
 end
 
@@ -248,8 +265,8 @@ local function sendRunState(player: Player)
 	end
 end
 
--- run = nil starts a normal seam; otherwise the next floor of that Expedition.
-local function startSeam(player: Player, run: Expedition.Run?)
+-- run = nil starts a normal seam; otherwise the next floor of that Expedition. puzzle = the Daily Puzzle (day + par).
+local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: number, Par: number }?)
 	local data = Data.Get(player)
 	local siteId = playerSite[player]
 	if not data or not siteId then
@@ -259,16 +276,23 @@ local function startSeam(player: Player, run: Expedition.Run?)
 	local stratum = run and Expedition.FloorStratum(run.Floor, data.Progress.StrataUnlocked, ExpeditionConfig) or WorldConfig.Sites[siteId].Stratum
 	local fx = Events.Combine(activeEvents())
 	local chance = Tuning.MutationChance * (Purchases.Owns(player, "PrismaticLuck") and 2 or 1) * fx.MutationMult * (run and Expedition.Modifiers(run, ExpeditionConfig).MutationChanceMult or 1)
-	local grid = Seam.Generate(Crystals, Tuning, stratum, seamCounter * 7919 + player.UserId % 100003 + os.time(), chance)
+	local grid
+	if puzzle then
+		stratum = PuzzleConfig.Stratum
+		grid = Seam.Generate(Crystals, Tuning, stratum, Puzzle.Seed(puzzle.Day), PuzzleConfig.MutationChance) -- the same for everyone
+	else
+		grid = Seam.Generate(Crystals, Tuning, stratum, seamCounter * 7919 + player.UserId % 100003 + os.time(), chance)
+	end
 	local max = Tuning.BaseCharges + upgradeLevel(data, "ExtraCharge") * Upgrades.Defs.ExtraCharge.PerLevel + fx.ChargeBonus
 	local seam: SeamState = {
 		Id = seamCounter,
 		SiteId = siteId,
 		Grid = grid,
 		Stratum = stratum,
-		Charges = run and run.Charges or max,
-		ChargesMax = run and run.StartCharges or max,
+		Charges = puzzle and PuzzleConfig.Charges or run and run.Charges or max,
+		ChargesMax = puzzle and PuzzleConfig.Charges or run and run.StartCharges or max,
 		Run = run,
+		Puzzle = puzzle,
 		Earned = 0,
 		Popped = 0,
 		Valuable = Seam.CountValuable(grid, Crystals),
@@ -291,6 +315,17 @@ local function releaseSite(player: Player)
 	awaySince[player] = nil
 	World.SetSiteStatus(siteId, "Free")
 	Remotes.SeamRemove:FireAllClients(player.UserId)
+end
+
+-- The Daily Puzzle ignores upgrades, relics and events so every player plays by the same rules.
+local function puzzleContext()
+	return {
+		Crystals = Config.Context.Crystals,
+		Charges = Config.Context.Charges,
+		Tuning = Tuning,
+		RadiusBonus = 0,
+		MomentumPops = Tuning.MomentumPops,
+	}
 end
 
 local function contextFor(data: any, run: Expedition.Run?)
@@ -322,6 +357,44 @@ end
 local function award(data: any, amount: number)
 	data.Shards += amount
 	data.Stats.TotalShards += amount
+end
+
+-- The one volley of the Daily Puzzle has played out: score it against par, record it and pay the medal.
+local function endPuzzle(player: Player, seam: SeamState, score: number)
+	local data = Data.Get(player)
+	local puzzle = seam.Puzzle
+	if not data or not puzzle or seams[player] ~= seam then
+		return
+	end
+	local p = data.Puzzle
+	if p.Day ~= puzzle.Day then -- (the once-a-day check happens at the start; this also guards a double finish)
+		local medal = Puzzle.Medal(score, puzzle.Par, PuzzleConfig)
+		local streak = Puzzle.Streak(p.LastDay, p.Streak, puzzle.Day)
+		data.Puzzle = {
+			Day = puzzle.Day,
+			Score = score,
+			Par = puzzle.Par,
+			Medal = medal or "",
+			Streak = streak,
+			LastDay = puzzle.Day,
+			BestStreak = math.max(p.BestStreak, streak),
+		}
+		if medal then
+			local reward = Puzzle.Reward(Puzzle.MedalReward(medal, PuzzleConfig), streak, PuzzleConfig)
+			award(data, reward)
+			notify(player, ("Daily Puzzle: %d points (par %d). %s medal! +%d shards (day %d streak)"):format(score, puzzle.Par, medal, reward, streak), "Reward")
+		else
+			notify(player, ("Daily Puzzle: %d points (par %d). No medal today; come back tomorrow!"):format(score, puzzle.Par), "Info")
+		end
+	end
+	seam.Puzzle = nil
+	announceGoals(player)
+	sync(player)
+	task.delay(Tuning.SeamRegenDelay, function()
+		if seams[player] == seam and player.Parent then
+			startSeam(player)
+		end
+	end)
 end
 
 -- A floor of an Expedition ended (charges spent or grid cleared). The run decides what happens next.
@@ -404,7 +477,7 @@ local function onDetonate(player: Player, payload: any)
 		return -- choosing a card or finished: no blasting
 	end
 
-	local volley, reason = Validate.Volley(payload, seam.Charges, data.UnlockedCharges, seam.Grid.Size, Tuning.MaxVolleyCharges)
+	local volley, reason = Validate.Volley(payload, seam.Charges, seam.Puzzle and { Basic = true } or data.UnlockedCharges, seam.Grid.Size, seam.Puzzle and PuzzleConfig.Charges or Tuning.MaxVolleyCharges)
 	if not volley then
 		warn(("[Game] Rejected Detonate from %s: %s"):format(player.Name, tostring(reason)))
 		return
@@ -412,7 +485,33 @@ local function onDetonate(player: Player, payload: any)
 
 	seam.InFlight = true
 	seam.Charges -= #volley
-	local result = ChainSim.Run(seam.Grid, volley, contextFor(data, seam.Run))
+	local result = ChainSim.Run(seam.Grid, volley, seam.Puzzle and puzzleContext() or contextFor(data, seam.Run))
+
+	if seam.Puzzle then
+		-- Puzzle: one volley, plain score (no multipliers), nothing else in the save changes until it is scored.
+		for _, ev in result.Events do
+			seam.Grid.Cells[ChainSim.Key(seam.Grid.Size, ev.X, ev.Z)] = nil
+		end
+		Remotes.VolleyResult:FireAllClients({
+			UserId = player.UserId,
+			Style = Cosmetics.Active(data, CosmeticsConfig).Id,
+			Charges = volley,
+			Events = result.Events,
+			Pops = result.Pops,
+			Raw = result.Raw,
+			Bonus = result.Bonus,
+			Total = result.Total,
+			Multiplier = 1,
+			PeakMult = result.PeakMult,
+			Tier = result.Tier,
+			Duration = result.Duration,
+			Momentum = false,
+		})
+		task.delay(result.Duration + 0.3, function()
+			endPuzzle(player, seam, result.Total)
+		end)
+		return
+	end
 
 	local valuablePops = 0
 	for _, ev in result.Events do
@@ -733,6 +832,57 @@ local function onRunPick(player: Player, choice: any)
 	end
 end
 
+-- "Play today's puzzle" (Menu > Daily): uses the pad the player is standing at, or the nearest free unlocked one.
+local puzzleParCache: { [number]: number } = {}
+
+local function onPuzzleStart(player: Player)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	local today = Dailies.DayNumber(os.time())
+	if data.Puzzle.Day == today then
+		return notify(player, "You already played today's puzzle. A new one arrives in " .. ("%dh %02dm"):format(Dailies.SecondsUntilReset(os.time()) // 3600, Dailies.SecondsUntilReset(os.time()) % 3600 // 60) .. ".", "Info")
+	end
+	local current = seams[player]
+	if current and current.Run then
+		return notify(player, "Finish or bank your expedition first.", "Error")
+	end
+
+	local siteId, bestDist = nil, PROMPT_LEASH
+	for id, site in WorldConfig.Sites do
+		local owner = siteOwner[id]
+		if data.Progress.StrataUnlocked >= site.Stratum and (owner == nil or owner == player) then
+			local station = Geometry.Station(id)
+			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if root then
+				local dist = (root.Position - station).Magnitude
+				if dist <= bestDist then
+					siteId, bestDist = id, dist
+				end
+			end
+		end
+	end
+	if not siteId then
+		return notify(player, "Walk up to a free blast pad first, then start the puzzle from the Menu.", "Error")
+	end
+
+	if playerSite[player] ~= siteId then
+		releaseSite(player)
+		siteOwner[siteId] = player
+		playerSite[player] = siteId
+	end
+	World.SetSiteStatus(siteId, "Puzzle: " .. player.DisplayName)
+	local par = puzzleParCache[today]
+	if not par then
+		local grid = Seam.Generate(Crystals, Tuning, PuzzleConfig.Stratum, Puzzle.Seed(today), PuzzleConfig.MutationChance)
+		par = Puzzle.Par(grid, puzzleContext(), PuzzleConfig.Charges, ChainSim.Run)
+		puzzleParCache[today] = par
+	end
+	startSeam(player, nil, { Day = today, Par = par })
+	Remotes.Engage:FireClient(player, siteId)
+end
+
 local function onCacheTriggered(player: Player, cacheId: string)
 	local data = Data.Get(player)
 	local cache = cachesById[cacheId]
@@ -848,6 +998,7 @@ function Game.Init()
 	Remotes.Equip.OnServerEvent:Connect(guarded("Equip", 5, 8, onEquip))
 	Remotes.Setting.OnServerEvent:Connect(guarded("Setting", 5, 8, onSetting))
 	Remotes.RunPick.OnServerEvent:Connect(guarded("RunPick", 5, 8, onRunPick))
+	Remotes.PuzzleStart.OnServerEvent:Connect(guarded("PuzzleStart", 2, 3, onPuzzleStart))
 	optional("Purchases", function()
 		Purchases.Init({ Notify = notify, OnChanged = sync })
 	end)

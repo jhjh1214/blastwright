@@ -256,12 +256,13 @@ local function refresh()
 	end
 
 	local upgrades = Config.Upgrades.Defs
+	local puzzle = State.Data.Puzzle and State.Data.Puzzle.Active -- the puzzle ignores upgrades
 	local ctx = {
 		Crystals = Config.Context.Crystals,
 		Charges = Config.Context.Charges,
 		Tuning = Config.Tuning,
-		RadiusBonus = State.UpgradeLevel("BlastRadius") * upgrades.BlastRadius.PerLevel,
-		MomentumPops = math.max(3, Config.Tuning.MomentumPops - State.UpgradeLevel("Momentum") * upgrades.Momentum.PerLevel + (State.Run and State.Run.Modifiers.MomentumPopsDelta or 0)),
+		RadiusBonus = puzzle and 0 or State.UpgradeLevel("BlastRadius") * upgrades.BlastRadius.PerLevel,
+		MomentumPops = puzzle and Config.Tuning.MomentumPops or math.max(3, Config.Tuning.MomentumPops - State.UpgradeLevel("Momentum") * upgrades.Momentum.PerLevel + (State.Run and State.Run.Modifiers.MomentumPopsDelta or 0)),
 		Modifiers = State.Run and State.Run.Modifiers or nil, -- relics change the real rules, so the preview must too
 	}
 	local result = ChainSim.Run(view.Grid, State.Placed, ctx)

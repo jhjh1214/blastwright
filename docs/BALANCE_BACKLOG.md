@@ -25,3 +25,5 @@ Balancing is deliberately done LAST (developer's call, 2026-09-21). This file co
 2. Fix the target time per seam from real playtest logs.
 3. Make objective targets scale with income (or with the player's area) so they stay meaningful, and cap the reward at a fraction of what blasting earns in the same time.
 4. Re-run the simulators and update `docs/ECONOMY.md`.
+
+- Daily Puzzle medal rewards (1.5k/3k/6k/12k, +10%/day streak) and Expedition rewards (depth +15%/floor, x1.5 win, 40% salvage) are unmeasured placeholders; also check whether greedy par is too easy/hard to beat on typical grids (run a sweep over many days).

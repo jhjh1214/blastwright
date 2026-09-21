@@ -556,6 +556,24 @@ local function rebuildPanel()
 				if done and not item.Claimed then Remotes.Claim:FireServer(item.Slot) end
 			end)
 		end
+		-- Daily Puzzle: same grid for everyone, one try, medal by score against par.
+		local pz = d.Puzzle
+		if pz then
+			header(20, ("Daily Puzzle  (streak %d, best %d)"):format(pz.Streak, pz.BestStreak))
+			local medals = {}
+			for _, m in Config.Puzzle.Medals do
+				table.insert(medals, ("%s %d%%: %s"):format(m.Name, m.Ratio * 100, commas(m.Reward)))
+			end
+			local desc = "Stand at a blast pad. 3 Basic charges, one volley, everyone gets the same grid. Score vs par: " .. table.concat(medals, ", ") .. ". Streak adds +10% a day."
+			local btn, canPlay = "Play", true
+			if pz.Done then
+				btn = (pz.Medal ~= "" and pz.Medal or "No medal") .. (" (%s / par %s)"):format(commas(pz.Score), commas(pz.Par))
+				canPlay = false
+			end
+			row(21, "Today's puzzle", desc, btn, canPlay, function()
+				if canPlay then Remotes.PuzzleStart:FireServer() end
+			end)
+		end
 		-- Weekly challenges: bigger targets and rewards, reset Monday 00:00 UTC.
 		local weekSecs = math.max(0, math.floor((State.WeeklyResetAt or 0) - os.clock()))
 		header(10, ("Weekly challenges: reset in %dd %02dh (unclaimed rewards are lost)"):format(weekSecs // 86400, (weekSecs % 86400) // 3600))
@@ -682,6 +700,13 @@ function UI.Refresh()
 	if not gui or not State.Data then return end
 	local d = State.Data
 	seamLabel.Text = ("Charges %d / %d"):format(d.ChargesLeft - #State.Placed, d.ChargesMax)
+	if d.Puzzle and d.Puzzle.Active then
+		runLabel.Text = "DAILY PUZZLE\nSame grid for everyone. Basic charges only, ONE volley: plant up to " .. Config.Puzzle.Charges .. ", then detonate."
+		runLabel.Size = UDim2.fromOffset(300, 70)
+		runLabel.Visible = true
+	elseif not State.Run then
+		runLabel.Visible = false
+	end
 
 	local found, total = 0, #Config.World.Caches
 	for _ in d.Caches or {} do

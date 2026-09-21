@@ -53,7 +53,8 @@ local function toggleCharge(x, z)
 		UI.Toast("No charges left to plant", "Error")
 		return
 	end
-	table.insert(State.Placed, { X = x, Z = z, Kind = State.SelectedCharge })
+	local puzzle = State.Data and State.Data.Puzzle and State.Data.Puzzle.Active
+	table.insert(State.Placed, { X = x, Z = z, Kind = puzzle and "Basic" or State.SelectedCharge }) -- the puzzle is Basic charges only
 	AudioManager.Play("Place")
 end
 
