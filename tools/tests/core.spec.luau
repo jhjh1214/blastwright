@@ -1665,19 +1665,23 @@ test("expedition: picking a card applies its route and relic and descends", func
 	Expedition.FloorEnded(run, 100, 0.9, 2, lcg(7), ExpCfg)
 	local steady = findCard(run, "Steady")
 	local relic = run.Choices[steady].Relic
+	local extra = relic and ExpCfg.Relics[relic].Modifiers.ExtraCharges or 0 -- Deep Pockets adds a charge on top of the route
 	eq(Expedition.Pick(run, steady, ExpCfg), true, "valid pick")
 	eq(run.Floor, 2, "descended")
 	eq(run.Phase, "Blasting", "blasting again")
-	eq(run.Charges, 2 + ExpCfg.Routes.Steady.ChargeDelta, "steady route gives its charge")
+	eq(run.Charges, 2 + ExpCfg.Routes.Steady.ChargeDelta + extra, "steady route gives its charge (plus any relic charge)")
 	eq(run.ValueMult, ExpCfg.Routes.Steady.ValueMult, "route value multiplier")
 	if relic then eq(run.Relics[#run.Relics], relic, "relic added") end
 	eq(Expedition.Pick(run, 1, ExpCfg), false, "cannot pick twice")
 
 	local rich = startRun(4)
 	Expedition.FloorEnded(rich, 100, 0.9, 2, lcg(7), ExpCfg)
-	Expedition.Pick(rich, findCard(rich, "Rich"), ExpCfg)
+	local richCard = findCard(rich, "Rich")
+	local richRelic = rich.Choices[richCard].Relic
+	local richExtra = richRelic and ExpCfg.Relics[richRelic].Modifiers.ExtraCharges or 0
+	Expedition.Pick(rich, richCard, ExpCfg)
 	eq(rich.ValueMult, ExpCfg.Routes.Rich.ValueMult, "rich vein doubles payouts")
-	eq(rich.Charges, math.max(1, 2 + ExpCfg.Routes.Rich.ChargeDelta), "rich vein costs a charge")
+	eq(rich.Charges, math.max(1, 2 + ExpCfg.Routes.Rich.ChargeDelta) + richExtra, "rich vein costs a charge (plus any relic charge)")
 
 	local rest = startRun(4)
 	Expedition.FloorEnded(rest, 100, 0.9, 1, lcg(7), ExpCfg)
@@ -1783,6 +1787,22 @@ test("expedition: config is valid (routes, relics, rewards)", function()
 		eq(any, true, id .. " does something")
 	end
 	eq(relics >= 6, true, "enough relics that runs differ")
+end)
+
+test("expedition: stacked relics of the same kind multiply (or add, for radii) instead of overwriting", function()
+	local cfg = { Relics = {
+		A = { Modifiers = { AmplifierMult = 2, ValueMult = 1.5, RelayValueMult = 2, MutationChanceMult = 3, VolatileRadiusBonus = 0.5, MomentumPopsDelta = -2 } },
+		B = { Modifiers = { AmplifierMult = 3, ValueMult = 2, RelayValueMult = 5, MutationChanceMult = 2, VolatileRadiusBonus = 0.25, MomentumPopsDelta = -1 } },
+	} }
+	local run = Expedition.New(ExpCfg, 4)
+	run.Relics = { "A", "B" }
+	local m = Expedition.Modifiers(run, cfg)
+	eq(m.AmplifierMult, 6, "2 x 3")
+	eq(m.ValueMult, 3, "1.5 x 2")
+	eq(m.RelayValueMult, 10, "2 x 5")
+	eq(m.MutationChanceMult, 6, "3 x 2")
+	eq(m.VolatileRadiusBonus, 0.75, "0.5 + 0.25")
+	eq(m.MomentumPopsDelta, -3, "-2 + -1")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))
