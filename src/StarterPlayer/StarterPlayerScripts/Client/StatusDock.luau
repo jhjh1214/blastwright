@@ -82,12 +82,26 @@ function StatusDock.Build(parent)
 	local dock = {}
 	local eventTiles = {} -- { { Tile, EndsAt } } in display order
 	local goalTile, goalView, goalAt = nil, nil, 0
+	local bossTile, bossView, bossAt = nil, nil, 0
 	local eventSignature = ""
 
 	local function refresh()
 		local now = os.clock()
 		for _, e in eventTiles do
 			e.Tile.Value.Text = StatusDock.FormatTime(e.EndsAt - now)
+		end
+		if bossTile and bossView then
+			local v = bossView
+			if v.Defeated then
+				bossTile.Title.Text = "WORLD BOSS"
+				bossTile.Value.Text = "DEFEATED!"
+				bossTile.Fill.Size = UDim2.fromScale(0, 1)
+			else
+				local left = math.max(0, (v.EndsIn or 0) - (now - bossAt))
+				bossTile.Title.Text = string.upper(v.Name or "World boss") .. "  " .. StatusDock.FormatTime(left)
+				bossTile.Value.Text = ("%s / %s"):format(commas(v.HP or 0), commas(v.MaxHP or 0))
+				bossTile.Fill.Size = UDim2.fromScale(math.clamp((v.HP or 0) / math.max(1, v.MaxHP or 1), 0, 1), 1)
+			end
 		end
 		if goalTile and goalView then
 			local v = goalView
@@ -138,6 +152,24 @@ function StatusDock.Build(parent)
 			local look = LOOK[ev.Id] or FALLBACK
 			local tile = buildTile(holder, i, look, ev.Name)
 			table.insert(eventTiles, { Tile = tile, EndsAt = (receivedAt or os.clock()) + ev.EndsIn })
+		end
+		refresh()
+	end
+
+	-- view: WorldBoss.View (Active, Name, HP, MaxHP, EndsIn) or nil/inactive to hide the tile
+	function dock.SetWorldBoss(view, receivedAt)
+		local show = view ~= nil and (view.Active or view.Defeated)
+		bossView, bossAt = view, receivedAt or os.clock()
+		if not show then
+			if bossTile then
+				bossTile.Root:Destroy()
+				bossTile = nil
+			end
+			return
+		end
+		if not bossTile then
+			bossTile = buildTile(holder, 50, { Icon = "Skull", Color = Theme.Colors.Danger }, "WORLD BOSS")
+			addBar(bossTile)
 		end
 		refresh()
 	end

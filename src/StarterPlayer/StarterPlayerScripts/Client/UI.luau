@@ -581,6 +581,12 @@ function UI.SetInfo(text)
 	end
 end
 
+function UI.SetWorldBoss(view, receivedAt)
+	if statusDock then
+		statusDock.SetWorldBoss(view, receivedAt)
+	end
+end
+
 -- Shared Server Goal tile (bottom-right status dock). view = { Round, Progress, Target, Done, FrenzyLeft } or nil.
 function UI.SetCommunity(view, receivedAt)
 	if statusDock then

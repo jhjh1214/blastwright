@@ -18,6 +18,7 @@ local Events = require(Shared.Events)
 local Expedition = require(Shared.Expedition)
 local Puzzle = require(Shared.Puzzle)
 local Contracts = require(Shared.Contracts)
+local WorldBoss = require(Shared.WorldBoss)
 local Farm = require(Shared.Farm)
 local Lurker = require(Shared.Lurker)
 local Power = require(Shared.Power)
@@ -48,6 +49,7 @@ local CommunityConfig = Config.Community
 local ExpeditionConfig = Config.Expedition
 local PuzzleConfig = Config.Puzzle
 local ContractsConfig = Config.Contracts
+local WorldBossConfig = Config.WorldBoss
 local FarmConfig = Config.Farm
 local LurkerConfig = Config.Lurkers
 local BossConfig = Config.Bosses
@@ -365,6 +367,70 @@ local function seamPayload(player: Player, seam: SeamState): { [string]: any }
 end
 
 -- Server Goal: reward everyone who contributed, start the frenzy, and open the next round a little later.
+-- The Crystal Colossus (Shared/WorldBoss.luau): appears on a clock for a few minutes; every normal volley in the server
+-- damages it, and contributors are paid when it falls or time runs out.
+local worldBoss: WorldBoss.State? = nil
+local worldBossDirty = true
+
+local function worldBossView()
+	return WorldBoss.View(worldBoss, os.time(), WorldBossConfig)
+end
+
+local function settleWorldBoss()
+	local state = worldBoss
+	if not state then
+		return
+	end
+	local won = state.Done
+	for _, pay in WorldBoss.Settle(state, WorldBossConfig) do
+		local player = Players:GetPlayerByUserId(pay.UserId)
+		local data = player and Data.Get(player)
+		if player and data then
+			Grants.Apply(data, pay.Grants, os.time(), data.Progress.StrataUnlocked)
+			notify(player, won and ("The %s fell! You ranked #%d with %d damage. Rewards collected."):format(WorldBossConfig.Name, pay.Rank, pay.Damage) or ("The %s escaped. Thanks for fighting it (%d damage): a small reward."):format(WorldBossConfig.Name, pay.Damage), "Reward")
+			sync(player)
+		end
+	end
+	if not won then
+		for _, player in Players:GetPlayers() do
+			notify(player, ("The %s has left the hub."):format(WorldBossConfig.Name), "Info")
+		end
+	end
+	worldBossDirty = true
+end
+
+-- Called every couple of seconds: start the boss when its window opens, settle it when it is beaten or time is up.
+local function worldBossTick()
+	local window = WorldBoss.Window(os.time(), WorldBossConfig)
+	local state = worldBoss
+	if window.Active and (not state or state.Cycle ~= window.Cycle) then
+		if state and not state.Settled then
+			settleWorldBoss()
+		end
+		worldBoss = WorldBoss.New(window.Cycle, #Players:GetPlayers(), WorldBossConfig)
+		worldBossDirty = true
+		for _, player in Players:GetPlayers() do
+			notify(player, ("The %s has appeared in the hub! Blast anywhere to hurt it: big chains hit hardest."):format(WorldBossConfig.Name), "Warning")
+		end
+	elseif state and not state.Settled and (state.Done or not window.Active) then
+		settleWorldBoss()
+	end
+	if worldBossDirty then
+		worldBossDirty = false
+		Remotes.WorldBoss:FireAllClients(worldBossView())
+	end
+end
+
+local function hitWorldBoss(player: Player, pops: number)
+	local state = worldBoss
+	if state and not state.Settled and WorldBoss.Hit(state, player.UserId, pops, WorldBossConfig) > 0 then
+		worldBossDirty = true
+		if state.Done then
+			worldBossTick() -- pay out at once
+		end
+	end
+end
+
 local function finishGoal()
 	for _, userId in Community.Rewardees(goal) do
 		local player = Players:GetPlayerByUserId(userId)
@@ -1017,6 +1083,9 @@ local function onDetonate(player: Player, payload: any)
 	recordDaily(data, "Chain", result.Pops)
 	recordDaily(data, "Volleys", 1)
 	recordContract(data, "Chain", nil, result.Pops)
+	if not seam.Puzzle then
+		hitWorldBoss(player, result.Pops)
+	end
 	if criticalStarted then
 		recordDaily(data, "Critical", 1)
 		recordContract(data, "Critical", nil, 1)
@@ -1594,6 +1663,7 @@ local function onPlayerAdded(player: Player)
 	player:LoadCharacter()
 	sync(player)
 	Remotes.Community:FireClient(player, Community.View(goal, os.clock(), CommunityConfig))
+	Remotes.WorldBoss:FireClient(player, worldBossView())
 
 	-- Show caverns that are already active.
 	for other, seam in seams do
@@ -1700,6 +1770,15 @@ function Game.Init()
 		task.spawn(onPlayerAdded, player)
 	end
 	task.spawn(idleLoop)
+	task.spawn(function()
+		while true do
+			task.wait(2)
+			local ok, err = pcall(worldBossTick)
+			if not ok then
+				warn("[Game] worldBossTick failed: " .. tostring(err))
+			end
+		end
+	end)
 	-- Broadcast the shared goal when it changed (at most every 2 seconds), and at least every 30 (clients count the frenzy down themselves) so timers stay honest.
 	task.spawn(function()
 		local ticks = 0

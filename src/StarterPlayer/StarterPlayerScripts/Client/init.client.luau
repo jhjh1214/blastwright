@@ -13,6 +13,7 @@ local AudioManager = require(script.AudioManager)
 local Blasting = require(script.Blasting)
 local CacheView = require(script.CacheView)
 local Trophies = require(script.Trophies)
+local WorldBossView = require(script.WorldBossView)
 local CameraFeedback = require(script.CameraFeedback)
 local CavernView = require(script.CavernView)
 local Guide = require(script.Guide)
@@ -160,6 +161,11 @@ Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
 	if not ok then
 		warn("[Client] MonsterTurn failed: " .. tostring(err))
 	end
+end)
+
+Remotes.WorldBoss.OnClientEvent:Connect(function(view)
+	UI.SetWorldBoss(view, os.clock())
+	pcall(WorldBossView.Show, view)
 end)
 
 Remotes.Community.OnClientEvent:Connect(function(view)

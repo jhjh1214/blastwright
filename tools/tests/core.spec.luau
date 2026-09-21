@@ -3594,5 +3594,87 @@ test("schema: v13 saves migrate to v14 with an empty contract record", function(
 	eq(d.Shards, 7, "shards kept")
 end)
 
+-- World boss ---------------------------------------------------------------------------------------------------------
+local WorldBoss = require("../../src/ReplicatedStorage/Shared/WorldBoss")
+local WBCfg = require("../../src/ReplicatedStorage/Shared/Config/WorldBoss")
+
+test("worldboss: the window opens at the start of each cycle and closes exactly after ActiveSeconds", function()
+	local base = 1800 * 1000
+	local w = WorldBoss.Window(base, WBCfg)
+	eq(w.Active, true, "open at the very start")
+	eq(w.EndsIn, WBCfg.ActiveSeconds, "full time left")
+	eq(WorldBoss.Window(base + WBCfg.ActiveSeconds - 1, WBCfg).Active, true, "last second still open")
+	local closed = WorldBoss.Window(base + WBCfg.ActiveSeconds, WBCfg)
+	eq(closed.Active, false, "closed at ActiveSeconds")
+	eq(closed.NextIn, 1800 - WBCfg.ActiveSeconds, "time until the next one")
+	eq(WorldBoss.Window(base + 1799, WBCfg).NextIn, 1, "one second before the next")
+	eq(WorldBoss.Window(base + 1800, WBCfg).Cycle, 1001, "next cycle number")
+end)
+
+test("worldboss: hp scales with players, never below the minimum", function()
+	eq(WorldBoss.MaxHP(1, WBCfg), WBCfg.BaseHP + WBCfg.HPPerPlayer * WBCfg.MinPlayers, "solo is treated as the minimum")
+	eq(WorldBoss.MaxHP(10, WBCfg), WBCfg.BaseHP + WBCfg.HPPerPlayer * 10, "ten players")
+	eq(WorldBoss.MaxHP(0, WBCfg) > 0, true, "zero players still positive")
+end)
+
+test("worldboss: volley damage grows faster than pops, junk does nothing", function()
+	eq(WorldBoss.VolleyDamage(0, WBCfg), 0, "no pops")
+	eq(WorldBoss.VolleyDamage(-5, WBCfg), 0, "negative")
+	eq(WorldBoss.VolleyDamage(0 / 0, WBCfg), 0, "NaN")
+	eq(WorldBoss.VolleyDamage(40, WBCfg) > 2 * WorldBoss.VolleyDamage(20, WBCfg), true, "a big chain beats two small ones")
+	eq(WorldBoss.VolleyDamage(1e9, WBCfg), WorldBoss.VolleyDamage(500, WBCfg), "capped")
+end)
+
+test("worldboss: hits accumulate per player, the boss falls exactly at zero and takes nothing after", function()
+	local st = WorldBoss.New(1, 3, WBCfg)
+	local total = 0
+	total += WorldBoss.Hit(st, 11, 20, WBCfg)
+	total += WorldBoss.Hit(st, 22, 10, WBCfg)
+	eq(st.HP, st.MaxHP - total, "hp went down by what was dealt")
+	eq(st.Damage[11], WorldBoss.VolleyDamage(20, WBCfg), "player one")
+	eq(WorldBoss.Hit(st, "x" :: any, 20, WBCfg), 0, "junk user id")
+	local dealt = WorldBoss.Hit(st, 11, 500, WBCfg)
+	eq(dealt <= st.MaxHP, true, "cannot deal more than the boss had")
+	eq(st.Done, true, "down")
+	eq(st.HP, 0, "exactly zero, never negative")
+	eq(WorldBoss.Hit(st, 22, 30, WBCfg), 0, "no damage after it is down")
+	local sum = 0
+	for _, d in st.Damage do sum += d end
+	eq(sum, st.MaxHP, "all damage recorded adds up to the boss's hp")
+end)
+
+test("worldboss: ranking breaks ties by user id, settlement pays once with tiers", function()
+	local st = WorldBoss.New(1, 3, WBCfg)
+	st.Damage = { [5] = 100, [3] = 100, [9] = 300, [7] = 10, [2] = 60, [8] = 40 }
+	local order = WorldBoss.Ranking(st)
+	eq(order[1].UserId, 9, "top damage")
+	eq(order[2].UserId, 3, "tie: lower id first")
+	eq(order[3].UserId, 5, "tie: higher id second")
+	st.Done = true
+	local pay = WorldBoss.Settle(st, WBCfg)
+	local by = {}
+	for _, p in pay do by[p.UserId] = p end
+	eq(by[7], nil, "below MinDamage gets nothing")
+	eq(#by[9].Grants, #WBCfg.Rewards.Participant + #WBCfg.Rewards.Defeated + #WBCfg.Rewards.Top, "top three get everything")
+	eq(#by[2].Grants, #WBCfg.Rewards.Participant + #WBCfg.Rewards.Defeated, "rank 4 gets participant and defeat rewards")
+	eq(#WorldBoss.Settle(st, WBCfg), 0, "settling twice pays nothing")
+	local lost = WorldBoss.New(2, 3, WBCfg)
+	lost.Damage = { [1] = 500 }
+	local consolation = WorldBoss.Settle(lost, WBCfg)
+	eq(#consolation[1].Grants, #WBCfg.Rewards.Participant, "if it was not beaten only the participant reward")
+end)
+
+test("worldboss: every reward is a valid grant and the view hides a settled boss", function()
+	local G = require("../../src/ReplicatedStorage/Shared/Grants")
+	for _, list in WBCfg.Rewards do
+		for _, g in list do eq(G.Valid(g), true, "valid grant") end
+	end
+	local st = WorldBoss.New(1, 3, WBCfg)
+	eq(WorldBoss.View(st, 1800 * 5 + 10, WBCfg).Active, true, "up")
+	eq(WorldBoss.View(nil, 1800 * 5 + 10, WBCfg).Active, false, "none")
+	WorldBoss.Settle(st, WBCfg)
+	eq(WorldBoss.View(st, 1800 * 5 + 10, WBCfg).Active, false, "settled")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end
