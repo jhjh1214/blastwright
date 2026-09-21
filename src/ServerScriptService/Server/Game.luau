@@ -605,7 +605,7 @@ local function endFloor(player: Player, seam: SeamState)
 	else
 		local amount = Expedition.Salvage(run, ExpeditionConfig)
 		award(data, amount)
-		notify(player, ("The tunnel collapsed! You salvaged %d shards from floor %d."):format(amount, run.Floor), "Error")
+		notify(player, ("The tunnel collapsed! You salvaged %d shards from floor %d.%s"):format(amount, run.Floor, (data.Inventory.Revive or 0) == 0 and " (Revive tokens in the Shop can save a run.)" or ""), "Error")
 		finishRun(player, seam)
 	end
 	announceGoals(player)
@@ -678,6 +678,10 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 				seam.Earned += bounty
 			end
 			data.Stats.LurkersSlain += 1
+			if Community.Contribute(goal, player.UserId, 5) then -- monsters are a shared threat: kills count toward the Server Goal
+				finishGoal()
+			end
+			goalDirty = true
 			Mastery.RecordLurker(data.Collection, m.Kind)
 			local slayMods = seam.Run and Expedition.Modifiers(seam.Run, ExpeditionConfig) or nil
 			if slayMods and slayMods.KillRefund > 0 then
@@ -767,6 +771,10 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 		seam.BossDefeated = true
 		seam.Boss = nil
 		data.Stats.BossesSlain += 1
+		if Community.Contribute(goal, player.UserId, 40) then -- a boss kill is worth 40 pops toward the Server Goal
+			finishGoal()
+		end
+		goalDirty = true
 		Mastery.RecordBoss(data.Collection, boss.Kind)
 		Leaderboard.Submit("Bosses", player.UserId, data.Stats.BossesSlain)
 		local newly = Mastery.Evaluate(boss.Kind, { HeartsLost = stats.HeartsLost, Volleys = stats.Volleys, FinalPops = result.Pops, HeartsLeft = seam.Hearts }, data.Mastery.Done, MasteryConfig)

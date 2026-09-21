@@ -140,6 +140,9 @@ Everything below was written without being run in Studio (the automated tests co
 - A "Featured" section at the top shows the Ultimate Blastwright, Boss Hunter and Starter Blast bundles. Prices shown are my hints (about R$) and are NOT read from Roblox; the real price appears in the Roblox prompt.
 - Watch for: hitches when the Shop tab opens (many animations at once), text overflow inside cards on a phone, gems not rendering inside cards, the card border animation looking too busy.
 
+### E14. Shared threat (unseen in Studio)
+- Killing a Lurker adds 5 and a boss 40 to the server-wide Server Goal counter (the same one chain pops feed), so everyone in the server is pushing the same bar. After a collapse without Revive tokens the toast mentions the Shop once; it is a plain message, never a purchase prompt.
+
 ### F. Multi-player and phones (Test > 2 players, and the Device emulator)
 23. Two players use different pads and see each other's grids and blasts (distant grids appear only when you are near: level of detail). A pad in use is labelled "In use". Walking 130+ studs away for a minute releases it.
 24. Phone-size window (for example 390 x 844): top bar (shards, Menu, ?) does not overlap; the Menu panel's 5 tabs fit; the grid is fully visible in the free band; buttons are tappable; text readable.
