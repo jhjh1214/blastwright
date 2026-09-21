@@ -803,6 +803,45 @@ local function rebuildPanel()
 				if canPlay then Remotes.PuzzleStart:FireServer() end
 			end, nil, { Icon = "P", Accent = Color3.fromRGB(255, 200, 60), Dim = not canPlay })
 		end
+		-- Notice Board: pick ONE contract at a time from three daily offers (Easy / Standard / Hard).
+		if d.Contracts and #d.Contracts > 0 then
+			local anyActive = false
+			for _, c in d.Contracts do
+				anyActive = anyActive or c.Active
+			end
+			header(30, anyActive and "Notice Board: finish your contract or give it up to take another" or "Notice Board: pick one contract (progress counts after you accept)")
+			local tierIcons = { "E", "S", "H" }
+			local tierColors = { Theme.Colors.Success, Theme.Colors.Warning, Theme.Colors.Danger }
+			for _, c in d.Contracts do
+				local rewards = Config.Contracts.Rewards[c.Tier] or {}
+				local parts = {}
+				for _, g in rewards do
+					if g.Kind == "Shards" then
+						table.insert(parts, "◆ " .. commas(g.Amount * math.max(1, d.Progress and d.Progress.StrataUnlocked or 1)))
+					elseif g.Kind == "Tokens" then
+						table.insert(parts, ("%d %s token%s"):format(g.Count, string.lower(g.Token), g.Count > 1 and "s" or ""))
+					end
+				end
+				local done = c.Progress >= c.Target
+				local btn, can, onClick
+				if c.Done then
+					btn, can = "Done", false
+				elseif c.Active then
+					if done then
+						btn, can, onClick = "Claim", true, function() Remotes.ContractClaim:FireServer() end
+					else
+						btn, can = ("%d / %d"):format(c.Progress, c.Target), false
+					end
+				else
+					btn, can = "Accept", not anyActive
+					onClick = function() Remotes.ContractAccept:FireServer(c.Tier) end
+				end
+				row(30 + c.Tier, ("%s: %s"):format(c.TierName, c.Text), "Reward: " .. table.concat(parts, " + "), btn, can, onClick or function() end, nil, { Progress = c.Active and c.Progress / math.max(1, c.Target) or (c.Done and 1 or nil), Icon = tierIcons[c.Tier], Accent = tierColors[c.Tier], Dim = c.Done })
+			end
+			if anyActive then
+				row(34, "Give up the current contract", "Its progress is lost, but you can take it (or another) again today.", "Give up", true, function() Remotes.ContractAccept:FireServer("abandon") end, nil, { Icon = "X", Accent = Theme.Colors.Neutral })
+			end
+		end
 		-- Weekly challenges: bigger targets and rewards, reset Monday 00:00 UTC.
 		local weekSecs = math.max(0, math.floor((State.WeeklyResetAt or 0) - os.clock()))
 		header(10, ("Weekly challenges: reset in %dd %02dh (unclaimed rewards are lost)"):format(weekSecs // 86400, (weekSecs % 86400) // 3600))
@@ -1175,6 +1214,9 @@ function UI.Refresh()
 			for _, item in list do
 				if item.Progress >= item.Target and not item.Claimed then dailyReady = true end
 			end
+		end
+		for _, c in d.Contracts or {} do
+			if c.Active and c.Progress >= c.Target then dailyReady = true end
 		end
 		for _, g in d.Goals or {} do
 			if g.Complete and not g.Claimed then goalReady = true end

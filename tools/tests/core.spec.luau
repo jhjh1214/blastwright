@@ -3084,7 +3084,7 @@ test("schema: v12 saves migrate to v13 with boosts, tokens, finishers and club r
 	eq(d.Inventory.Revive, 0, "no tokens")
 	eq(d.Finishers.Equipped, "Gold", "default finisher")
 	eq(d.Club.LastMonth, 0, "club unclaimed")
-	eq(Schema.CURRENT_VERSION, 13, "version")
+	eq(Schema.CURRENT_VERSION >= 13, true, "v13 exists")
 end)
 
 test("grants: adding a weaker boost never weakens a running one, and one huge purchase is capped from the start", function()
@@ -3514,6 +3514,84 @@ test("bossrt: simulating a volley reports exactly what Counter would do, and cha
 			end
 		end
 	end
+end)
+
+
+-- Notice Board contracts ---------------------------------------------------------------------------------------------
+local Contracts = require("../../src/ReplicatedStorage/Shared/Contracts")
+local ContractCfg = require("../../src/ReplicatedStorage/Shared/Config/Contracts")
+
+test("contracts: three distinct offers a day, deterministic, targets rise by tier", function()
+	for day = 20000, 20060 do
+		local a, b = Contracts.ForDay(day, ContractCfg), Contracts.ForDay(day, ContractCfg)
+		eq(#a, 3, "three offers")
+		eq(a[1].Id ~= a[2].Id and a[2].Id ~= a[3].Id and a[1].Id ~= a[3].Id, true, "distinct templates")
+		for i = 1, 3 do
+			eq(a[i].Id, b[i].Id, "same day same offers")
+			eq(a[i].Tier, i, "tier order")
+		end
+	end
+	for _, t in ContractCfg.Templates do
+		eq(t.Targets[1] < t.Targets[2] and t.Targets[2] < t.Targets[3], true, t.Id .. " targets rise")
+	end
+	eq(#ContractCfg.Rewards, #ContractCfg.Tiers, "a reward per tier")
+end)
+
+test("contracts: accept one at a time, count only matching events after accepting, claim once", function()
+	local offers = {
+		{ Tier = 1, Id = "H", Kind = "Slay", Param = "Gnasher", Target = 3, Text = "", TierName = "Easy" },
+		{ Tier = 2, Id = "C", Kind = "Chain", Target = 20, Text = "", TierName = "Standard" },
+		{ Tier = 3, Id = "B", Kind = "Boss", Target = 2, Text = "", TierName = "Hard" },
+	}
+	local s = Contracts.Default()
+	Contracts.Ensure(s, 5)
+	Contracts.Record(s, offers, "Slay", "Gnasher", 1)
+	eq(s.Progress, 0, "nothing counts before accepting")
+	for _, junk in { 0, 4, -1, 1.5, "1", true, {}, 0 / 0 } do
+		eq(Contracts.Accept(s, junk, offers), false, "junk tier")
+	end
+	eq(Contracts.Accept(s, 1, offers), true, "accepted")
+	eq(Contracts.Accept(s, 2, offers), false, "only one at a time")
+	Contracts.Record(s, offers, "Slay", "Skitter", 1)
+	eq(s.Progress, 0, "wrong lurker does not count")
+	Contracts.Record(s, offers, "Chain", nil, 30)
+	eq(s.Progress, 0, "wrong kind does not count")
+	Contracts.Record(s, offers, "Slay", "Gnasher", 1)
+	Contracts.Record(s, offers, "Slay", "Gnasher", 5)
+	eq(s.Progress, 3, "capped at target")
+	eq(Contracts.Claim(s, offers), 1, "claim returns the tier")
+	eq(Contracts.Claim(s, offers), nil, "nothing to claim twice")
+	eq(Contracts.Accept(s, 1, offers), false, "a finished contract cannot be retaken today")
+	eq(Contracts.Accept(s, 2, offers), true, "another can be")
+	Contracts.Record(s, offers, "Chain", nil, 12)
+	Contracts.Record(s, offers, "Chain", nil, 8)
+	eq(s.Progress, 12, "chain keeps the best")
+	Contracts.Record(s, offers, "Chain", nil, 99)
+	eq(s.Progress, 20, "chain capped at the target")
+	eq(Contracts.Claim(s, offers), 2, "complete: claim")
+	eq(Contracts.Accept(s, 3, offers), true, "next")
+	eq(Contracts.Claim(s, offers), nil, "incomplete cannot be claimed")
+	eq(Contracts.Abandon(s), true, "abandon")
+	eq(s.Progress, 0, "progress lost")
+	Contracts.Ensure(s, 6)
+	eq(next(s.Done), nil, "a new day clears what was done")
+end)
+
+test("contracts: every reward is a valid grant and every kind is one the server records", function()
+	local Grants2 = require("../../src/ReplicatedStorage/Shared/Grants")
+	for _, list in ContractCfg.Rewards do
+		for _, g in list do eq(Grants2.Valid(g), true, "valid grant") end
+	end
+	local recorded = { Slay = true, Chain = true, Critical = true, Boss = true, Floor = true }
+	for _, t in ContractCfg.Templates do eq(recorded[t.Kind], true, t.Id .. " kind recorded") end
+end)
+
+test("schema: v13 saves migrate to v14 with an empty contract record", function()
+	local d = Schema.Migrate({ SchemaVersion = 13, Shards = 7 })
+	eq(d.SchemaVersion, Schema.CURRENT_VERSION, "version")
+	eq(Schema.CURRENT_VERSION >= 14, true, "v14 exists")
+	eq(d.Contract.Active, 0, "no active contract")
+	eq(d.Shards, 7, "shards kept")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

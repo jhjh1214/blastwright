@@ -17,6 +17,7 @@ local Dailies = require(Shared.Dailies)
 local Events = require(Shared.Events)
 local Expedition = require(Shared.Expedition)
 local Puzzle = require(Shared.Puzzle)
+local Contracts = require(Shared.Contracts)
 local Farm = require(Shared.Farm)
 local Lurker = require(Shared.Lurker)
 local Power = require(Shared.Power)
@@ -46,6 +47,7 @@ local EventsConfig = Config.Events
 local CommunityConfig = Config.Community
 local ExpeditionConfig = Config.Expedition
 local PuzzleConfig = Config.Puzzle
+local ContractsConfig = Config.Contracts
 local FarmConfig = Config.Farm
 local LurkerConfig = Config.Lurkers
 local BossConfig = Config.Bosses
@@ -139,6 +141,16 @@ end
 
 local function ensureDaily(data: any)
 	Dailies.Refresh(data.Daily, Dailies.DayNumber(os.time()))
+end
+
+-- Notice Board: today's three offers (same for everyone); the player's record resets when the UTC day rolls over.
+local function todaysContracts()
+	return Contracts.ForDay(Dailies.DayNumber(os.time()), ContractsConfig)
+end
+
+local function recordContract(data: any, kind: string, param: string?, amount: number)
+	Contracts.Ensure(data.Contract, Dailies.DayNumber(os.time()))
+	Contracts.Record(data.Contract, todaysContracts(), kind, param, amount)
 end
 
 local function weeklyDefs()
@@ -239,6 +251,10 @@ local function snapshot(player: Player): { [string]: any }?
 		Settings = data.Settings,
 		Dailies = Dailies.View(data.Daily, todaysDefs(), data.Progress.StrataUnlocked),
 		Weeklies = Dailies.View(data.Weekly, weeklyDefs(), data.Progress.StrataUnlocked),
+		Contracts = (function()
+			Contracts.Ensure(data.Contract, Dailies.DayNumber(os.time()))
+			return Contracts.View(data.Contract, todaysContracts())
+		end)(),
 		WeeklyResetIn = Dailies.SecondsUntilWeekReset(os.time()),
 		DailyResetIn = Dailies.SecondsUntilReset(os.time()),
 		Shards = data.Shards,
@@ -603,6 +619,9 @@ local function endFloor(player: Player, seam: SeamState)
 	data.Stats.BestDepth = math.max(data.Stats.BestDepth, run.Floor)
 	Leaderboard.Submit("Depth", player.UserId, data.Stats.BestDepth)
 
+	if outcome == "Choose" or outcome == "Victory" then
+		recordContract(data, "Floor", nil, run.Floor)
+	end
 	if outcome == "Choose" then
 		notify(player, ("Floor %d cleared! Choose your next step, or bank your haul."):format(run.Floor), "Reward")
 		sendRunState(player)
@@ -688,6 +707,7 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 				seam.Earned += bounty
 			end
 			data.Stats.LurkersSlain += 1
+			recordContract(data, "Slay", m.Kind, 1)
 			recordDaily(data, "Slays", 1)
 			if Community.Contribute(goal, player.UserId, 5) then -- monsters are a shared threat: kills count toward the Server Goal
 				finishGoal()
@@ -782,6 +802,7 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 		seam.BossDefeated = true
 		seam.Boss = nil
 		data.Stats.BossesSlain += 1
+		recordContract(data, "Boss", nil, 1)
 		if Community.Contribute(goal, player.UserId, 40) then -- a boss kill is worth 40 pops toward the Server Goal
 			finishGoal()
 		end
@@ -995,8 +1016,10 @@ local function onDetonate(player: Player, payload: any)
 	recordDaily(data, "Pops", result.Pops)
 	recordDaily(data, "Chain", result.Pops)
 	recordDaily(data, "Volleys", 1)
+	recordContract(data, "Chain", nil, result.Pops)
 	if criticalStarted then
 		recordDaily(data, "Critical", 1)
+		recordContract(data, "Critical", nil, 1)
 	end
 	recordDaily(data, "Shards", payout)
 	if result.Pops >= DailiesConfig.TierPops then
@@ -1286,6 +1309,41 @@ local function onClaimWeekly(player: Player, slot: any)
 	data.Weekly.Claimed[tostring(slot)] = true
 	data.Shards += reward
 	notify(player, ("Weekly challenge complete! +%d shards"):format(reward), "Reward")
+	sync(player)
+end
+
+local function onContractAccept(player: Player, tier: any)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	Contracts.Ensure(data.Contract, Dailies.DayNumber(os.time()))
+	-- "abandon" gives up the current contract so another can be taken
+	if tier == "abandon" then
+		if Contracts.Abandon(data.Contract) then
+			sync(player)
+		end
+		return
+	end
+	if Contracts.Accept(data.Contract, tier, todaysContracts()) then
+		notify(player, "Contract accepted. Finish it before the day ends!", "Info")
+		sync(player)
+	end
+end
+
+local function onContractClaim(player: Player)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	Contracts.Ensure(data.Contract, Dailies.DayNumber(os.time()))
+	local tier = Contracts.Claim(data.Contract, todaysContracts())
+	if not tier then
+		return notify(player, "That contract is not finished yet.", "Error")
+	end
+	Grants.Apply(data, ContractsConfig.Rewards[tier], os.time(), data.Progress.StrataUnlocked)
+	notify(player, "Contract complete! Reward collected.", "Reward")
+	announceGoals(player)
 	sync(player)
 end
 
@@ -1608,6 +1666,8 @@ function Game.Init()
 	Remotes.RunRevive.OnServerEvent:Connect(guarded("RunRevive", 3, 5, onRunRevive))
 	Remotes.UseCharge.OnServerEvent:Connect(guarded("UseCharge", 3, 5, onUseCharge))
 	Remotes.EquipFinisher.OnServerEvent:Connect(guarded("EquipFinisher", 3, 5, onEquipFinisher))
+	Remotes.ContractAccept.OnServerEvent:Connect(guarded("ContractAccept", 4, 6, onContractAccept))
+	Remotes.ContractClaim.OnServerEvent:Connect(guarded("ContractClaim", 3, 5, onContractClaim))
 	Remotes.ClubClaim.OnServerEvent:Connect(guarded("ClubClaim", 1, 2, onClubClaim))
 	Remotes.EquipTitle.OnServerEvent:Connect(guarded("EquipTitle", 3, 5, onEquipTitle))
 	Remotes.Dodge.OnServerEvent:Connect(guarded("Dodge", 4, 6, onDodge))

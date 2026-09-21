@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 13
+Schema.CURRENT_VERSION = 14
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -20,6 +20,7 @@ function Schema.Default(): { [string]: any }
 		Cosmetics = { Owned = {}, Equipped = { BlastColor = "Classic" } }, -- Owned = purchased styles; goal styles are derived
 		Achievements = { Claimed = {} }, -- [goalId] = true once the reward was taken (see Shared/Achievements.luau)
 		Puzzle = { Day = 0, Score = 0, Par = 0, Medal = "", Streak = 0, LastDay = 0, BestStreak = 0 }, -- see Shared/Puzzle.luau
+		Contract = { Day = 0, Active = 0, Progress = 0, Done = {} }, -- Notice Board, see Shared/Contracts.luau
 		Farm = { Level = 1, LastCollect = 0 }, -- see Shared/Farm.luau (LastCollect 0 = stamped with the time on first load)
 		Collection = { Lurkers = {}, Bosses = {}, Relics = {} }, -- see Shared/Mastery.luau: kill counts and relics found
 		Mastery = { Done = {}, Title = "", Extra = {} }, -- boss mastery objectives done, the title worn, and titles from purchases

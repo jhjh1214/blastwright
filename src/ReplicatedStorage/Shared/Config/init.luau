@@ -23,6 +23,7 @@ return {
 	Expedition = require(script.Expedition),
 	Puzzle = require(script.Puzzle),
 	Farm = require(script.Farm),
+	Contracts = require(script.Contracts),
 	Lurkers = require(script.Lurkers),
 	Bosses = require(script.Bosses),
 	Mastery = require(script.Mastery),

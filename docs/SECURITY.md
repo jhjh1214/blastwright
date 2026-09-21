@@ -10,6 +10,8 @@ All handlers go through a per-player, per-remote token bucket (`Server/RateLimit
 | `Detonate` | 6 / 10 | Payload is a table of at most 8 entries; each entry rebuilt clean (extra fields stripped); coordinates finite integers in range; charge kind must be unlocked in the server's record; no duplicate cells; count within remaining charges; character within 45 studs of the site station; 0.15 s cooldown; one volley in flight | The outcome (the server runs the simulation), rewards, multipliers, momentum, daily/goal progress |
 | `Buy` | 5 / 8 | `kind` and `id` must be strings; id looked up in config; cost checked against the server's shards; areas only in order | Prices, ownership, shards |
 | `Claim`, `ClaimWeekly` | 5 / 8 | Slot must be an integer 1-3 of today's/this week's objectives, complete, and not already claimed (`Dailies.CanClaim`) | Progress, completion, reward size |
+| `ContractAccept` | 4 / 6 | Tier must be an integer naming one of today's offers, or the string "abandon"; only one active contract; a finished one cannot be retaken (`Contracts.Accept`, hostile tiers tested) | Which contract is active |
+| `ContractClaim` | 3 / 5 | No argument; pays only when the active contract is complete (`Contracts.Claim`) once | Reward |
 | `ClaimGoal` | 5 / 8 | Id must be a string naming a real goal, complete and unclaimed (`Achievements.CanClaim`) | Progress, reward size |
 | `Equip` | 5 / 8 | Id must be a string naming a style the server says the player owns (`Cosmetics.CanEquip`) | Ownership |
 | `Setting` | 5 / 8 | Name must be `Music`, `Sfx` or `Shake`, value a boolean (`Validate.Setting`) | Anything except those three flags |
