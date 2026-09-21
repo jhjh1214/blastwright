@@ -1830,5 +1830,87 @@ test("goals: expedition depth and wins are readable stats", function()
 	eq(seenDepth and seenWins, true, "goals exist for both")
 end)
 
+local Puzzle = require("../../src/ReplicatedStorage/Shared/Puzzle")
+local PuzzleCfg = require("../../src/ReplicatedStorage/Shared/Config/Puzzle")
+
+test("puzzle: the seed depends only on the day, and differs between days", function()
+	eq(Puzzle.Seed(20000), Puzzle.Seed(20000), "same day, same seed")
+	eq(Puzzle.Seed(20000) ~= Puzzle.Seed(20001), true, "next day differs")
+end)
+
+test("puzzle: everyone gets the same grid for a day", function()
+	local a = Seam.Generate(Crystals, Tuning, PuzzleCfg.Stratum, Puzzle.Seed(20000), PuzzleCfg.MutationChance)
+	local b = Seam.Generate(Crystals, Tuning, PuzzleCfg.Stratum, Puzzle.Seed(20000), PuzzleCfg.MutationChance)
+	for i = 1, N * N do
+		local ca, cb = a.Cells[i], b.Cells[i]
+		eq(ca and ca.Kind, cb and cb.Kind, "cell " .. i)
+	end
+end)
+
+test("puzzle: par is what a greedy player scores, and three charges beat one", function()
+	local g = grid(function(x, z) if x == 5 then return "Glimmerstone" end end)
+	local par, picks = Puzzle.Par(g, ctx, 3, ChainSim.Run)
+	eq(#picks, 3, "three charges chosen")
+	local single = ChainSim.Run(g, { cap(5, 5) }, ctx).Total
+	eq(par > single, true, "three charges beat one")
+	eq(par, ChainSim.Run(g, picks, ctx).Total, "par equals the greedy volley's real score")
+end)
+
+test("puzzle: par never changes the grid", function()
+	local g = grid(function(x, z) if (x + z) % 3 == 0 then return "Glimmerstone" end end)
+	local before = 0
+	for _ in g.Cells do before += 1 end
+	Puzzle.Par(g, ctx, 3, ChainSim.Run)
+	local after = 0
+	for _ in g.Cells do after += 1 end
+	eq(after, before, "cells untouched")
+end)
+
+test("puzzle: an empty grid has a par of zero and no medal", function()
+	local par, picks = Puzzle.Par(grid(function() return nil end), ctx, 3, ChainSim.Run)
+	eq(#picks, 0, "no pointless charges are chosen")
+	eq(par, 0, "par")
+	eq(Puzzle.Medal(0, par, PuzzleCfg), nil, "no medal for nothing")
+end)
+
+test("puzzle: medals follow the ratio to par at their exact boundaries", function()
+	local m = PuzzleCfg.Medals
+	for i, medal in m do
+		local at = math.ceil(medal.Ratio * 1000)
+		eq(Puzzle.Medal(at, 1000, PuzzleCfg), medal.Name, medal.Name .. " at its threshold")
+		eq(Puzzle.Medal(at - 1, 1000, PuzzleCfg), i > 1 and m[i - 1].Name or nil, "just under " .. medal.Name)
+	end
+end)
+
+test("puzzle: streak continues on consecutive days, holds within a day, resets after a gap", function()
+	eq(Puzzle.Streak(0, 0, 100), 1, "first ever")
+	eq(Puzzle.Streak(99, 4, 100), 5, "yesterday continues")
+	eq(Puzzle.Streak(100, 5, 100), 5, "same day unchanged")
+	eq(Puzzle.Streak(97, 9, 100), 1, "gap resets")
+end)
+
+test("puzzle: streak bonus grows per day and is capped", function()
+	eq(Puzzle.Reward(1000, 1, PuzzleCfg), 1000, "no bonus on day one")
+	local capped = Puzzle.Reward(1000, PuzzleCfg.MaxStreakDays, PuzzleCfg)
+	eq(capped > Puzzle.Reward(1000, 2, PuzzleCfg), true, "grows")
+	eq(Puzzle.Reward(1000, 500, PuzzleCfg), capped, "capped")
+end)
+
+test("puzzle: config medals ascend and rewards rise with them", function()
+	for i = 2, #PuzzleCfg.Medals do
+		eq(PuzzleCfg.Medals[i].Ratio > PuzzleCfg.Medals[i - 1].Ratio, true, "ratio ascends at " .. i)
+		eq(PuzzleCfg.Medals[i].Reward > PuzzleCfg.Medals[i - 1].Reward, true, "reward ascends at " .. i)
+	end
+end)
+
+test("puzzle: schema v8 adds a puzzle record and keeps old saves intact", function()
+	local d = Schema.Migrate({ SchemaVersion = 7, Shards = 42 })
+	eq(d.Shards, 42, "shards kept")
+	eq(d.Puzzle.Day, 0, "day")
+	eq(d.Puzzle.Streak, 0, "streak")
+	eq(d.Puzzle.Medal, "", "medal")
+	eq(Schema.CURRENT_VERSION, 8, "version")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 7
+Schema.CURRENT_VERSION = 8
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -19,6 +19,7 @@ function Schema.Default(): { [string]: any }
 		Weekly = { Day = 0, Progress = {}, Claimed = {} }, -- same shape; Day holds the week number
 		Cosmetics = { Owned = {}, Equipped = { BlastColor = "Classic" } }, -- Owned = purchased styles; goal styles are derived
 		Achievements = { Claimed = {} }, -- [goalId] = true once the reward was taken (see Shared/Achievements.luau)
+		Puzzle = { Day = 0, Score = 0, Par = 0, Medal = "", Streak = 0, LastDay = 0, BestStreak = 0 }, -- see Shared/Puzzle.luau
 		Purchases = {}, -- receipt ids, reserved for monetization
 	}
 end
@@ -64,6 +65,12 @@ local Migrations: { [number]: (data: { [string]: any }) -> () } = {
 			if type(data.Stats.ExpeditionsWon) ~= "number" then
 				data.Stats.ExpeditionsWon = 0
 			end
+		end
+	end,
+	-- v8: daily puzzle. Missing record is filled from defaults by reconcile; nothing to convert.
+	[8] = function(data)
+		if type(data.Puzzle) ~= "table" then
+			data.Puzzle = { Day = 0, Score = 0, Par = 0, Medal = "", Streak = 0, LastDay = 0, BestStreak = 0 }
 		end
 	end,
 }

@@ -21,6 +21,7 @@ return {
 	Events = require(script.Events),
 	Community = require(script.Community),
 	Expedition = require(script.Expedition),
+	Puzzle = require(script.Puzzle),
 	Tuning = Tuning,
 	Context = {
 		Crystals = Crystals.Defs,
