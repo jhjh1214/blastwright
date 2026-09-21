@@ -429,32 +429,35 @@ local function buildHub()
 		end
 	end
 
-	-- Leaderboard board beside the spawn. Text is filled in by Server/Leaderboard.luau.
-	local boardPos = Vector3.new(W.Hub.X + 30, 7, W.Hub.Z + 16)
+	-- Leaderboards beside the spawn (Chain, Depth, Bosses). Text is filled in by Server/Leaderboard.luau.
+	World.Registry.Boards = {}
 	local face = Vector3.new(W.Spawn.X, 7, W.Spawn.Z)
-	for _, dz in { -6, 6 } do
-		decorPart(folder, Vector3.new(0.7, 8, 0.7), CFrame.new(boardPos + Vector3.new(0, -3, dz)), Color3.fromRGB(30, 32, 44), Enum.Material.Metal)
+	for index, kind in { "Chain", "Depth", "Bosses" } do
+		local boardPos = Vector3.new(W.Hub.X + 30, 7, W.Hub.Z + 16 - (index - 1) * 18)
+		for _, dz in { -6, 6 } do
+			decorPart(folder, Vector3.new(0.7, 8, 0.7), CFrame.new(boardPos + Vector3.new(0, -3, dz)), Color3.fromRGB(30, 32, 44), Enum.Material.Metal)
+		end
+		local board = decorPart(folder, Vector3.new(16, 10, 0.6), CFrame.lookAt(boardPos, face), Color3.fromRGB(20, 24, 36), Enum.Material.Metal)
+		board.Name = "LeaderboardBoard_" .. kind
+		local boardGui = Instance.new("SurfaceGui")
+		boardGui.Face = Enum.NormalId.Front
+		boardGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		boardGui.PixelsPerStud = 40
+		boardGui.LightInfluence = 0
+		boardGui.Brightness = 1.6
+		boardGui.Parent = board
+		local boardLabel = Instance.new("TextLabel")
+		boardLabel.Size = UDim2.fromScale(1, 1)
+		boardLabel.BackgroundTransparency = 1
+		boardLabel.Font = Enum.Font.Code
+		boardLabel.TextSize = 26
+		boardLabel.TextColor3 = Color3.fromRGB(255, 210, 110)
+		boardLabel.TextXAlignment = Enum.TextXAlignment.Left
+		boardLabel.TextYAlignment = Enum.TextYAlignment.Top
+		boardLabel.Text = kind
+		boardLabel.Parent = boardGui
+		World.Registry.Boards[kind] = boardLabel
 	end
-	local board = decorPart(folder, Vector3.new(16, 10, 0.6), CFrame.lookAt(boardPos, face), Color3.fromRGB(20, 24, 36), Enum.Material.Metal)
-	board.Name = "LeaderboardBoard"
-	local boardGui = Instance.new("SurfaceGui")
-	boardGui.Face = Enum.NormalId.Front
-	boardGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	boardGui.PixelsPerStud = 40
-	boardGui.LightInfluence = 0
-	boardGui.Brightness = 1.6
-	boardGui.Parent = board
-	local boardLabel = Instance.new("TextLabel")
-	boardLabel.Size = UDim2.fromScale(1, 1)
-	boardLabel.BackgroundTransparency = 1
-	boardLabel.Font = Enum.Font.Code
-	boardLabel.TextSize = 26
-	boardLabel.TextColor3 = Color3.fromRGB(255, 210, 110)
-	boardLabel.TextXAlignment = Enum.TextXAlignment.Left
-	boardLabel.TextYAlignment = Enum.TextYAlignment.Top
-	boardLabel.Text = "LONGEST CHAINS"
-	boardLabel.Parent = boardGui
-	World.Registry.Board = boardLabel
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "Spawn"

@@ -122,6 +122,9 @@ Everything below was written without being run in Studio (the automated tests co
 ### E10. Combat live events (unseen in Studio)
 - New calendar events (UTC): Lurker Swarm Friday (Lurkers 3x as common, bounties 1.5x), Crystal Storm (every day 20:00-21:00: rare crystals 3x, damage +25%, Lurkers 1.5x), Explosive Sunday (damage +50%, bounties 1.5x). To test without waiting, temporarily change an event's Weekdays/hours in `Config/Events.luau` to include now. The event banner (top right) should name it; Lurkers should appear noticeably more often and fights should end faster during the damage events.
 
+### E11. Hub boards (unseen in Studio; need a published game with API access)
+- Three boards now stand by the spawn: LONGEST CHAINS, DEEPEST EXPEDITIONS, BOSS SLAYERS (each an OrderedDataStore, refreshed every 90 s, written at most every 30 s). Check they do not clip into other hub decor, face the spawn, and show "Unavailable" (not an error) in an unpublished Studio place. After reaching a new depth or slaying the Titan, the right board should list you within a couple of minutes.
+
 ### F. Multi-player and phones (Test > 2 players, and the Device emulator)
 23. Two players use different pads and see each other's grids and blasts (distant grids appear only when you are near: level of detail). A pad in use is labelled "In use". Walking 130+ studs away for a minute releases it.
 24. Phone-size window (for example 390 x 844): top bar (shards, Menu, ?) does not overlap; the Menu panel's 5 tabs fit; the grid is fully visible in the free band; buttons are tappable; text readable.

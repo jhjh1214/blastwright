@@ -591,6 +591,7 @@ local function endFloor(player: Player, seam: SeamState)
 	end
 	local outcome = Expedition.FloorEnded(run, seam.Earned, fraction, chargesLeft, runRng, ExpeditionConfig)
 	data.Stats.BestDepth = math.max(data.Stats.BestDepth, run.Floor)
+	Leaderboard.Submit("Depth", player.UserId, data.Stats.BestDepth)
 
 	if outcome == "Choose" then
 		notify(player, ("Floor %d cleared! Choose your next step, or bank your haul."):format(run.Floor), "Reward")
@@ -767,6 +768,7 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 		seam.Boss = nil
 		data.Stats.BossesSlain += 1
 		Mastery.RecordBoss(data.Collection, boss.Kind)
+		Leaderboard.Submit("Bosses", player.UserId, data.Stats.BossesSlain)
 		local newly = Mastery.Evaluate(boss.Kind, { HeartsLost = stats.HeartsLost, Volleys = stats.Volleys, FinalPops = result.Pops, HeartsLeft = seam.Hearts }, data.Mastery.Done, MasteryConfig)
 		if #newly > 0 then
 			award(data, Mastery.Grant(data.Mastery, newly))
@@ -922,7 +924,7 @@ local function onDetonate(player: Player, payload: any)
 		recordDaily(data, "Tiers", 1)
 	end
 	data.Stats.BestChain = math.max(data.Stats.BestChain, result.Pops)
-	Leaderboard.Submit(player.UserId, data.Stats.BestChain)
+	Leaderboard.Submit("Chain", player.UserId, data.Stats.BestChain)
 	if Community.Contribute(goal, player.UserId, result.Pops) then
 		finishGoal()
 	end
@@ -1446,7 +1448,9 @@ local function onPlayerAdded(player: Player)
 		session.Data.Farm.LastCollect = os.time() -- a new farm starts producing now (no backpay for old saves)
 	end
 	seenGoals[player] = {}
-	Leaderboard.Submit(player.UserId, session.Data.Stats.BestChain)
+	Leaderboard.Submit("Chain", player.UserId, session.Data.Stats.BestChain)
+	Leaderboard.Submit("Depth", player.UserId, session.Data.Stats.BestDepth)
+	Leaderboard.Submit("Bosses", player.UserId, session.Data.Stats.BossesSlain)
 	Achievements.NewlyComplete(session.Data, AchievementsConfig, seenGoals[player]) -- silent: old completions are not announced
 	Purchases.LoadPasses(player)
 	task.spawn(Purchases.RefreshClub, player)
@@ -1521,7 +1525,7 @@ function Game.Init()
 		Purchases.Init({ Notify = notify, OnChanged = sync })
 	end)
 	optional("Leaderboard", function()
-		Leaderboard.Init(World.Registry.Board)
+		Leaderboard.Init(World.Registry.Boards)
 	end)
 
 	for siteId, entry in World.Registry.Sites do
