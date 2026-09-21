@@ -118,6 +118,22 @@ BUILDERS.Titan = function(m)
 	return body
 end
 
+BUILDERS.Warden = function(m)
+	local body = part(m, "Body", BLOCK, Vector3.new(6, 16, 6), Vector3.new(0, 8, 0), Color3.fromRGB(70, 120, 150), Enum.Material.Glass, 0.15)
+	part(m, "Base", BLOCK, Vector3.new(12, 2.4, 12), Vector3.new(0, 1.2, 0), Color3.fromRGB(40, 60, 84), Enum.Material.Slate)
+	part(m, "Core", BALL, Vector3.new(4.4, 4.4, 4.4), Vector3.new(0, 9, 3.4), Color3.fromRGB(255, 200, 60), Enum.Material.Neon)
+	part(m, "Spire", BLOCK, Vector3.new(2.2, 7, 2.2), Vector3.new(0, 19.5, 0), Color3.fromRGB(130, 210, 255), Enum.Material.Neon, 0.25)
+	-- prisms orbiting the tower (they are static parts; the whole model sways)
+	for i = 1, 6 do
+		local a = i / 6 * math.pi * 2
+		local pos = Vector3.new(math.cos(a) * 8, 6 + (i % 3) * 4, math.sin(a) * 8)
+		local prism = part(m, "Prism", BLOCK, Vector3.new(1.6, 4.2, 1.6), pos, Color3.fromRGB(150, 230, 255), Enum.Material.Neon, 0.3)
+		prism.CFrame = CFrame.new(pos) * CFrame.Angles(math.rad(20 * (i % 2 == 0 and 1 or -1)), a, math.rad(25))
+	end
+	eyes(m, 15, 3.1, 1.3, 1.0, Color3.fromRGB(255, 240, 150))
+	return body
+end
+
 -- Build a creature model centred on the origin (its "Body" is the PrimaryPart). Unknown kinds get a plain dark ball.
 function Creatures.Build(kind)
 	local model = Instance.new("Model")
@@ -163,7 +179,11 @@ function Creatures.SetPhase(model, phase)
 	core.Color = colors[phase] or core.Color
 	local body = model:FindFirstChild("Body")
 	if body then
-		body.Color = phase == "Enrage" and Color3.fromRGB(110, 40, 60) or Color3.fromRGB(60, 52, 96)
+		if model.Name == "Creature_Titan" then
+			body.Color = phase == "Enrage" and Color3.fromRGB(110, 40, 60) or Color3.fromRGB(60, 52, 96)
+		else
+			body.Color = phase == "Enrage" and Color3.fromRGB(150, 70, 110) or Color3.fromRGB(70, 120, 150)
+		end
 	end
 end
 

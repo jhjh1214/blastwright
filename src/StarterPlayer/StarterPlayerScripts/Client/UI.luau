@@ -952,7 +952,7 @@ local function rebuildPanel()
 			header(order, "Bosses")
 			for _, r in col.Bosses do
 				order += 1
-				row(order, r.Found and ("%s  x%d"):format(r.Name, r.Kills) or "???", r.Found and r.Description or "Reach floor 4 of an Expedition", nil, false, nil, r.Found and THEME.Gold or THEME.Dim, { Icon = "★", Accent = Color3.fromRGB(200, 40, 60), Dim = not r.Found })
+				row(order, r.Found and ("%s  x%d"):format(r.Name, r.Kills) or "???", r.Found and r.Description or "Reach a boss floor of an Expedition (floor 4 or 8)", nil, false, nil, r.Found and THEME.Gold or THEME.Dim, { Icon = "★", Accent = Color3.fromRGB(200, 40, 60), Dim = not r.Found })
 			end
 			order += 1
 			header(order, ("Relics found %d/%d"):format(col.RelicsFound, col.RelicsTotal))

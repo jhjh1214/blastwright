@@ -42,8 +42,11 @@ The Titan no longer waits for your turn. From its Attack phase on it winds up at
 - **DODGE** (Q or the button): a 1.2 s shield with a 7 s cooldown. It blocks the heart loss (crystals still fall), so you can also just time it as a reaction.
 So the board is read for the threat as well as the payout: "which crystal answers this attack?" The volley damage phases (armor nodes, weak points, finisher) are unchanged. This is a real-time layer on the same grid, not a free-roaming 3D arena: there is no character movement or physics dodge, by design, so the fight stays the same game.
 
+## The second boss: the Prism Warden (Expedition floor 8)
+A prism tower with 36 HP and 5 armor nodes whose favourite attack is METEOR from its first phase (a Lensglass is the answer), adding CORRUPTION in the Weak phase and SLAM in Enrage; faster intervals than the Titan and a 14-pop finisher. It shares the same phase machine (`Boss.luau`) and attack engine (`BossRT.luau`); only `Config/Bosses.luau`, a model in `Creatures.luau` and three mastery objectives were needed (Unbroken, Prism Rush, Shatter). A structural test runs every defined boss from armor to defeat.
+
 ## Not built
-A free-roaming 3D arena with character movement, and a second boss with different attacks (the attack types are data in `Config/Bosses.luau` `RT`, so a new boss is mostly configuration).
+A free-roaming 3D arena with character movement (see above for why it was kept on the grid).
 Expedition bosses (floors 4 and 8) pull the player into a small real-time arena inside the seam. Needs its own design pass (movement, dodging, throwing/planting explosives live, boss telegraphs, server-side hit validation). Nothing of it exists yet. The grid Lurkers do not depend on it.
 
 ## Numbers are placeholders

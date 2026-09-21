@@ -3320,5 +3320,42 @@ test("bossrt: config is sane (known attack types, fair telegraph windows, shield
 	eq(RT.Interval.Enrage < RT.Interval.Attack, true, "enrage attacks faster")
 end)
 
+test("bosses: every defined boss has complete real-time config and can be fought from armor to defeat", function()
+	local KNOWN = { Slam = true, Meteor = true, Corruption = true }
+	local n = 0
+	for kind, def in BossCfg.Defs do
+		n += 1
+		eq(def.MaxHP > 0 and def.Bounty > 0 and def.Nodes >= 1, true, kind .. " basics")
+		eq(def.AttackEnd > def.WeakEnd and def.WeakEnd > def.FinisherAt and def.FinisherAt > 0, true, kind .. " phase thresholds descend")
+		for phase, list in def.RT.Attacks do
+			eq(def.RT.Interval[phase] ~= nil and def.RT.MaxThreats[phase] ~= nil, true, kind .. " " .. phase .. " has timing")
+			for _, a in list do eq(KNOWN[a] and def.RT[a] ~= nil, true, kind .. " " .. phase .. " uses a real attack") end
+		end
+		for name in KNOWN do eq(def.RT[name].Delay >= 2, true, kind .. " " .. name .. " is reactable") end
+		-- a fight: clear the armor, then hit hard until it dies
+		local g = fullGrid()
+		local b = Boss.New(kind, g, bctx, BossCfg, lcg(5))
+		eq(#b.Nodes, def.Nodes, kind .. " armor nodes")
+		local nodes = {}
+		for _, node in b.Nodes do nodes[#nodes + 1] = { X = node.X, Z = node.Z } end
+		Boss.Apply(b, {}, fakeResult(3, nodes), bctx, BossCfg, 1, g, lcg(1))
+		eq(b.Phase, "Attack", kind .. " armor breaks")
+		local guard = 0
+		while b.Phase ~= "Dead" and guard < 60 do
+			guard += 1
+			Boss.Apply(b, { cap(5, 5) }, fakeResult(def.Finisher.Pops, {}), bctx, BossCfg, 3, g, lcg(guard))
+		end
+		eq(b.Phase, "Dead", kind .. " can be defeated")
+		-- and each phase's attacks can actually spawn on a full grid
+		for phase, list in def.RT.Attacks do
+			local st = armedState()
+			eq(BossRT.Spawn(st, phase, kind, fullGrid(), bctx, 1, lcg(9), BossCfg) ~= nil, true, kind .. " " .. phase .. " spawns")
+		end
+	end
+	eq(n >= 2, true, "at least two bosses exist")
+	for f, kind in BossCfg.BossFloors do eq(BossCfg.Defs[kind] ~= nil, true, "floor " .. f .. " names a real boss") end
+	eq(BossCfg.BossFloors[4] ~= BossCfg.BossFloors[8], true, "the two boss floors are different fights")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

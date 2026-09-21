@@ -15,9 +15,50 @@ return {
 	},
 
 	-- Expedition floors that are boss fights (the first arrives early: a few floors in).
-	BossFloors = { [4] = "Titan", [8] = "Titan" },
+	BossFloors = { [4] = "Titan", [8] = "Warden" },
 
 	Defs = {
+		-- The second boss: a prism tower that rains meteors and corrupts your crystals. The answer to its favourite attack
+		-- is a Lensglass, so the board has to be read for prisms before anything else.
+		Warden = {
+			Name = "Prism Warden",
+			Description = "A tower of living prism. It calls down meteors and corrupts your crystals. Keep a Lensglass ready.",
+			MaxHP = 36,
+			Bounty = 12000,
+			Core = { X = 5, Z = 5 },
+			Nodes = 5,
+			ArmorBreakDamage = 6,
+			Direct = { Basic = 4, Shaft = 5, Cross = 5 },
+			Splash = 1,
+			SplashCap = 6,
+			PopsPerBonus = 4,
+			AttackEnd = 0.65,
+			WeakEnd = 0.35,
+			FinisherAt = 0.15,
+			Weak = { Count = 2, MinDist = 4, One = 8, Both = 22, PopsPerMiss = 6 },
+			Finisher = { Pops = 14, Tries = 3, HealOnFail = 4 },
+			Dodge = { Cooldown = 2 },
+			AttackEvery = 2,
+			CutPops = 3,
+			EnrageLines = 2,
+			PhaseRefund = 1,
+			RT = {
+				FirstAttackDelay = 2.5,
+				Interval = { Attack = 5.5, Weak = 4.5, Enrage = 3.5, Finisher = 4.5 },
+				MaxThreats = { Attack = 1, Weak = 1, Enrage = 2, Finisher = 1 },
+				Attacks = {
+					Attack = { "Meteor" },
+					Weak = { "Meteor", "Corruption" },
+					Enrage = { "Slam", "Meteor", "Corruption" },
+					Finisher = { "Meteor", "Corruption" },
+				},
+				Slam = { Delay = 2.6 },
+				Meteor = { Delay = 3.4, Zones = 3 },
+				Corruption = { Delay = 4.5, Marks = 5 },
+				ShieldSeconds = 1.2,
+				DodgeCooldown = 7,
+			},
+		},
 		Titan = {
 			Name = "Crystal Titan",
 			Description = "A colossus grown into the mine. Break its armor nodes, then out-chain it.",

@@ -263,7 +263,7 @@ end)
 
 -- Creatures: each Lurker kind and the boss has its own procedural model (Creatures.luau). They idle (bob and sway), rise out
 -- of the rock when they appear, and flash when hit. One shared loop animates every creature that exists.
-local GROUND = { Gnasher = 2.2, Skitter = 1.1, Leech = 1.5, Sapper = 2.2, Brute = 2.6, Titan = 4 }
+local GROUND = { Gnasher = 2.2, Skitter = 1.1, Leech = 1.5, Sapper = 2.2, Brute = 2.6, Titan = 4, Warden = 8 }
 local creatureLoop = nil
 
 local function ensureCreatureLoop()
@@ -399,7 +399,7 @@ function CavernView.SetBoss(view, boss)
 		local body = model.PrimaryPart
 		local gui = Instance.new("BillboardGui")
 		gui.Size = UDim2.fromOffset(240, 30)
-		gui.StudsOffset = Vector3.new(0, 14, 0)
+		gui.StudsOffset = Vector3.new(0, boss.Kind == "Warden" and 15 or 14, 0)
 		gui.AlwaysOnTop = true
 		gui.Parent = body
 		local text = Instance.new("TextLabel")
@@ -412,7 +412,7 @@ function CavernView.SetBoss(view, boss)
 		text.TextStrokeTransparency = 0.3
 		text.Parent = gui
 		view.BossModel = model
-		view.BossBase = CFrame.new(Geometry.CellPosition(view.Origin, boss.Core.X, boss.Core.Z) + Vector3.new(0, GROUND.Titan, 0))
+		view.BossBase = CFrame.new(Geometry.CellPosition(view.Origin, boss.Core.X, boss.Core.Z) + Vector3.new(0, GROUND[boss.Kind] or 4, 0))
 		view.MonsterBorn = view.MonsterBorn or os.clock()
 		view.BossHP = boss.HP
 		ensureCreatureLoop()

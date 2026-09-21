@@ -863,7 +863,7 @@ local function bossTick(player: Player, seam: SeamState)
 			if seam.BossStats then
 				seam.BossStats.HeartsLost += r.HeartsLost
 			end
-			notify(player, ("The Titan's %s hit your rig! Hearts left: %d"):format(string.lower(landed.Type), seam.Hearts), "Error")
+			notify(player, ("The %s's %s hit your rig! Hearts left: %d"):format(BossConfig.Defs[boss.Kind].Name, string.lower(landed.Type), seam.Hearts), "Error")
 			if seam.Hearts <= 0 then
 				seam.Defeated = true
 			end

@@ -44,7 +44,7 @@ return {
 		goal("Slay1", "Monster Hunter", "Slay 5 Lurkers.", "LurkersSlain", 5, 3000),
 		goal("Slay2", "Lurker Bane", "Slay 25 Lurkers.", "LurkersSlain", 25, 15000),
 		goal("Slay3", "Terror of the Deep", "Slay 100 Lurkers.", "LurkersSlain", 100, 60000),
-		goal("Boss1", "Titan Slayer", "Defeat the Crystal Titan.", "BossesSlain", 1, 8000),
+		goal("Boss1", "Titan Slayer", "Defeat your first boss.", "BossesSlain", 1, 8000),
 		goal("Boss2", "Titan Hunter", "Defeat 5 bosses.", "BossesSlain", 5, 30000),
 		goal("Boss3", "Bane of Colossi", "Defeat 25 bosses.", "BossesSlain", 25, 120000),
 		goal("Won3", "Legend of the Deep", "Complete 25 Expeditions.", "ExpeditionsWon", 25, 75000),
