@@ -1444,7 +1444,7 @@ local function onPuzzleStart(player: Player)
 		end
 	end
 	if not siteId then
-		return notify(player, "Walk up to a free blast pad first, then start the puzzle from the Menu.", "Error")
+		return notify(player, "Walk up to a free blast pad first, then start the puzzle from the Daily button.", "Error")
 	end
 
 	if playerSite[player] ~= siteId then

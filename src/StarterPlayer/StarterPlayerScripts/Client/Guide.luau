@@ -64,7 +64,7 @@ local function build()
 	local arrow = Instance.new("TextLabel")
 	arrow.BackgroundTransparency = 1
 	arrow.Size = UDim2.new(1, 0, 0, 44)
-	arrow.Font = Enum.Font.GothamBlack
+	arrow.Font = Enum.Font.FredokaOne
 	arrow.Text = "▼"
 	arrow.TextSize = 40
 	arrow.TextColor3 = GOLD
@@ -74,7 +74,7 @@ local function build()
 	markerLabel.BackgroundTransparency = 1
 	markerLabel.Position = UDim2.fromOffset(0, 42)
 	markerLabel.Size = UDim2.new(1, 0, 0, 40)
-	markerLabel.Font = Enum.Font.GothamBold
+	markerLabel.Font = Enum.Font.BuilderSansBold
 	markerLabel.TextSize = 18
 	markerLabel.TextColor3 = GOLD
 	markerLabel.TextStrokeTransparency = 0.3
@@ -100,7 +100,7 @@ local function build()
 	edgeArrow.BackgroundTransparency = 1
 	edgeArrow.AnchorPoint = Vector2.new(0.5, 0.5)
 	edgeArrow.Size = UDim2.fromOffset(56, 56)
-	edgeArrow.Font = Enum.Font.GothamBlack
+	edgeArrow.Font = Enum.Font.FredokaOne
 	edgeArrow.Text = "▲"
 	edgeArrow.TextSize = 46
 	edgeArrow.TextColor3 = GOLD
@@ -111,7 +111,7 @@ local function build()
 	edgeDistance.BackgroundTransparency = 1
 	edgeDistance.AnchorPoint = Vector2.new(0.5, 0)
 	edgeDistance.Size = UDim2.fromOffset(120, 22)
-	edgeDistance.Font = Enum.Font.GothamBold
+	edgeDistance.Font = Enum.Font.BuilderSansBold
 	edgeDistance.TextSize = 16
 	edgeDistance.TextColor3 = GOLD
 	edgeDistance.TextStrokeTransparency = 0.3

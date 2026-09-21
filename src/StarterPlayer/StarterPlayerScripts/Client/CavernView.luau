@@ -320,7 +320,7 @@ function CavernView.SetMonster(view, monster)
 		name.Name = "Name"
 		name.BackgroundTransparency = 1
 		name.Size = UDim2.new(1, 0, 0, 22)
-		name.Font = Enum.Font.GothamBold
+		name.Font = Enum.Font.BuilderSansBold
 		name.TextSize = 16
 		name.TextColor3 = Color3.fromRGB(255, 120, 120)
 		name.TextStrokeTransparency = 0.4
@@ -406,7 +406,7 @@ function CavernView.SetBoss(view, boss)
 		text.Name = "Text"
 		text.BackgroundTransparency = 1
 		text.Size = UDim2.fromScale(1, 1)
-		text.Font = Enum.Font.GothamBlack
+		text.Font = Enum.Font.FredokaOne
 		text.TextSize = 18
 		text.TextColor3 = Color3.fromRGB(255, 200, 90)
 		text.TextStrokeTransparency = 0.3
@@ -449,7 +449,7 @@ function CavernView.SetBoss(view, boss)
 		local label = Instance.new("TextLabel")
 		label.BackgroundTransparency = 1
 		label.Size = UDim2.fromScale(1, 1)
-		label.Font = Enum.Font.GothamBold
+		label.Font = Enum.Font.BuilderSansBold
 		label.TextSize = 18
 		label.TextColor3 = color
 		label.TextStrokeTransparency = 0.5

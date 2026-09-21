@@ -64,61 +64,19 @@ function Fx.Gradient(gui, c1, c2, rotation)
 	return make("UIGradient", { Color = ColorSequence.new(c1, c2), Rotation = rotation or 90 }, gui)
 end
 
--- A stroke whose transparency slowly breathes.
+-- A plain outline (kept under the old name so callers keep working). Deliberately static: no pulsing glow.
 function Fx.Glow(gui, color, thickness, period)
-	local stroke = make("UIStroke", { Color = color, Thickness = thickness or 2, Transparency = 0.55, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, gui)
-	pcall(function()
-		TweenService:Create(stroke, TweenInfo.new(period or 1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.05 }):Play()
-	end)
-	return stroke
+	return make("UIStroke", { Color = color, Thickness = math.min(thickness or 2, 2), Transparency = 0.35, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, gui)
 end
 
--- A stroke with a colour gradient that slowly travels around the border.
+-- A plain outline in the first colour (kept under the old name). No travelling rainbow.
 function Fx.AnimatedBorder(gui, colors, thickness, period)
-	local stroke = make("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = thickness or 2, Transparency = 0.15, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, gui)
-	local keys = {}
-	for i, c in colors do
-		table.insert(keys, ColorSequenceKeypoint.new((i - 1) / (#colors - 1), c))
-	end
-	local grad = make("UIGradient", { Color = ColorSequence.new(keys) }, stroke)
-	pcall(function()
-		TweenService:Create(grad, TweenInfo.new(period or 6, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1), { Rotation = 360 }):Play()
-	end)
-	return stroke
+	return make("UIStroke", { Color = colors[1], Thickness = math.min(thickness or 2, 2), Transparency = 0.25, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, gui)
 end
 
--- A soft light band that sweeps across the element (best on buttons and banners). It is an overlay frame, because an
--- object can only show one UIGradient and the element usually has its own.
+-- (Removed on purpose: sweeping light bands read as cheap. Kept as a no-op so existing calls are harmless.)
 function Fx.Shimmer(gui, period, strength)
-	strength = strength or 0.55
-	local overlay = make("Frame", {
-		Name = "Shimmer",
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BackgroundTransparency = 0,
-		BorderSizePixel = 0,
-		Size = UDim2.fromScale(1, 1),
-		ZIndex = (gui.ZIndex or 1) + 1,
-		Active = false,
-	}, gui)
-	local corner = gui:FindFirstChildOfClass("UICorner")
-	if corner then
-		make("UICorner", { CornerRadius = corner.CornerRadius }, overlay)
-	end
-	local grad = make("UIGradient", {
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.4, 1),
-			NumberSequenceKeypoint.new(0.5, 1 - strength),
-			NumberSequenceKeypoint.new(0.6, 1),
-			NumberSequenceKeypoint.new(1, 1),
-		}),
-		Rotation = 25,
-		Offset = Vector2.new(-1, 0),
-	}, overlay)
-	pcall(function()
-		TweenService:Create(grad, TweenInfo.new(period or 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1), { Offset = Vector2.new(1, 0) }):Play()
-	end)
-	return overlay
+	return nil
 end
 
 -- Grow slightly on hover and shrink slightly on press.
@@ -156,7 +114,7 @@ function Fx.Icon(parent, glyph, color, size, props)
 	make("TextLabel", {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromScale(1, 1),
-		Font = Enum.Font.GothamBlack,
+		Font = Enum.Font.FredokaOne,
 		Text = glyph,
 		TextSize = math.floor(size * 0.5),
 		TextColor3 = Color3.new(1, 1, 1),
@@ -258,25 +216,8 @@ function Fx.OnFrame(object, fn)
 	end)
 end
 
--- Tiny stars that twinkle at random spots (a background for cards and banners).
-function Fx.Sparkles(parent, count, color)
-	local rng = Random.new()
-	for _ = 1, count do
-		local size = rng:NextInteger(2, 5)
-		local star = make("Frame", {
-			BackgroundColor3 = color or Color3.new(1, 1, 1),
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(size, size),
-			Position = UDim2.fromScale(rng:NextNumber(0.03, 0.97), rng:NextNumber(0.03, 0.97)),
-			Rotation = 45,
-			ZIndex = (parent.ZIndex or 1) + 1,
-		}, parent)
-		pcall(function()
-			TweenService:Create(star, TweenInfo.new(rng:NextNumber(0.7, 1.6), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true, rng:NextNumber(0, 1.5)), { BackgroundTransparency = 0.05 }):Play()
-		end)
-	end
-end
+-- (Removed on purpose, see Shimmer.)
+function Fx.Sparkles(parent, count, color) end
 
 -- Expanding rings (an "explosion preview" or a pulse), centred in `parent`.
 function Fx.Rings(parent, color, count, period, maxSize)

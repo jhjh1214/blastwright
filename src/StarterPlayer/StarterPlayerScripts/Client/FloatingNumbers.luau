@@ -9,7 +9,7 @@ folder.Name = "FloatingNumbers"
 folder.Parent = workspace
 
 local free = {}
-local FONT = Enum.Font.GothamBlack
+local FONT = Enum.Font.FredokaOne
 
 local function acquire()
 	local item = table.remove(free)

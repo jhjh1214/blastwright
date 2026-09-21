@@ -577,7 +577,7 @@ test("objectives: a finished daily objective is surfaced before anything else", 
 	local data = snap({ Shards = 50, Stats = { TotalPops = 20 }, Dailies = { { Slot = 1, Progress = 10, Target = 10, Claimed = false } } })
 	local o = Objectives.Roam(data, 0, 0, ocfg)
 	eq(o.Id, "ClaimDaily", "id")
-	eq(o.Highlight, "Forge", "menu pulses")
+	eq(o.Highlight, "Daily", "the Daily button pulses")
 	data.Dailies[1].Claimed = true
 	eq(Objectives.Roam(data, 0, 0, ocfg).Id ~= "ClaimDaily", true, "claimed one no longer nags")
 	local fresh = snap({ Dailies = { { Slot = 1, Progress = 10, Target = 10, Claimed = false } } })
@@ -840,7 +840,7 @@ test("objectives: a finished goal is surfaced (after dailies), and never for a b
 	local data = snap({ Shards = 50, Stats = { TotalPops = 20 }, Goals = { { Id = "x", Progress = 100, Target = 100, Claimed = false, Complete = true } } })
 	local o = Objectives.Roam(data, 0, 0, ocfg)
 	eq(o.Id, "ClaimGoal", "id")
-	eq(o.Highlight, "Forge", "menu pulses")
+	eq(o.Highlight, "Goals", "the Goals button pulses")
 	data.Goals[1].Claimed = true
 	eq(Objectives.Roam(data, 0, 0, ocfg).Id ~= "ClaimGoal", true, "claimed one no longer nags")
 	local fresh = snap({ Goals = { { Id = "x", Progress = 100, Target = 100, Claimed = false, Complete = true } } })

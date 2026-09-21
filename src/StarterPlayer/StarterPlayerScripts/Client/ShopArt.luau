@@ -15,7 +15,7 @@ ShopArt.TierColor = {
 }
 
 local GOLD = Color3.fromRGB(255, 205, 90)
-local FONT = Enum.Font.GothamBlack
+local FONT = Enum.Font.FredokaOne
 
 local function make(class, props, parent)
 	local inst = Instance.new(class)
@@ -258,7 +258,7 @@ function ShopArt.Card(parent, spec)
 	end
 
 	text(card, spec.Name, 17, Color3.fromRGB(240, 244, 255), { Position = UDim2.fromOffset(10, 112), Size = UDim2.new(1, -20, 0, 22), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 14, TextTruncate = Enum.TextTruncate.AtEnd })
-	text(card, spec.Description, 12, Color3.fromRGB(160, 170, 195), { Font = Enum.Font.GothamMedium, Position = UDim2.fromOffset(10, 134), Size = UDim2.new(1, -20, 0, 34), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, TextStrokeTransparency = 1, ZIndex = 14 })
+	text(card, spec.Description, 12, Color3.fromRGB(160, 170, 195), { Font = Enum.Font.BuilderSansMedium, Position = UDim2.fromOffset(10, 134), Size = UDim2.new(1, -20, 0, 34), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, TextStrokeTransparency = 1, ZIndex = 14 })
 
 	if spec.Hint then
 		local chip = make("Frame", { AnchorPoint = Vector2.new(0, 1), BackgroundColor3 = Color3.fromRGB(20, 24, 38), Position = UDim2.new(0, 10, 1, -8), Size = UDim2.fromOffset(74, 30), BorderSizePixel = 0, ZIndex = 14 }, card)
