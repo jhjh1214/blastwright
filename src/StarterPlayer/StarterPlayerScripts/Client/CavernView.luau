@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Geometry = require(Shared.Geometry)
+local Creatures = require(script.Parent.Creatures)
 
 local Crystals = Config.Crystals
 local CellSize = Config.Tuning.CellSize
@@ -260,30 +261,54 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
--- A Lurker on the grid: a dark body with a name and health bar, moved between cells. monster = nil removes it.
+-- Creatures: each Lurker kind and the boss has its own procedural model (Creatures.luau). They idle (bob and sway), rise out
+-- of the rock when they appear, and flash when hit. One shared loop animates every creature that exists.
+local GROUND = { Gnasher = 2.2, Skitter = 1.1, Leech = 1.5, Sapper = 2.2, Brute = 2.6, Titan = 4 }
+local creatureLoop = nil
+
+local function ensureCreatureLoop()
+	if creatureLoop then
+		return
+	end
+	creatureLoop = RunService.Heartbeat:Connect(function()
+		local t = os.clock()
+		for _, view in views do
+			local m = view.MonsterModel
+			if m and m.Parent and view.MonsterBase then
+				local rise = math.clamp((t - view.MonsterBorn) / 0.5, 0, 1)
+				local bob = math.sin(t * 3 + view.UserId) * 0.25
+				m:PivotTo(view.MonsterBase * CFrame.new(0, bob - (1 - rise) * 4, 0) * CFrame.Angles(0, math.sin(t * 1.5) * 0.2, 0))
+			end
+			local boss = view.BossModel
+			if boss and boss.Parent and view.BossBase then
+				boss:PivotTo(view.BossBase * CFrame.new(0, math.sin(t * 1.4) * 0.35, 0) * CFrame.Angles(0, math.sin(t * 0.7) * 0.06, 0))
+			end
+		end
+	end)
+end
+
+-- A Lurker on the grid, with a name and health bar. monster = nil removes it.
 function CavernView.SetMonster(view, monster)
 	if not monster then
-		if view.MonsterPart then
-			view.MonsterPart:Destroy()
-			view.MonsterPart = nil
+		if view.MonsterModel then
+			view.MonsterModel:Destroy()
+			view.MonsterModel = nil
+			view.MonsterKind = nil
 		end
 		return
 	end
-	if not view.MonsterPart then
-		local body = Instance.new("Part")
-		body.Name = "Lurker"
-		body.Shape = Enum.PartType.Ball
-		body.Size = Vector3.new(4.2, 4.2, 4.2)
-		body.Anchored = true
-		body.CanCollide = false
-		body.CanQuery = false
-		body.Material = Enum.Material.Slate
-		body.Color = Color3.fromRGB(70, 30, 40)
-		body.Parent = view.Folder
+	if view.MonsterModel and view.MonsterKind ~= monster.Kind then
+		view.MonsterModel:Destroy()
+		view.MonsterModel = nil
+	end
+	if not view.MonsterModel then
+		local model = Creatures.Build(monster.Kind)
+		model.Parent = view.Folder
+		local body = model.PrimaryPart
 		local gui = Instance.new("BillboardGui")
 		gui.Name = "Tag"
 		gui.Size = UDim2.fromOffset(150, 46)
-		gui.StudsOffset = Vector3.new(0, 4, 0)
+		gui.StudsOffset = Vector3.new(0, 4.2, 0)
 		gui.AlwaysOnTop = true
 		gui.Parent = body
 		local name = Instance.new("TextLabel")
@@ -302,23 +327,38 @@ function CavernView.SetMonster(view, monster)
 		back.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 		back.BorderSizePixel = 0
 		back.Parent = gui
+		local backCorner = Instance.new("UICorner")
+		backCorner.CornerRadius = UDim.new(0, 5)
+		backCorner.Parent = back
 		local fill = Instance.new("Frame")
 		fill.Name = "Fill"
 		fill.Size = UDim2.fromScale(1, 1)
 		fill.BackgroundColor3 = Color3.fromRGB(230, 70, 70)
 		fill.BorderSizePixel = 0
 		fill.Parent = back
-		view.MonsterPart = body
+		local fillCorner = Instance.new("UICorner")
+		fillCorner.CornerRadius = UDim.new(0, 5)
+		fillCorner.Parent = fill
+		view.MonsterModel = model
+		view.MonsterKind = monster.Kind
+		view.MonsterBorn = os.clock()
+		view.MonsterHP = monster.HP
+		ensureCreatureLoop()
 	end
-	local body = view.MonsterPart
-	body.Position = Geometry.CellPosition(view.Origin, monster.X, monster.Z) + Vector3.new(0, 2.6, 0)
-	local gui = body:FindFirstChild("Tag")
-	gui.Name.Text = monster.Warn and (monster.Kind .. "  !! SMASH NEXT !!") or monster.Kind
+	local model = view.MonsterModel
+	local offset = GROUND[monster.Kind] or 2.4
+	view.MonsterBase = CFrame.new(Geometry.CellPosition(view.Origin, monster.X, monster.Z) + Vector3.new(0, offset, 0))
+	if view.MonsterHP and monster.HP < view.MonsterHP then
+		Creatures.Flash(model, Color3.fromRGB(255, 80, 80)) -- a hit
+	end
+	view.MonsterHP = monster.HP
+	local gui = model.PrimaryPart:FindFirstChild("Tag")
+	gui:FindFirstChild("Name").Text = monster.Warn and (monster.Kind .. "  !! SMASH NEXT !!") or monster.Kind -- (gui.Name is the instance's own name, hence FindFirstChild)
 	gui.Back.Fill.Size = UDim2.fromScale(math.clamp(monster.HP / monster.MaxHP, 0, 1), 1)
 end
 
--- The boss on the grid: a big core body over the middle 3x3, gold armor-node markers, magenta weak-point markers and red
--- flat tiles on the cells its next attack will hit. boss = nil clears it all. Rebuilt on every update (it is only ~30 parts).
+-- The boss on the grid: the Titan model over the middle 3x3, plus marker parts: gold armor nodes, magenta weak points and
+-- red flat tiles on the cells its next attack will hit. The model persists between updates; only the markers are rebuilt.
 local function marker(view, cell, color, height, size, transparency)
 	local p = Instance.new("Part")
 	p.Anchored, p.CanCollide, p.CanQuery, p.CastShadow = true, false, false, false
@@ -337,34 +377,48 @@ function CavernView.SetBoss(view, boss)
 		view.BossFx = nil
 	end
 	if not boss then
+		if view.BossModel then
+			view.BossModel:Destroy()
+			view.BossModel = nil
+			view.BossBase = nil
+		end
 		return
 	end
 	local fx = Instance.new("Folder")
 	fx.Name = "BossFx"
 	fx.Parent = view.Folder
 	view.BossFx = fx
-	local body = Instance.new("Part")
-	body.Name = "BossCore"
-	body.Anchored, body.CanCollide, body.CanQuery = true, false, false
-	body.Material = Enum.Material.Slate
-	body.Color = boss.Phase == "Enrage" and Color3.fromRGB(150, 30, 40) or Color3.fromRGB(60, 50, 90)
-	body.Size = Vector3.new(CellSize * 2.6, CellSize * 2.2, CellSize * 2.6)
-	body.Position = Geometry.CellPosition(view.Origin, boss.Core.X, boss.Core.Z) + Vector3.new(0, CellSize * 1.1, 0)
-	body.Parent = fx
-	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(220, 30)
-	gui.StudsOffset = Vector3.new(0, CellSize * 1.7, 0)
-	gui.AlwaysOnTop = true
-	gui.Parent = body
-	local text = Instance.new("TextLabel")
-	text.BackgroundTransparency = 1
-	text.Size = UDim2.fromScale(1, 1)
-	text.Font = Enum.Font.GothamBlack
-	text.TextSize = 18
-	text.TextColor3 = Color3.fromRGB(255, 200, 90)
-	text.TextStrokeTransparency = 0.3
-	text.Text = ("%s  %d/%d"):format(boss.Name, boss.HP, boss.MaxHP)
-	text.Parent = gui
+	if not view.BossModel then
+		local model = Creatures.Build(boss.Kind)
+		model.Parent = view.Folder
+		local body = model.PrimaryPart
+		local gui = Instance.new("BillboardGui")
+		gui.Size = UDim2.fromOffset(240, 30)
+		gui.StudsOffset = Vector3.new(0, 14, 0)
+		gui.AlwaysOnTop = true
+		gui.Parent = body
+		local text = Instance.new("TextLabel")
+		text.Name = "Text"
+		text.BackgroundTransparency = 1
+		text.Size = UDim2.fromScale(1, 1)
+		text.Font = Enum.Font.GothamBlack
+		text.TextSize = 18
+		text.TextColor3 = Color3.fromRGB(255, 200, 90)
+		text.TextStrokeTransparency = 0.3
+		text.Parent = gui
+		view.BossModel = model
+		view.BossBase = CFrame.new(Geometry.CellPosition(view.Origin, boss.Core.X, boss.Core.Z) + Vector3.new(0, GROUND.Titan, 0))
+		view.MonsterBorn = view.MonsterBorn or os.clock()
+		view.BossHP = boss.HP
+		ensureCreatureLoop()
+	end
+	local model = view.BossModel
+	if view.BossHP and boss.HP < view.BossHP then
+		Creatures.Flash(model, Color3.fromRGB(255, 255, 255))
+	end
+	view.BossHP = boss.HP
+	Creatures.SetPhase(model, boss.Phase)
+	model.PrimaryPart:FindFirstChildOfClass("BillboardGui").Text.Text = ("%s  %d/%d"):format(boss.Name, boss.HP, boss.MaxHP)
 	for _, cell in boss.Nodes do
 		marker(view, cell, Color3.fromRGB(255, 200, 60), 5, 3.2, 0.25) -- armor node: break these
 	end
