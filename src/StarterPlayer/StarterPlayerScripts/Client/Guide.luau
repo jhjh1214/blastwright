@@ -189,7 +189,7 @@ local function updateVisuals()
 	local now = os.clock()
 	markerPart.Parent = workspace.Guide
 	markerPart.Position = target + Vector3.new(0, 9 + math.sin(now * 3) * 0.8, 0)
-	markerLabel.Text = ("%s\n%d studs"):format(targetLabel, math.floor(dist))
+	markerLabel.Text = ("%s\n%d m"):format(targetLabel, math.floor(dist))
 
 	local dir = flat.Unit
 	local usable = math.min(CRUMBS, math.floor((dist - 10) / CRUMB_SPACING))
@@ -230,7 +230,7 @@ local function updateVisuals()
 	edgeArrow.Rotation = math.deg(math.atan2(dx, -dy))
 	edgeArrow.Visible = true
 	edgeDistance.Position = UDim2.fromOffset(px, py + 28)
-	edgeDistance.Text = ("%d studs"):format(math.floor(dist))
+	edgeDistance.Text = ("%d m"):format(math.floor(dist))
 	edgeDistance.Visible = true
 end
 

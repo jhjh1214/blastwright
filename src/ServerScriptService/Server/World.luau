@@ -565,6 +565,8 @@ local function buildSites()
 		label.Text = site.Name .. "\nFree"
 		label.Parent = gui
 
+		plunger:SetAttribute("Stratum", site.Stratum)
+		plunger:SetAttribute("Status", "Free")
 		World.Registry.Sites[site.Id] = { Station = plunger, Prompt = prompt, ExpeditionPrompt = expeditionPrompt, Label = label, Name = site.Name }
 	end
 end
@@ -573,6 +575,7 @@ function World.SetSiteStatus(siteId, status)
 	local entry = World.Registry.Sites[siteId]
 	if entry then
 		entry.Label.Text = entry.Name .. "\n" .. status
+		entry.Station:SetAttribute("Status", status) -- the client turns this into "Locked" per player (Client/SiteLabels.luau)
 	end
 end
 

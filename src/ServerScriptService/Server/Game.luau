@@ -1150,6 +1150,19 @@ local function onDetonate(player: Player, payload: any)
 	end)
 end
 
+-- Unlocking the next area (Forge button, or pressing E at a locked pad). Returns true when it was bought.
+local function buyStratum(player: Player, data: any, n: number): boolean
+	local cost = Strata[n].Cost
+	if data.Shards < cost then
+		notify(player, ("Not enough shards: %s costs %d and you have %d."):format(Strata[n].Name, cost, data.Shards), "Error")
+		return false
+	end
+	data.Shards -= cost
+	data.Progress.StrataUnlocked = n
+	notify(player, Strata[n].Name .. " unlocked! Blast sites there are open.", "Reward")
+	return true
+end
+
 local function onBuy(player: Player, kind: any, id: any)
 	local data = Data.Get(player)
 	if not data or type(kind) ~= "string" or type(id) ~= "string" then
@@ -1196,13 +1209,9 @@ local function onBuy(player: Player, kind: any, id: any)
 		if not n or n % 1 ~= 0 or Strata[n] == nil or n ~= data.Progress.StrataUnlocked + 1 then
 			return
 		end
-		local cost = Strata[n].Cost
-		if data.Shards < cost then
-			return notify(player, "Not enough shards.", "Error")
+		if not buyStratum(player, data, n) then
+			return
 		end
-		data.Shards -= cost
-		data.Progress.StrataUnlocked = n
-		notify(player, Strata[n].Name .. " unlocked! Blast sites there are open.", "Reward")
 	else
 		return
 	end
@@ -1469,6 +1478,18 @@ local function onClaim(player: Player, slot: any)
 end
 
 -- A player used a site's blast station.
+-- Pressing E at a pad in an area you have not unlocked: buys the area when it is the next one and you can afford it.
+local function unlockFromPad(player: Player, data: any, stratum: number)
+	local nextArea = data.Progress.StrataUnlocked + 1
+	if stratum ~= nextArea then
+		return notify(player, ("%s is locked. Unlock %s first."):format(Strata[stratum].Name, Strata[nextArea].Name), "Error")
+	end
+	if buyStratum(player, data, stratum) then
+		announceGoals(player)
+		sync(player)
+	end
+end
+
 local function onSiteTriggered(player: Player, siteId: number)
 	local data = Data.Get(player)
 	local site = WorldConfig.Sites[siteId]
@@ -1479,8 +1500,7 @@ local function onSiteTriggered(player: Player, siteId: number)
 		return
 	end
 	if data.Progress.StrataUnlocked < site.Stratum then
-		local s = Strata[site.Stratum]
-		return notify(player, ("%s is locked. Unlock it in the Forge (%d shards)."):format(s.Name, s.Cost), "Error")
+		return unlockFromPad(player, data, site.Stratum)
 	end
 	local owner = siteOwner[siteId]
 	if owner and owner ~= player then
@@ -1513,8 +1533,7 @@ local function onExpeditionTriggered(player: Player, siteId: number)
 		return
 	end
 	if data.Progress.StrataUnlocked < site.Stratum then
-		local s = Strata[site.Stratum]
-		return notify(player, ("%s is locked. Unlock it in the Forge (%d shards)."):format(s.Name, s.Cost), "Error")
+		return notify(player, ("%s is locked. Press E at the pad to unlock it (%d shards)."):format(Strata[site.Stratum].Name, Strata[site.Stratum].Cost), "Error")
 	end
 	local owner = siteOwner[siteId]
 	if owner and owner ~= player then
