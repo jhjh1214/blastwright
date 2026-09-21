@@ -43,9 +43,12 @@ def logical_calls(text, start_pattern):
 
 def main():
     errors, warns = [], []
-    for name in sorted(os.listdir(CLIENT)):
-        if not name.endswith(".luau"):
-            continue
+    files = []
+    for folder, _dirs, names in os.walk(CLIENT):
+        for n in names:
+            if n.endswith(".luau"):
+                files.append(os.path.relpath(os.path.join(folder, n), CLIENT))
+    for name in sorted(files):
         path = os.path.join(CLIENT, name)
         text = open(path, encoding="utf8").read()
         lines = text.split("\n")
@@ -53,7 +56,7 @@ def main():
             code = line.split("--", 1)[0]
             if PLACEHOLDER.search(code):
                 errors.append(f"{name}:{n}: placeholder text or id: {line.strip()[:90]}")
-            if name not in ASSET_ID_FILES and ASSET_ID.search(code):
+            if os.path.basename(name) not in ASSET_ID_FILES and ASSET_ID.search(code):
                 errors.append(f"{name}:{n}: asset id outside Icons/ShopArt/AudioManager: {line.strip()[:90]}")
             m = ZINDEX_BARE.search(code)
             if m and (int(m.group(1)) >= 100 or int(m.group(1)) < 0):
