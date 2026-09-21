@@ -167,18 +167,15 @@ function UI.Init()
 	locationLabel.TextTransparency = 1
 	statusDock = StatusDock.Build(roamGroup)
 	cacheLabel = label(roamGroup, "", 16, THEME.Text, { Position = UDim2.new(0, 16, 0, 66), Size = UDim2.fromOffset(200, 22), TextXAlignment = Enum.TextXAlignment.Left })
-	objectiveCard = Kit.Card(roamGroup, { Name = "Objective", Color = Theme.Colors.PanelDark, Position = UDim2.new(0, 12, 0, 96), Size = UDim2.fromOffset(230, 0) })
-	objectiveCard.AutomaticSize = Enum.AutomaticSize.Y
+	-- Quest card under the shards. Fixed sizes only (no automatic sizing): the height is set from the measured text in
+	-- UI.SetObjective, so nothing can collapse or grow by itself.
+	objectiveCard = Kit.Card(roamGroup, { Name = "Objective", Color = Theme.Colors.PanelDark, Position = UDim2.new(0, 12, 0, 96), Size = UDim2.fromOffset(230, 80), ZIndex = Theme.Z.Hud })
 	objectiveCard.Visible = false
-	mk("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 10), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, objectiveCard)
-	mk("UIListLayout", { Padding = UDim.new(0, 4) }, objectiveCard)
-	local tag = mk("Frame", { BackgroundColor3 = Theme.Colors.Warning, Size = UDim2.fromOffset(112, 24), BorderSizePixel = 0, LayoutOrder = 1 }, objectiveCard)
+	local tag = mk("Frame", { BackgroundColor3 = Theme.Colors.Warning, Position = UDim2.fromOffset(10, 8), Size = UDim2.fromOffset(112, 24), BorderSizePixel = 0, ZIndex = Theme.Z.Hud + 1 }, objectiveCard)
 	corner(tag, 8)
 	mk("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3 }, tag)
-	Kit.Label(tag, "OBJECTIVE", 16, { Size = UDim2.fromScale(0.92, 0.8), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5) })
-	objectiveText = label(objectiveCard, "", 16, THEME.Text, { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = 2, Font = Theme.Font.Body })
-	local objectiveStroke = objectiveText:FindFirstChildOfClass("UIStroke") -- plain text reads best on the dark card
-	if objectiveStroke then objectiveStroke:Destroy() end
+	mk("TextLabel", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Font = Theme.Font.Display, Text = "QUEST", TextSize = 15, TextColor3 = Color3.fromRGB(255, 255, 255), ZIndex = Theme.Z.Hud + 2 }, tag)
+	objectiveText = mk("TextLabel", { Name = "Text", BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 38), Size = UDim2.fromOffset(206, 20), Font = Theme.Font.Body, Text = "", TextSize = 16, TextColor3 = Color3.fromRGB(255, 255, 255), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = Theme.Z.Hud + 2 }, objectiveCard)
 
 	-- A small help button in the corner; every feature has its own button in the dock along the bottom.
 	Kit.Button(roamGroup, { Name = "Help", Size = UDim2.fromOffset(54, 60), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Color = Theme.Colors.Codex, Text = "?", TextSize = 34, Depth = 5, Corner = 12, OnClick = function() UI.ShowWelcome(true) end })
@@ -497,6 +494,9 @@ function UI.SetObjective(text)
 	objectiveCard.Visible = text ~= nil and text ~= ""
 	if text then
 		objectiveText.Text = text
+		local h = math.max(18, math.ceil(objectiveText.TextBounds.Y))
+		objectiveText.Size = UDim2.fromOffset(206, h)
+		objectiveCard.Size = UDim2.fromOffset(230, 38 + h + 10)
 	end
 end
 

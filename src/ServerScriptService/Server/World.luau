@@ -434,10 +434,14 @@ local function buildHub()
 	local face = Vector3.new(W.Spawn.X, 7, W.Spawn.Z)
 	for index, kind in { "Chain", "Depth", "Bosses" } do
 		local boardPos = Vector3.new(W.Hub.X + 30, 7, W.Hub.Z + 16 - (index - 1) * 18)
-		for _, dz in { -6, 6 } do
-			decorPart(folder, Vector3.new(0.7, 8, 0.7), CFrame.new(boardPos + Vector3.new(0, -3, dz)), Color3.fromRGB(30, 32, 44), Enum.Material.Metal)
+		-- The board faces the spawn; two posts stand on the ground directly behind its left and right sides and run up into it.
+		local boardCF = CFrame.lookAt(boardPos, face)
+		local board = decorPart(folder, Vector3.new(16, 10, 0.6), boardCF, Color3.fromRGB(20, 24, 36), Enum.Material.Metal)
+		local top = boardPos.Y + 3 -- posts end inside the board, below its top edge
+		for _, dx in { -6, 6 } do
+			local base = boardPos + boardCF.RightVector * dx - boardCF.LookVector * 0.75
+			decorPart(folder, Vector3.new(0.9, top, 0.9), CFrame.new(base.X, top / 2, base.Z), Color3.fromRGB(30, 32, 44), Enum.Material.Metal)
 		end
-		local board = decorPart(folder, Vector3.new(16, 10, 0.6), CFrame.lookAt(boardPos, face), Color3.fromRGB(20, 24, 36), Enum.Material.Metal)
 		board.Name = "LeaderboardBoard_" .. kind
 		local boardGui = Instance.new("SurfaceGui")
 		boardGui.Face = Enum.NormalId.Front

@@ -1,7 +1,7 @@
 --!nonstrict
 -- Bottom-right status tiles for things that are running right now: one tile per live event (its own icon and colour) and one
 -- for the shared Server Goal (progress bar, or the frenzy countdown). Each tile shows a timer or progress and can be tapped
--- to read what it does. Pure display: the server decides what is live; a 1-second loop only updates the countdown text.
+-- (fixed sizes only). Pure display: the server decides what is live; a 1-second loop only updates the countdown text.
 local Kit = require(script.Parent.Kit)
 local Icons = require(script.Parent.Icons)
 local Theme = require(script.Parent.Theme)
@@ -44,16 +44,14 @@ function StatusDock.FormatTime(seconds)
 	return ("%d:%02d"):format(seconds // 60, seconds % 60)
 end
 
--- One tile: icon disc, name, big value line, optional bar, and a description shown on tap.
-local function buildTile(parent, order, look, name, description)
-	local root = make("Frame", { BackgroundColor3 = Theme.Shade(look.Color, 0.4), Size = UDim2.fromOffset(WIDTH, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = order, BorderSizePixel = 0, ZIndex = Theme.Z.Hud }, parent)
+-- One tile with a fixed size (no automatic sizing, nothing can grow): icon disc, name and a big value line; addBar adds a bar.
+local function buildTile(parent, order, look, name)
+	local root = make("Frame", { BackgroundColor3 = Theme.Shade(look.Color, 0.4), Size = UDim2.fromOffset(WIDTH, 44), LayoutOrder = order, BorderSizePixel = 0, ZIndex = Theme.Z.Hud }, parent)
 	make("UICorner", { CornerRadius = UDim.new(0, 14) }, root)
 	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = Theme.Stroke.Small, LineJoinMode = Enum.LineJoinMode.Round }, root)
 	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(look.Color, 0.1), Theme.Shade(look.Color, 0.35)), Rotation = 90 }, root)
-	make("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 8) }, root)
-	make("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }, root)
 
-	local row = make("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 34), LayoutOrder = 1, ZIndex = Theme.Z.Hud + 1 }, root)
+	local row = make("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(6, 5), Size = UDim2.new(1, -14, 0, 34), ZIndex = Theme.Z.Hud + 1 }, root)
 	local disc = make("Frame", { BackgroundColor3 = look.Color, Size = UDim2.fromOffset(34, 34), ZIndex = Theme.Z.Hud + 1 }, row)
 	make("UICorner", { CornerRadius = UDim.new(1, 0) }, disc)
 	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = Theme.Stroke.Small }, disc)
@@ -65,19 +63,12 @@ local function buildTile(parent, order, look, name, description)
 
 	local tile = { Root = root, Value = value, Title = title, Color = look.Color }
 
-	local desc = make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Font = Theme.Font.Body, Text = description or "", TextSize = 14, TextColor3 = Color3.fromRGB(240, 244, 255), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, Visible = false, LayoutOrder = 3, ZIndex = Theme.Z.Hud + 2 }, root)
-	tile.Description = desc
-	local tap = make("TextButton", { BackgroundTransparency = 1, Text = "", Size = UDim2.fromScale(1, 1), ZIndex = Theme.Z.Hud + 3 }, root)
-	tap.Activated:Connect(function()
-		if desc.Text ~= "" then
-			desc.Visible = not desc.Visible
-		end
-	end)
 	return tile
 end
 
 local function addBar(tile)
-	local track = make("Frame", { BackgroundColor3 = Theme.Colors.Outline, Size = UDim2.new(1, 0, 0, 9), LayoutOrder = 2, BorderSizePixel = 0, ZIndex = Theme.Z.Hud + 1 }, tile.Root)
+	tile.Root.Size = UDim2.fromOffset(WIDTH, 60)
+	local track = make("Frame", { BackgroundColor3 = Theme.Colors.Outline, Position = UDim2.fromOffset(6, 44), Size = UDim2.new(1, -14, 0, 9), BorderSizePixel = 0, ZIndex = Theme.Z.Hud + 1 }, tile.Root)
 	make("UICorner", { CornerRadius = UDim.new(1, 0) }, track)
 	local fill = make("Frame", { BackgroundColor3 = Theme.Tint(tile.Color, 0.25), Size = UDim2.fromScale(0, 1), BorderSizePixel = 0, ZIndex = Theme.Z.Hud + 2 }, track)
 	make("UICorner", { CornerRadius = UDim.new(1, 0) }, fill)
@@ -85,7 +76,7 @@ local function addBar(tile)
 end
 
 function StatusDock.Build(parent)
-	local holder = make("Frame", { Name = "StatusDock", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -12), Size = UDim2.fromOffset(WIDTH, 0), AutomaticSize = Enum.AutomaticSize.Y, ZIndex = Theme.Z.Hud }, parent)
+	local holder = make("Frame", { Name = "StatusDock", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -12), Size = UDim2.fromOffset(WIDTH, 200), ZIndex = Theme.Z.Hud }, parent)
 	make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Bottom, HorizontalAlignment = Enum.HorizontalAlignment.Right }, holder)
 
 	local dock = {}
@@ -145,7 +136,7 @@ function StatusDock.Build(parent)
 				break
 			end
 			local look = LOOK[ev.Id] or FALLBACK
-			local tile = buildTile(holder, i, look, ev.Name, ev.Description)
+			local tile = buildTile(holder, i, look, ev.Name)
 			table.insert(eventTiles, { Tile = tile, EndsAt = (receivedAt or os.clock()) + ev.EndsIn })
 		end
 		refresh()
@@ -162,7 +153,7 @@ function StatusDock.Build(parent)
 			return
 		end
 		if not goalTile then
-			goalTile = buildTile(holder, 100, { Icon = "Goals", Color = GOAL_COLOR }, "SERVER GOAL", "Everyone's pops and Lurker kills fill this bar together. Reach it for a server-wide payout frenzy.")
+			goalTile = buildTile(holder, 100, { Icon = "Goals", Color = GOAL_COLOR }, "SERVER GOAL")
 			addBar(goalTile)
 		end
 		refresh()

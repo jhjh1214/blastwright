@@ -189,3 +189,7 @@ Everything below was written without being run in Studio (the automated tests co
 ## E20. Notice Board contracts (unseen in Studio)
 - Daily button > "Notice Board": three offers (Easy / Standard / Hard) with rewards (shards, plus emergency charge tokens on Standard and a revive token on Hard). Accept one; the other two grey out. Hunt a specific Lurker, set a chain, trigger Critical Mass, beat bosses or clear an Expedition floor: the bar moves only after you accepted. Claim when complete; "Give up" drops it. Offers change at 00:00 UTC. The Daily button shows a badge when a contract can be claimed.
 - The status tiles, objective card and Dock spacing were tightened (E19): the objective card must not overlap the Forge button; on a short screen the dock should shrink instead.
+
+## E21. Fixes after playtest (unseen until re-run)
+- Quest card under the shards (now titled QUEST): fixed-size card, white text, height set from the text. Server Goal / event tiles: fixed size (the earlier version grew huge because a full-size tap button sat inside an auto-sizing tile and covered the ? button); tiles no longer expand on tap. The ? button must click again.
+- Leaderboard boards: two posts now stand directly behind each board's left and right edges (they used to be offset in world Z, so on a rotated board they missed it).
