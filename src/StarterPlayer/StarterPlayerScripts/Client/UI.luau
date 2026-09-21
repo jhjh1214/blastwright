@@ -19,6 +19,7 @@ local Fx = require(script.Parent.Fx)
 local ShopArt = require(script.Parent.ShopArt)
 local Dock = require(script.Parent.Dock)
 local Feed = require(script.Parent.Feed)
+local BossHud = require(script.Parent.BossHud)
 
 local UI = {}
 
@@ -95,7 +96,7 @@ local welcomeFrame, detonateStroke
 local detonatePulse = false
 local settingButtons = {}
 local tabButtons = {}
-local chargeColumn, panel, panelScroll, detonateButton, dock, topCenter
+local chargeColumn, panel, panelScroll, detonateButton, dock, topCenter, bossHud, leftCol, readPanel
 local roamGroup, blastGroup
 local runLabel, runModal, runCards, runTitle, runBank, rigLabel
 local bossFrame, bossName, bossFill, bossHint, dodgeButton, criticalLabel
@@ -178,21 +179,24 @@ function UI.Init()
 		if UI.OnLeave then UI.OnLeave() end
 	end)
 
-	runLabel = label(blastGroup, "", 15, THEME.Gold, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.fromOffset(240, 54), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, Visible = false })
+	-- Left column: status cards that stack (Critical Mass, run / puzzle, rig hearts and the monster) instead of overlapping.
+	leftCol = mk("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 12, 0, 56), Size = UDim2.fromOffset(290, 0), AutomaticSize = Enum.AutomaticSize.Y }, blastGroup)
+	mk("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, leftCol)
+	local function card(order, color, props)
+		local l = label(leftCol, "", 15, color, { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, BackgroundColor3 = Color3.fromRGB(18, 20, 33), BackgroundTransparency = 0.12, LayoutOrder = order, Visible = false, Font = Enum.Font.BuilderSansBold })
+		corner(l, 10)
+		mk("UIPadding", { PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 7), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, l)
+		for k, v in props or {} do l[k] = v end
+		return l
+	end
+	criticalLabel = card(1, Color3.fromRGB(255, 176, 80), { Font = Enum.Font.FredokaOne, TextSize = 19 })
+	runLabel = card(2, THEME.Gold)
+	rigLabel = card(3, Color3.fromRGB(255, 150, 150))
+	rigLabel.Visible = true
 
-	rigLabel = label(blastGroup, "", 16, Color3.fromRGB(255, 130, 130), { Position = UDim2.new(0, 14, 0, 112), Size = UDim2.fromOffset(280, 40), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top })
+	-- Boss HUD: a header plate (health, the five phases, the one thing to do) and a row of threat cards.
+	bossHud = BossHud.Build(blastGroup, Config.Bosses)
 
-	-- Boss bar (top centre) with a hint for the current phase, the Dodge button, and the CRITICAL MASS label.
-	bossFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.15, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 90), Size = UDim2.fromOffset(380, 66), Visible = false }, blastGroup)
-	corner(bossFrame, 10)
-	Fx.Depth(bossFrame, 0.35)
-	Fx.Glow(bossFrame, Color3.fromRGB(255, 90, 70), 2.5, 1.1)
-	bossName = label(bossFrame, "", 16, Color3.fromRGB(255, 200, 90), { Position = UDim2.fromOffset(0, 2), Size = UDim2.new(1, 0, 0, 20), Font = Enum.Font.FredokaOne })
-	local bossBack = mk("Frame", { BackgroundColor3 = Color3.fromRGB(30, 30, 40), Position = UDim2.fromOffset(12, 26), Size = UDim2.new(1, -24, 0, 12), BorderSizePixel = 0 }, bossFrame)
-	corner(bossBack, 6)
-	bossFill = mk("Frame", { BackgroundColor3 = Color3.fromRGB(230, 70, 70), Size = UDim2.fromScale(1, 1), BorderSizePixel = 0 }, bossBack)
-	corner(bossFill, 6)
-	bossHint = label(bossFrame, "", 13, THEME.Text, { Position = UDim2.fromOffset(6, 42), Size = UDim2.new(1, -12, 0, 20), TextWrapped = true })
 	dodgeButton = button(blastGroup, "DODGE (Q)", THEME.Panel, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -84), Size = UDim2.fromOffset(190, 48), TextSize = 20, Visible = false })
 	dodgeButton.Activated:Connect(function()
 		Remotes.Dodge:FireServer()
@@ -201,8 +205,9 @@ function UI.Init()
 	local tickAccumulator = 0
 	RunService.Heartbeat:Connect(function(dt)
 		tickAccumulator += dt
-		if tickAccumulator < 0.2 then return end
+		if tickAccumulator < 0.1 then return end
 		tickAccumulator = 0
+		bossHud.Tick() -- threat countdowns
 		local boss = State.Data and State.Data.Boss
 		if boss and boss.RT and dodgeButton.Visible then
 			local passed = os.clock() - (State.EventsAt or os.clock())
@@ -217,10 +222,8 @@ function UI.Init()
 			end
 		end
 	end)
-	criticalLabel = label(blastGroup, "", 22, Color3.new(1, 1, 1), { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 160), Size = UDim2.fromOffset(340, 30), Font = Enum.Font.FredokaOne, Visible = false, TextStrokeTransparency = 0.2, TextStrokeColor3 = Color3.fromRGB(120, 40, 0) })
-	mk("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 240, 130), Color3.fromRGB(255, 110, 30)), Rotation = 90 }, criticalLabel)
-
-	-- Active boosts (top right, always visible), the emergency-charge button, and the Revive offer.
+	-- Active boosts (top, beside the shard count), the emergency-charge button, and the Revive offer.
+	-- (boosts are shown next to the shards), the emergency-charge button, and the Revive offer.
 	boostLabel = label(gui, "", 14, THEME.Gold, { Position = UDim2.new(0, 162, 0, 8), Size = UDim2.new(0, 0, 0, 40), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = Color3.fromRGB(20, 22, 36), BackgroundTransparency = 0.2, Visible = false, Font = Enum.Font.BuilderSansBold })
 	corner(boostLabel, 12)
 	mk("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, boostLabel)
@@ -239,11 +242,19 @@ function UI.Init()
 		Remotes.RunRevive:FireServer(false)
 	end)
 
-	-- The planning read for fights (what this volley does to the Lurker / boss and to its wound-up attacks).
-	combatLabel = label(blastGroup, "", 15, Color3.fromRGB(255, 225, 190), { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.new(1, -440, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = Color3.fromRGB(40, 22, 22), BackgroundTransparency = 0.25, TextWrapped = true, Visible = false, TextStrokeTransparency = 1, Font = Enum.Font.BuilderSansMedium })
-	corner(combatLabel, 10)
-	mk("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, combatLabel)
-	mk("UIStroke", { Color = Color3.fromRGB(255, 120, 90), Thickness = 1.5, Transparency = 0.4 }, combatLabel)
+	-- Bottom centre: the crystal info line and the combat read (what this volley does to the Lurker / boss / its attacks) stack.
+	readPanel = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.new(1, -440, 0, 0), AutomaticSize = Enum.AutomaticSize.Y }, blastGroup)
+	mk("UIListLayout", { Padding = UDim.new(0, 6), VerticalAlignment = Enum.VerticalAlignment.Bottom, SortOrder = Enum.SortOrder.LayoutOrder }, readPanel)
+	mk("UISizeConstraint", { MaxSize = Vector2.new(520, 9999) }, readPanel)
+	local function readCard(order, color, fill)
+		local l = label(readPanel, "", 14, color, { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, BackgroundColor3 = fill, BackgroundTransparency = 0.1, LayoutOrder = order, Visible = false, Font = Enum.Font.BuilderSansMedium })
+		corner(l, 10)
+		mk("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, l)
+		return l
+	end
+	infoLabel = readCard(1, Color3.fromRGB(190, 198, 220), Color3.fromRGB(18, 20, 33))
+	combatLabel = readCard(2, Color3.fromRGB(255, 226, 200), Color3.fromRGB(56, 26, 28))
+	mk("UIStroke", { Color = Color3.fromRGB(226, 96, 84), Thickness = 1.5, Transparency = 0.35 }, combatLabel)
 
 	-- Between-floor choice: three cards and "Bank & leave". Covers the screen while choosing (blasting is paused anyway).
 	runModal = mk("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 20, Active = true }, gui)
@@ -286,17 +297,13 @@ function UI.Init()
 		Remotes.RunPick:FireServer("bank")
 	end)
 
-	seamLabel = label(blastGroup, "", 17, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 54), Size = UDim2.fromOffset(340, 24), Visible = false })
-	previewFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.35, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 54), Size = UDim2.new(1, -24, 0, 30), Visible = false }, blastGroup)
+	seamLabel = label(blastGroup, "", 17, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 12), Size = UDim2.fromOffset(340, 24), Visible = false })
+	previewFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.35, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 8), Size = UDim2.new(1, -340, 0, 34), Visible = false }, blastGroup)
 	corner(previewFrame, 10)
-	mk("UISizeConstraint", { MaxSize = Vector2.new(440, 30) }, previewFrame)
+	mk("UISizeConstraint", { MaxSize = Vector2.new(460, 34) }, previewFrame)
 	previewLabel = label(previewFrame, "", 17, THEME.Text, { Size = UDim2.fromScale(1, 1), TextScaled = true })
 	mk("UITextSizeConstraint", { MaxTextSize = 17, MinTextSize = 13 }, previewLabel)
-	infoLabel = label(blastGroup, "", 14, THEME.Dim, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 88), Size = UDim2.new(1, -24, 0, 44), BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.45, TextWrapped = true, Visible = false, TextYAlignment = Enum.TextYAlignment.Center })
-	corner(infoLabel, 10)
-	mk("UISizeConstraint", { MaxSize = Vector2.new(440, 44) }, infoLabel)
-	mk("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 12 }, infoLabel)
-	chainLabel = label(blastGroup, "", 40, THEME.Hot, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 90), Size = UDim2.fromOffset(340, 52), Font = Enum.Font.FredokaOne })
+	chainLabel = label(blastGroup, "", 40, THEME.Hot, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.62, 0), Size = UDim2.fromOffset(420, 56), Font = Enum.Font.FredokaOne, TextStrokeTransparency = 0.5, TextStrokeColor3 = Color3.fromRGB(20, 20, 30) })
 
 	chargeColumn = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -12), Size = UDim2.fromOffset(150, 180) }, blastGroup)
 	mk("UIListLayout", { VerticalAlignment = Enum.VerticalAlignment.Bottom, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, chargeColumn)
@@ -573,6 +580,18 @@ function UI.SetChain(pops, mult)
 	local base = 36 + math.min(pops, 40) * 0.5
 	chainLabel.TextSize = base
 	TweenService:Create(chainLabel, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextSize = base + 8 }):Play()
+end
+
+-- The boss appears / changes phase: a banner with the name (or the new phase) and what to do now.
+function UI.ShowBossIntro(boss)
+	AudioManager.Play("Tier")
+	local def = Config.Bosses.Defs[boss.Kind]
+	Feed.Banner(string.upper(boss.Name), def and def.Description or nil, Color3.fromRGB(214, 70, 78), 3.2)
+end
+
+function UI.ShowPhase(phase, boss)
+	AudioManager.Play("Tier")
+	Feed.Banner(string.upper(phase) .. " PHASE", boss and BossHud.Objective(boss, Config.Bosses) or nil, BossHud.PhaseColor[phase] or THEME.Gold, 2.2)
 end
 
 -- Big moments (chain tiers, Critical Mass, boss phases) use the banner: one plate at a time, no glow.
@@ -1069,21 +1088,9 @@ function UI.Refresh()
 		reviveYes.Text = ("Use a Revive (%d left)"):format(d.Inventory and d.Inventory.Revive or 0)
 	end
 	local boss = d.Boss
-	bossFrame.Visible = boss ~= nil
+	bossHud.Update(boss)
 	dodgeButton.Visible = boss ~= nil
 	if boss then
-		bossName.Text = ("%s   %d / %d   [%s]"):format(boss.Name, boss.HP, boss.MaxHP, string.upper(boss.Phase))
-		bossFill.Size = UDim2.fromScale(math.clamp(boss.HP / boss.MaxHP, 0, 1), 1)
-		local phaseColor = { Armor = Color3.fromRGB(255, 200, 60), Attack = Color3.fromRGB(240, 80, 80), Weak = Color3.fromRGB(255, 70, 220), Enrage = Color3.fromRGB(255, 40, 40), Finisher = Color3.fromRGB(120, 255, 255) }
-		bossFill.BackgroundColor3 = phaseColor[boss.Phase] or Color3.fromRGB(230, 70, 70)
-		local hints = {
-			Armor = "Pop the glowing GOLD armor nodes to break its armor.",
-			Attack = "Hit the core! SLAM (red line): pop 3+ crystals on it to cut it, or Dodge (Q).",
-			Weak = "Chain through BOTH magenta weak points! METEORS (orange): pop a Lensglass to deflect. SLAM: cut it.",
-			Enrage = "ENRAGED! SLAM = pop 3+ on the line. METEOR = pop Lensglass. CORRUPTION (purple) = pop the marked crystals. Dodge (Q) shields.",
-			Finisher = "FINISHER: one huge chain (12+ pops) or Critical Mass ends it!",
-		}
-		bossHint.Text = hints[boss.Phase] or ""
 		local shielded = boss.RT and boss.RT.Shielded
 		dodgeButton.Text = shielded and "SHIELD UP" or (boss.DodgeReady and "DODGE (Q)" or ("Dodge %ds"):format(math.ceil(boss.DodgeCooldown or 0)))
 		dodgeButton.BackgroundColor3 = shielded and THEME.Accent or (boss.DodgeReady and Fx.Tab.Codex or THEME.Panel)
@@ -1094,7 +1101,6 @@ function UI.Refresh()
 	end
 	if d.Puzzle and d.Puzzle.Active then
 		runLabel.Text = "DAILY PUZZLE\nSame grid for everyone. Basic charges only, ONE volley: plant up to " .. Config.Puzzle.Charges .. ", then detonate."
-		runLabel.Size = UDim2.fromOffset(300, 70)
 		runLabel.Visible = true
 	elseif not State.Run then
 		runLabel.Visible = false

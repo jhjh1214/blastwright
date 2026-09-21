@@ -53,7 +53,7 @@ Everything below was written without being run in Studio (the automated tests co
 17. Goals tab (24): progress bars, claim; a "Goal ready" toast appears the moment one completes.
 18. Shop tab: everything says "Not for sale yet" (no product IDs exist). Nothing crashes.
 19. Codex tab: crystals appear as you discover them (7 kinds); Blast colors section: Classic equipped; others locked with a hint ("Claim the goal: ..."); claiming that goal unlocks it and Equip works; your planting markers and blast rings change color.
-19b. Live events: on a Saturday/Sunday, Wednesday or 18:00-19:00 UTC a gold banner appears under the Menu button. (To test any time, temporarily edit the weekday or hours in `Config/Events.luau`.) Prismatic Weekend should show noticeably more Prismatic crystals; Overcharge Wednesday gives +1 charge; Happy Hour raises blast payouts 1.5x.
+19b. Live events: on a Saturday/Sunday, Wednesday or 18:00-19:00 UTC a gold banner appears under the dock. (To test any time, temporarily edit the weekday or hours in `Config/Events.luau`.) Prismatic Weekend should show noticeably more Prismatic crystals; Overcharge Wednesday gives +1 charge; Happy Hour raises blast payouts 1.5x.
 19c. Server Goal: a right-hand line under the event banner shows "Server goal: n / target pops together". Blast until it fills: a "Server goal reached" toast pays you, and the line switches to a frenzy countdown. In a 2-player test both players' pops add to the same bar.
 20. Geode caches (22) hidden off the roads: crack open once each, reward + "n/22", then the cache goes dull.
 
@@ -70,13 +70,13 @@ Everything below was written without being run in Studio (the automated tests co
 - Known: leaving the pad mid-run forfeits the unbanked haul (idle release).
 
 ### E3. Daily Puzzle (unseen in Studio)
-- Menu > Daily: a "Daily Puzzle" row with a Play button. Away from any pad: toast "Walk up to a free blast pad first". Standing at a pad: it starts (HUD explains: Basic charges only, ONE volley of up to 3).
+- the Daily button: a "Daily Puzzle" row with a Play button. Away from any pad: toast "Walk up to a free blast pad first". Standing at a pad: it starts (HUD explains: Basic charges only, ONE volley of up to 3).
 - Everyone (test with 2 players) sees the identical grid; the charge picker is ignored (only Basic). Detonate: the chain plays, then a toast shows score vs par and the medal (Bronze 50% / Silver 80% / Gold 100% / Perfect 125% of par) with shards; the row now shows the medal and "already played".
 - Streak: play on consecutive UTC days for +10% per day (max 7). Skipping a day resets it. Leaving the pad before detonating does not use the attempt.
 - Puzzle results must NOT change pops/best chain/daily objectives (they are separate by design).
 
 ### E4. Crystal Farm (unseen in Studio)
-- Menu > Farm tab (opening it refreshes the number). New/old saves start at level 1 producing 300 shards/hour, stored up to 8 hours, also while you are offline (rejoin after a while to see it). Collect adds shards; Upgrade collects first, then charges; the farm never pays for time before your first load after the update.
+- the Farm button tab (opening it refreshes the number). New/old saves start at level 1 producing 300 shards/hour, stored up to 8 hours, also while you are offline (rejoin after a while to see it). Collect adds shards; Upgrade collects first, then charges; the farm never pays for time before your first load after the update.
 - Try: leave for 2+ minutes, reopen the tab, the store should show ~10 shards; collect; the store should read Empty.
 
 ### E5. Lurkers (hidden monsters, unseen in Studio; design in docs/MONSTERS.md)
@@ -109,18 +109,18 @@ Everything below was written without being run in Studio (the automated tests co
 - Watch for: card text overflowing the 200x250 cards on a phone, an awake Lurker standing on a crystal that still shows, hearts/charges going out of sync after an Elite relic.
 
 ### E8. Collection, mastery and titles (unseen in Studio)
-- Menu > Codex now continues below the blast colors with Lurkers (???, then name x kills after your first kill), Bosses, Relics found N/M, and Boss mastery rows.
+- the Codex button now continues below the blast colors with Lurkers (???, then name x kills after your first kill), Bosses, Relics found N/M, and Boss mastery rows.
 - Beat the Titan and check the toasts "MASTERY: Flawless! Title unlocked: Untouchable (+6000 shards)". Try a win with no hearts lost, one in 8 or fewer volleys, a 20+ pop finisher, and one that ends on exactly 1 heart. Each objective pays only once.
 - Wear a title from the Codex: it should float above your head (gold text) and other players should see it; "Remove" takes it off; it should reappear after respawn and after rejoining.
 - Kill a Lurker and pick a relic card: their Codex rows should change from ??? to the name.
 
 ### E9. Boosts, tokens, revive, finishers, club and the new shop (unseen in Studio; no product IDs exist)
-- Menu > Shop is now grouped: Club, Boosts and run support, Boss finishers, Bundles, Permanent perks, Blast colors, Shard packs. Every button says "Not for sale yet" and is disabled until IDs are pasted into `Config/Products.luau`.
+- the Shop button is now grouped: Club, Boosts and run support, Boss finishers, Bundles, Permanent perks, Blast colors, Shard packs. Every button says "Not for sale yet" and is disabled until IDs are pasted into `Config/Products.luau`.
 - To test WITHOUT real products, temporarily grant yourself things in the command bar (server): `require(game.ServerScriptService.Server.Data).Get(game.Players.<you>).Inventory.Revive = 3` and similar for `Charge`, then rejoin/sync; or (better) create the products in a private test place and paste real IDs.
 - Emergency charge: with a stock and 1 or fewer charges, a "+1 emergency charge (n)" button appears above Dodge; pressing it adds a charge and lowers the count. It must NOT appear in the Daily Puzzle.
 - Revive: lose an Expedition floor (0 charges and under half cleared, or 0 hearts) while holding a token: a full-screen "THE TUNNEL IS COLLAPSING! Use a Revive?" appears; accepting restores 3 charges and 2 hearts and continues the SAME floor; declining or waiting 25 seconds collapses normally (40% salvage). Only one offer per floor.
 - Boosts: a gold line at the top right shows "2x shards 14:59"; payouts should double while it runs.
-- Finishers: Menu > Codex > Boss finishers lets you wear an owned finish; beat the Titan and the FINAL BLAST bursts should use that colour.
+- Finishers: the Codex button > Boss finishers lets you wear an owned finish; beat the Titan and the FINAL BLAST bursts should use that colour.
 - Club: with a subscription id configured, Shop shows Subscribe; when active, a monthly Claim button pays 25,000 and grants the title.
 
 ### E10. Combat live events (unseen in Studio)
@@ -139,7 +139,7 @@ Everything below was written without being run in Studio (the automated tests co
 - Watch for: gems flickering or not spinning (ViewportFrames inside the scroll list), performance while the Codex is open (about 12 gems), text overflowing the toast pills or headers on a phone, the shimmer overlay covering button text, hover scaling on touch devices.
 
 ### E13. Shop cards with artwork (unseen in Studio)
-- Menu > Shop is now a grid of product cards (two columns, one on narrow screens), each with animated procedural art on a tier-coloured banner: spinning gem piles for shard packs (more gems for bigger packs), ringed "x2" for boosts, a beating heart for Revive, three pulsing orbs for emergency charges, an exploding-rings-and-orbiting-sparks preview in the finisher's own colour, glowing orbiting orbs for blast colors, a gold title ribbon, and a fanned stack of icon tiles for every bundle. Cards have a tier ribbon, badges (BEST VALUE, HOT, ULTIMATE, BUNDLE, OWNED), a price hint chip and a buy button that shimmers when for sale.
+- the Shop button is now a grid of product cards (two columns, one on narrow screens), each with animated procedural art on a tier-coloured banner: spinning gem piles for shard packs (more gems for bigger packs), ringed "x2" for boosts, a beating heart for Revive, three pulsing orbs for emergency charges, an exploding-rings-and-orbiting-sparks preview in the finisher's own colour, glowing orbiting orbs for blast colors, a gold title ribbon, and a fanned stack of icon tiles for every bundle. Cards have a tier ribbon, badges (BEST VALUE, HOT, ULTIMATE, BUNDLE, OWNED), a price hint chip and a buy button that shimmers when for sale.
 - A "Featured" section at the top shows the Ultimate Blastwright, Boss Hunter and Starter Blast bundles. Prices shown are my hints (about R$) and are NOT read from Roblox; the real price appears in the Roblox prompt.
 - Watch for: hitches when the Shop tab opens (many animations at once), text overflow inside cards on a phone, gems not rendering inside cards, the card border animation looking too busy.
 
@@ -150,6 +150,15 @@ Everything below was written without being run in Studio (the automated tests co
 - With a Lurker or boss on the grid, planting charges shows a red panel at the bottom centre using the SAME rules the server uses: Lurker "~N damage (HP a -> b)" or "KILLS IT" or "does not reach it"; boss "Core hit ~N (HP a -> b)", "Armor: breaks 2 nodes, 2 left", "Weak points hit 1/2", "FINISHER: this volley kills it!"; and for each wound-up attack "SLAM: cut" / "METEORS: 1/3 deflected (pop Lensglass)" / "CORRUPTION: 2/4 purified". Without the Seismograph it only counts direct hits and says so; with it, whole chains. Check the numbers against what actually happens after you detonate.
 - Chain feel: chain tier banners (Rumble, Cascade, Avalanche, Cataclysm) and CRITICAL MASS now fire LIVE the moment the chain reaches that length (with a camera punch and ring), not after it ends; the CHAIN counter grows and heats up (orange, gold, red, magenta) as the chain grows.
 - Onboarding: after about 30 pops the objective card points at Expeditions ("HOLD F at a pad"), then at reaching floor 4 for the Titan; the first seams after 40 pops have a 60% chance of a Lurker until you kill your first, and a Lurker on the grid replaces the beginner hint with a fight hint.
+
+### E16. UI overhaul: dock, message feed, banners, boss HUD (unseen in Studio)
+- **Dock:** in the world (not at a pad) a row of six tiles sits at the bottom centre: Forge, Shop, Daily, Goals, Codex, Farm, each a flat coloured tile with a drawn icon (hammer, bag, calendar, star, book, sprout) and a caption. Pressing one opens that page above the dock (the open tile stays pressed down; press again to close). Red badges appear on Daily / Goals when something is claimable and on Farm when an hour of income is waiting. The objective card can outline a tile in gold ("open Daily to claim"). There is no "Menu" button any more; only a small "?" (help) top right. Check the dock fits on a phone (it scales down) and does not overlap the panel.
+- **Fonts and text:** headings, numbers and buttons use the rounded display font (Fredoka), body text the clean Builder Sans; text no longer has glow/stroke, and the shimmer, sparkle and rainbow-border effects were removed on purpose.
+- **Messages:** things that happen appear as cards in a column on the RIGHT edge (newest on top, max 4, slide in/out, an icon tile, a bold title and a smaller body; goals/mastery/unlocks get a purple card). Big moments (chain tiers, Critical Mass, boss intro/phases/defeat) show as ONE banner plate in the upper middle, queued so they never pile up. Boss wind-up warnings no longer spam the feed (the boss panel shows them).
+- **Boss HUD:** a header plate under the top pills: name, health bar with numbers, five labelled phase pips (the current one lit), and ONE line of "what to do now"; below it a card per wound-up attack (SLAM / METEORS / CORRUPTION) with a live countdown, a draining bar, and the one-line answer, turning green ("Stopped") once you counter it. Dodge sits bottom right with its cooldown. Left column: Critical Mass, run/puzzle and rig cards STACK (no overlap). Bottom centre: crystal info and the combat read stack. The chain counter now pops in the middle of the screen.
+- **Boss presentation:** a banner with the boss name and description when it appears; the arena gets a coloured border and a sigil under the boss in the phase colour; the boss recoils when hit; landing attacks throw fire where crystals died with a shake; phase changes fire a big ring, a white flash and a banner naming the new phase and its goal.
+- **Kept the 9x9 grid for boss fights on purpose** (the pad, camera, preview and every rule assume it); the arena is made to feel bigger with the border, sigil, model size and camera punches instead.
+- Watch for: the right-hand feed overlapping the boss threat cards on a phone, the dock covering the Farm/Forge panel bottom, text sizes in the phase pips, the arena border z-fighting the pad rim.
 
 ### F. Multi-player and phones (Test > 2 players, and the Device emulator)
 23. Two players use different pads and see each other's grids and blasts (distant grids appear only when you are near: level of detail). A pad in use is labelled "In use". Walking 130+ studs away for a minute releases it.

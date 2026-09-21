@@ -90,6 +90,17 @@ Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
 		-- hit numbers and bursts on whatever was hit (positions are read before the creature moves on)
 		local hitPos = (turn.BossDamage and turn.BossDamage > 0 and CavernView.BossPosition(view)) or (turn.Damage and turn.Damage > 0 and CavernView.MonsterPosition(view)) or nil
 		local hitAmount = (turn.BossDamage and turn.BossDamage > 0 and turn.BossDamage) or (turn.Damage and turn.Damage > 0 and turn.Damage) or nil
+		if turn.BossDamage and turn.BossDamage > 0 then
+			CavernView.BossHit(view)
+		end
+		-- an attack landed: fire where the crystals were destroyed
+		if #turn.Eaten > 0 and turn.Boss then
+			for i = 1, math.min(#turn.Eaten, 10) do
+				local at = Geometry.CellPosition(view.Origin, turn.Eaten[i].X, turn.Eaten[i].Z) + Vector3.new(0, 2, 0)
+				VFX.Burst(at, Color3.fromRGB(255, 130, 60), 10, 24)
+			end
+			CameraFeedback.Shake(1)
+		end
 		if hitPos and hitAmount then
 			FloatingNumbers.Show(hitPos + Vector3.new(0, 8, 0), "-" .. hitAmount, Color3.fromRGB(255, 90, 90), math.min(1.1 + hitAmount * 0.03, 2))
 			VFX.Burst(hitPos + Vector3.new(0, 3, 0), Color3.fromRGB(255, 90, 90), 16, 26)
@@ -130,11 +141,15 @@ Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
 				end)
 			end
 			UI.ShowTier("Boss defeated")
+			UI.Flash(Color3.fromRGB(255, 240, 200), 0.6)
 			CameraFeedback.Shake(2)
 			CameraFeedback.Punch(10)
 		elseif turn.PhaseChanged then
-			UI.ShowTier(turn.PhaseChanged .. " phase")
-			CameraFeedback.Punch(5)
+			UI.ShowPhase(turn.PhaseChanged, turn.Boss)
+			CameraFeedback.Punch(6)
+			CameraFeedback.Shake(1.2)
+			VFX.Ring(view.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(255, 220, 160), view.Extent * 1.6, 0.8)
+			UI.Flash(Color3.fromRGB(255, 255, 255), 0.25)
 		end
 		if turn.Emerged or turn.Slain or turn.HeartsLost or #turn.Eaten > 0 then
 			CameraFeedback.Shake(turn.HeartsLost and 1.4 or 0.8)
@@ -159,6 +174,11 @@ Remotes.Sync.OnClientEvent:Connect(function(snapshot)
 	end)
 	-- The boss markers (armor nodes, weak points, marked attack cells) follow the server's snapshot.
 	local view = CavernView.Get(localPlayer.UserId)
+	if snapshot.Boss and not State.LastBoss and State.Engaged then
+		UI.ShowBossIntro(snapshot.Boss) -- the boss just appeared
+		CameraFeedback.Punch(7)
+	end
+	State.LastBoss = snapshot.Boss ~= nil
 	if view then
 		CavernView.SetBoss(view, snapshot.Boss)
 		CavernView.SetMonster(view, snapshot.Monster) -- an awake Lurker from a Nest, Elite room or Blood Rush shows up at floor start

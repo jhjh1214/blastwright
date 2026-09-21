@@ -286,7 +286,8 @@ local function ensureCreatureLoop()
 			end
 			local boss = view.BossModel
 			if boss and boss.Parent and view.BossBase then
-				boss:PivotTo(view.BossBase * CFrame.new(0, math.sin(t * 1.4) * 0.35, 0) * CFrame.Angles(0, math.sin(t * 0.7) * 0.06, 0))
+				local kick = view.BossKick and math.max(0, 1 - (t - view.BossKick) / 0.4) or 0 -- recoil when hit
+				boss:PivotTo(view.BossBase * CFrame.new(0, math.sin(t * 1.4) * 0.35, kick * 1.6) * CFrame.Angles(kick * 0.05, math.sin(t * 0.7) * 0.06, 0))
 			end
 		end
 	end)
@@ -423,6 +424,30 @@ function CavernView.SetBoss(view, boss)
 	end
 	view.BossHP = boss.HP
 	Creatures.SetPhase(model, boss.Phase)
+	-- the arena: a coloured border around the grid and a sigil under the boss, both in the phase colour
+	local phaseColor = ({ Armor = Color3.fromRGB(240, 190, 60), Attack = Color3.fromRGB(232, 92, 84), Weak = Color3.fromRGB(226, 90, 200), Enrage = Color3.fromRGB(236, 56, 56), Finisher = Color3.fromRGB(96, 214, 230) })[boss.Phase] or Color3.fromRGB(232, 92, 84)
+	local mid = (view.Size + 1) / 2
+	local centre = Geometry.CellPosition(view.Origin, mid, mid)
+	local half = view.Extent / 2 + 1
+	for _, side in { { 0, -half, view.Extent + 3, 1.4 }, { 0, half, view.Extent + 3, 1.4 }, { -half, 0, 1.4, view.Extent + 3 }, { half, 0, 1.4, view.Extent + 3 } } do
+		local strip = Instance.new("Part")
+		strip.Anchored, strip.CanCollide, strip.CanQuery, strip.CastShadow = true, false, false, false
+		strip.Material = Enum.Material.Neon
+		strip.Color = phaseColor
+		strip.Transparency = 0.45
+		strip.Size = Vector3.new(side[3], 0.3, side[4])
+		strip.Position = centre + Vector3.new(side[1], 0.25, side[2])
+		strip.Parent = view.BossFx
+	end
+	local sigil = Instance.new("Part")
+	sigil.Anchored, sigil.CanCollide, sigil.CanQuery, sigil.CastShadow = true, false, false, false
+	sigil.Shape = Enum.PartType.Cylinder
+	sigil.Material = Enum.Material.Neon
+	sigil.Color = phaseColor
+	sigil.Transparency = 0.7
+	sigil.Size = Vector3.new(0.2, CellSize * 3.6, CellSize * 3.6)
+	sigil.CFrame = CFrame.new(centre + Vector3.new(0, 0.22, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	sigil.Parent = view.BossFx
 	model.PrimaryPart:FindFirstChildOfClass("BillboardGui").Text.Text = ("%s  %d/%d"):format(boss.Name, boss.HP, boss.MaxHP)
 	for _, cell in boss.Nodes do
 		marker(view, cell, Color3.fromRGB(255, 200, 60), 5, 3.2, 0.25) -- armor node: break these
@@ -497,6 +522,10 @@ end
 -- Where a creature stands (for floating numbers and bursts), or nil.
 function CavernView.MonsterPosition(view)
 	return view.MonsterBase and view.MonsterBase.Position or nil
+end
+
+function CavernView.BossHit(view)
+	view.BossKick = os.clock()
 end
 
 function CavernView.BossPosition(view)

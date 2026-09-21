@@ -202,7 +202,7 @@ local function announceGoals(player: Player)
 		return
 	end
 	for _, def in Achievements.NewlyComplete(data, AchievementsConfig, seen) do
-		notify(player, ("Goal ready: %s  (Menu > Goals)"):format(def.Name), "Reward")
+		notify(player, ("Goal ready: %s. Open Goals to claim it."):format(def.Name), "Reward")
 	end
 end
 
@@ -845,7 +845,7 @@ local function bossTick(player: Player, seam: SeamState)
 			Meteor = "METEORS incoming! Pop a Lensglass (prism) crystal to deflect them, or Dodge.",
 			Corruption = "CORRUPTION! Pop the purple crystals before it lands.",
 		}
-		notify(player, warning[threat.Type], "Error")
+		notify(player, warning[threat.Type], "Threat") -- the boss panel shows it; this only plays the warning sound
 	end
 	for _, landed in BossRT.Due(seam.BossRT, now) do
 		changed = true
