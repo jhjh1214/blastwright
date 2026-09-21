@@ -220,3 +220,9 @@ Everything below was written without being run in Studio (the automated tests co
 ## E26. Ascension (unseen in Studio)
 - Loadout tab, top section "Expedition difficulty". Winning your first Expedition on Normal unlocks Ascension 1; winning at your highest unlocked tier unlocks the next (5 tiers). Each tier stacks its rule on the ones below (25% tougher Lurkers, one fewer charge, 30% tougher bosses, one fewer heart, and a harsher clear requirement plus more monster health) and pays a bigger banked haul (shown as "Total haul x..."). Winning a tier also earns the title "Ascendant I..V".
 - Check: pick a tier, start an Expedition (a warning states the rule), and confirm the effect (starting charges, hearts, Lurker/boss health bars). The tier cannot be changed mid-run. Banking early and victory both apply the haul multiplier; a collapse (salvage) does not.
+
+## E27. UI split, refresh, sounds, FREE shop section (unseen in Studio)
+- Every menu tab (Forge, Loadout, Daily, Farm, Goals, Shop, Codex) is now its own file in `Client/Tabs/`. This was a pure move: open each tab once and confirm it looks and behaves as before (buttons work, rows appear, nothing errors in Output).
+- The menu now refreshes at most every 0.3 s after server updates and keeps your scroll position; switching tabs starts at the top. Click Buy on something and check the list does not jump.
+- Specimen sounds: each grade has its own pitch/layer signature (Rough soft coin up to a rising run under a deep boom for Celestial). They reuse the existing cues, so they will sound like variations of the reward and bling sounds.
+- Shop: a "FREE rewards" section is now first (daily reward and the next free Track reward, both with a Claim button).

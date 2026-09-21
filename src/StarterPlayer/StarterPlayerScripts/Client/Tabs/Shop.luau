@@ -8,6 +8,7 @@ local Config = require(Shared.Config)
 local Products = Config.Products
 local Remotes = require(Shared.Remotes)
 local ShopArt = require(script.Parent.Parent.ShopArt)
+local TrackLogic = require(Shared.Track)
 
 return function(c)
 	local d, titleLabel, header, mk, commas, panel, panelScroll = c.d, c.titleLabel, c.header, c.mk, c.commas, c.panel, c.panelScroll
@@ -32,6 +33,34 @@ return function(c)
 		return function()
 			if def.Id then MarketplaceService:PromptProductPurchase(Players.LocalPlayer, def.Id) end
 		end
+	end
+
+	-- FREE: the first thing in the shop, so nobody has to pay to see that rewards exist. The daily streak and the next
+	-- unclaimed FREE Track reward; both are claimed through the same server checks as in the Daily and Goals tabs.
+	local freeGrid = section("FREE rewards")
+	local streak = d.Streak
+	if streak then
+		ShopArt.Card(freeGrid, {
+			Name = "Daily reward", Description = ("Log in every day: a 7-day streak of free rewards. Your streak: %d."):format(streak.Count), Art = ShopArt.Gems(3, Color3.fromRGB(110, 230, 150)), Tier = "Tiny", Badge = "FREE",
+			Hint = "free", Button = streak.CanClaim and "Claim" or "Claimed", Enabled = streak.CanClaim, Order = 1,
+			OnClick = function() Remotes.StreakClaim:FireServer() end,
+		})
+	end
+	if d.Track then
+		local trackState = { Xp = d.Track.Xp, Claimed = d.Track.Claimed }
+		local nextFree
+		local reached = TrackLogic.LevelsReached(trackState.Xp, Config.Track)
+		for level = 1, math.min(reached, Config.Track.MaxLevel + 50) do
+			if TrackLogic.CanClaim(trackState, level, false, false, Config.Track) then
+				nextFree = level
+				break
+			end
+		end
+		ShopArt.Card(freeGrid, {
+			Name = "Blastwright Track", Description = nextFree and ("Level %d has a free reward waiting."):format(nextFree) or "Everything you do earns Track XP. A free reward on every level, nothing expires.", Art = ShopArt.Boost(2, "free", Color3.fromRGB(255, 205, 90)), Tier = "Tiny", Badge = "FREE",
+			Hint = "free", Button = nextFree and "Claim" or ("Level " .. reached), Enabled = nextFree ~= nil, Order = 2,
+			OnClick = function() if nextFree then Remotes.TrackClaim:FireServer(nextFree, false) end end,
+		})
 	end
 
 	-- Club (monthly subscription)

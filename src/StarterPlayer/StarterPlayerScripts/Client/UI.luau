@@ -761,8 +761,10 @@ local TABS = {
 	Codex = require(script.Parent.Tabs.Codex),
 }
 
+local lastRenderedTab = nil
 local function rebuildPanel()
 	if not panel.Visible or not State.Data then return end
+	local keepScroll = lastRenderedTab == activeTab and panelScroll.CanvasPosition or Vector2.zero -- a refresh keeps your place in the list
 	for _, c in panelScroll:GetChildren() do
 		if c:IsA("GuiObject") then c:Destroy() end
 	end
@@ -778,6 +780,31 @@ local function rebuildPanel()
 
 	local build = TABS[activeTab] or TABS.Codex
 	build({ d = d, titleLabel = titleLabel, row = row, header = header, label = label, mk = mk, corner = corner, commas = commas, THEME = THEME, button = button, panel = panel, panelScroll = panelScroll })
+	lastRenderedTab = activeTab
+	task.defer(function()
+		panelScroll.CanvasPosition = keepScroll
+	end)
+end
+
+-- Snapshots can arrive in quick bursts (a volley, a claim, a purchase). Rebuilding the whole list for each one wastes work and
+-- flickers, so refreshes are coalesced to at most one every 0.3 s. Opening a tab (SetPanel) still rebuilds immediately.
+local lastRebuild, rebuildQueued = 0, false
+local function requestRebuild()
+	if not panel or not panel.Visible then
+		return
+	end
+	local wait = 0.3 - (os.clock() - lastRebuild)
+	if wait <= 0 then
+		lastRebuild = os.clock()
+		rebuildPanel()
+	elseif not rebuildQueued then
+		rebuildQueued = true
+		task.delay(wait, function()
+			rebuildQueued = false
+			lastRebuild = os.clock()
+			rebuildPanel()
+		end)
+	end
 end
 
 function UI.SetPanel(open, tab)
@@ -916,7 +943,7 @@ function UI.Refresh()
 	UI.RefreshSettings()
 
 	rebuildCharges()
-	rebuildPanel()
+	requestRebuild()
 end
 
 return UI

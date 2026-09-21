@@ -66,7 +66,7 @@ What is honestly still missing for a *month*: seasonal rotation of cabinet varia
 ## 4. Priorities
 - **P0 (done in this pass):** none of the earlier work was broken enough to block; the P0 gap was "no random chase and no free reward habit".
 - **P1 (done):** Specimens + reveals, Track + Track Premium, Streak, UI QA tool, gem-animation performance fix.
-- **P2 (not done):** split `UI.luau` per tab; painted art; a small "Collection" dock entry; sound cues per rarity (currently reuses Tier/Reward sounds).
+- **P2:** done: split `UI.luau` per tab, per-grade sounds, shop FREE section, coalesced refresh. Still open: painted art, a small "Collection" dock entry, dedicated rarity recordings.
 - **P3 (future):** rotating cabinet variants, seasonal Track (only if it stays optional), trading/showcase of specimens, cabinet display in the hub.
 
 ## 4b. Ideas deliberately NOT added (and why)
@@ -98,9 +98,9 @@ These need your playtest; `docs/TESTING.md` E25 says what to look at.
 ### Issues found in this audit
 - Gem spinners kept running in closed menus (a closed panel keeps its objects alive): **fixed** (visibility check every 0.5 s).
 - No static UI QA existed: **added** `tools/lint/ui_qa.py` (placeholder text/ids, buttons without a handler, asset ids outside the allowed files, ZIndex outside the layer scheme, small touch targets, fixed widths over 640, fonts outside the design system). It found nothing in the current code beyond two false positives in its own first version.
-- The menu panel rebuilds on every snapshot while open (performance and flicker risk): **not fixed** (needs a per-row update path); logged as P2.
+- The menu panel rebuilt on every snapshot while open: **mitigated** (refreshes are coalesced to one per 0.3 s and keep the scroll position); a true per-row diff is not built.
 - Several Heartbeat/RenderStepped connections exist (Fx gems and per-frame animations, Guide, Ambience, UI pulses, camera): each is a single shared loop, not per object; no leaks found by reading. Not profiled on a phone.
-- `UI.luau` size (about 1,350 lines) is a maintainability risk: P2.
+- `UI.luau` was about 1,400 lines: **split** (now about 920, with the tabs in `Client/Tabs/`).
 
 ## 7. Implementation status
 | Item | Status |
@@ -112,4 +112,8 @@ These need your playtest; `docs/TESTING.md` E25 says what to look at.
 | UI QA tool | Implemented and run |
 | Painted art, real device QA, balance from play | **Requires you** |
 | Ascension (5 opt-in Expedition difficulty tiers, `Shared/Ascension.luau`) | Implemented, logic tested and mutation-checked; UI unseen (added after the audit) |
-| UI.luau split, panel diffing, rarity-specific sounds, shop "Free" section | Future work |
+| `UI.luau` split into `Client/Tabs/*` (pure move, checked line by line and with the analyser) | Implemented |
+| Menu refresh coalescing (at most every 0.3 s, scroll position kept) | Implemented; unseen |
+| Per-grade specimen sound signatures (pitch/layering of existing verified cues) | Implemented; unheard |
+| Shop "FREE rewards" section (daily reward and free Track reward) | Implemented; unseen |
+| Painted art, real recordings for rarity sounds, a true row-level diff of the menu | Future work |

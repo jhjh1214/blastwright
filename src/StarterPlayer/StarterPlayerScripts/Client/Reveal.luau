@@ -58,6 +58,26 @@ local function commas(n)
 	return (s:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
 end
 
+-- One sound signature per grade, built only from the verified cues in Config/Sounds.luau by pitch, volume and layering:
+-- Rough: a soft coin; Polished: a brighter coin; Faceted: the diamond bling; Flawless: bling plus coin; Radiant: a rising
+-- three-note bling with a coin on top; Celestial: a longer rising run of blings under a deep boom. Never fails gameplay.
+local SIGNATURES = {
+	{ { "Reward", 0, 0.35, 0.9 } },
+	{ { "Reward", 0, 0.5, 1.2 } },
+	{ { "Tier", 0, 0.6, 1.0 } },
+	{ { "Tier", 0, 0.8, 1.1 }, { "Reward", 0.12, 0.6, 1.4 } },
+	{ { "Tier", 0, 0.8, 1.0 }, { "Tier", 0.16, 0.85, 1.25 }, { "Tier", 0.32, 0.9, 1.5 }, { "Reward", 0.4, 0.7, 1.7 } },
+	{ { "Detonate", 0, 0.45, 0.5 }, { "Tier", 0.05, 0.9, 0.9 }, { "Tier", 0.22, 0.9, 1.1 }, { "Tier", 0.39, 0.95, 1.35 }, { "Tier", 0.56, 1, 1.7 }, { "Reward", 0.7, 0.8, 1.9 } },
+}
+local function playSignature(index)
+	for _, note in SIGNATURES[math.clamp(index, 1, #SIGNATURES)] do
+		local cue, delay, volume, pitch = note[1], note[2], note[3], note[4]
+		task.delay(delay, function()
+			pcall(AudioManager.Play, cue, { Volume = volume, Pitch = pitch })
+		end)
+	end
+end
+
 -- The full reveal card (Flawless and up).
 local function card(drop, done)
 	local index = INDEX[drop.Rarity] or 4
@@ -131,7 +151,7 @@ local function card(drop, done)
 	-- pop in with a bounce, then the effects
 	TweenService:Create(scale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 	pcall(function()
-		AudioManager.Play(top and "Reward" or "Tier")
+		playSignature(index)
 		CameraFeedback.Punch(top and 6 or (big and 4 or 2))
 	end)
 	if top then
@@ -158,6 +178,9 @@ local function pump()
 	local index = INDEX[drop.Rarity] or 1
 	local name, grade = titleFor(drop)
 	local tail = drop.New and "New in your cabinet!" or ("Duplicate: +%s shards"):format(commas(drop.Dust))
+	if index <= 3 then
+		playSignature(index)
+	end
 	if index <= 2 then
 		pcall(Feed.Push, "Reward", name, tail)
 		task.defer(pump)
