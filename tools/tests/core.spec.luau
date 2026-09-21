@@ -2910,6 +2910,20 @@ local Grants = require("../../src/ReplicatedStorage/Shared/Grants")
 local FinCfg = require("../../src/ReplicatedStorage/Shared/Config/Finishers")
 local function freshSave() return Schema.Default() end
 
+test("grants: equipping a finisher needs a known, owned id; hostile ids change nothing", function()
+	local d = freshSave()
+	eq(Grants.EquipFinisher(d, "Inferno", FinCfg), false, "known but not owned")
+	eq(d.Finishers.Equipped, FinCfg.DefaultId, "unchanged")
+	for _, junk in { 5, true, {}, "", "Nope", "inferno", string.rep("x", 5000) } do
+		eq(Grants.EquipFinisher(d, junk, FinCfg), false, "junk id")
+	end
+	eq(d.Finishers.Equipped, FinCfg.DefaultId, "still default after junk")
+	d.Finishers.Owned.Inferno = true
+	eq(Grants.EquipFinisher(d, "Inferno", FinCfg), true, "owned")
+	eq(d.Finishers.Equipped, "Inferno", "equipped")
+	eq(Grants.EquipFinisher(d, FinCfg.DefaultId, FinCfg), true, "the default is always allowed")
+end)
+
 test("grants: shards are added, scaled by areas unlocked only when marked Scaled", function()
 	local d = freshSave()
 	local msgs = Grants.Apply(d, { { Kind = "Shards", Amount = 1000 }, { Kind = "Shards", Amount = 1000, Scaled = true } }, 0, 3)
