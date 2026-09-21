@@ -176,3 +176,7 @@ Everything below was written without being run in Studio (the automated tests co
 
 ### G. Publishing-only (do these last, see MANUAL_ACTIONS.md)
 25. Save persistence, the leaderboard, product prompts, and 2x Shards / Prismatic Luck can only be verified in a published place.
+
+## E18. Trophy hall and combat dailies (unseen in Studio)
+- West of the hub plaza: two gold pedestals (Crystal Titan, Prism Warden). Before your first kill each shows a black silhouette and "???"; after a kill the model gets its colours back and the sign reads "<name> Slain xN". Expect: updates right after leaving an Expedition boss fight; no Output errors from `[trophy hall]`; model is not floating or clipping into the pedestal (tune `MODEL_SCALE` / height in `Client/Trophies.luau`).
+- Daily/Weekly (Daily and Goals buttons): new objectives "Slay N Lurkers" and "Trigger Critical Mass N times" appear in the rotation and progress as you kill Lurkers / start Critical Mass.
