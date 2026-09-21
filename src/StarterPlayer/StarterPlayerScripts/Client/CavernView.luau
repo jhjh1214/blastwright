@@ -426,8 +426,20 @@ function CavernView.SetBoss(view, boss)
 		marker(view, cell, Color3.fromRGB(255, 70, 230), 6, 3.4, 0.2) -- weak point: chain through BOTH
 	end
 	for _, cell in boss.Telegraph do
-		marker(view, cell, Color3.fromRGB(255, 40, 40), 0.3, CellSize * 0.95, 0.55) -- next attack lands here
+		local tile = marker(view, cell, Color3.fromRGB(255, 40, 40), 0.3, CellSize * 0.95, 0.55) -- next attack lands here
+		pcall(function()
+			TweenService:Create(tile, TweenInfo.new(0.45, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.15 }):Play() -- it pulses: danger
+		end)
 	end
+end
+
+-- Where a creature stands (for floating numbers and bursts), or nil.
+function CavernView.MonsterPosition(view)
+	return view.MonsterBase and view.MonsterBase.Position or nil
+end
+
+function CavernView.BossPosition(view)
+	return view.BossBase and view.BossBase.Position or nil
 end
 
 -- An eaten crystal disappears without a chain.

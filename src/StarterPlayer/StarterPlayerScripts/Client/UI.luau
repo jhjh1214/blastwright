@@ -531,6 +531,14 @@ function UI.ShowTier(name, bonus, total)
 	end)
 end
 
+-- A quick full-screen colour flash (a hit taken, a boss phase). Purely visual.
+function UI.Flash(color, strength)
+	if not gui then return end
+	local f = mk("Frame", { BackgroundColor3 = color, BackgroundTransparency = 1 - (strength or 0.4), Size = UDim2.fromScale(1, 1), ZIndex = 40, Active = false, BorderSizePixel = 0 }, gui)
+	TweenService:Create(f, TweenInfo.new(0.45), { BackgroundTransparency = 1 }):Play()
+	task.delay(0.5, function() f:Destroy() end)
+end
+
 function UI.Toast(text, kind)
 	if not toastHolder then return end
 	local color = kind == "Reward" and THEME.Gold or (kind == "Error" and THEME.Bad or THEME.Accent)

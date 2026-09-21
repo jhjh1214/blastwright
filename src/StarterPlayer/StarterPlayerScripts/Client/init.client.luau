@@ -21,6 +21,7 @@ local Preview = require(script.Preview)
 local State = require(script.State)
 local UI = require(script.UI)
 local VFX = require(script.VFX)
+local FloatingNumbers = require(script.FloatingNumbers)
 local Geometry = require(Shared.Geometry)
 
 -- Optional presentation systems: a failure in one of these warns and the game still starts.
@@ -79,6 +80,22 @@ Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
 	for _, e in turn.Eaten do
 		CavernView.Eat(view, e.X, e.Z)
 	end
+	-- hit numbers and bursts on whatever was hit (positions are read before the creature moves on)
+	local hitPos = (turn.BossDamage and turn.BossDamage > 0 and CavernView.BossPosition(view)) or (turn.Damage and turn.Damage > 0 and CavernView.MonsterPosition(view)) or nil
+	local hitAmount = (turn.BossDamage and turn.BossDamage > 0 and turn.BossDamage) or (turn.Damage and turn.Damage > 0 and turn.Damage) or nil
+	if hitPos and hitAmount then
+		FloatingNumbers.Show(hitPos + Vector3.new(0, 8, 0), "-" .. hitAmount, Color3.fromRGB(255, 90, 90), math.min(1.1 + hitAmount * 0.03, 2))
+		VFX.Burst(hitPos + Vector3.new(0, 3, 0), Color3.fromRGB(255, 90, 90), 16, 26)
+	end
+	if turn.Slain then
+		local at = Geometry.CellPosition(view.Origin, turn.Slain.X, turn.Slain.Z) + Vector3.new(0, 3, 0)
+		VFX.Burst(at, Color3.fromRGB(255, 220, 90), 40, 34)
+		VFX.Ring(at, Color3.fromRGB(255, 220, 90), 22, 0.6)
+		FloatingNumbers.Show(at + Vector3.new(0, 4, 0), "+" .. turn.Slain.Bounty, Color3.fromRGB(255, 215, 90), 1.6)
+	end
+	if turn.HeartsLost or turn.Stolen then
+		UI.Flash(Color3.fromRGB(255, 40, 40), 0.45) -- the rig took a hit
+	end
 	CavernView.SetMonster(view, turn.Monster)
 	CavernView.SetBoss(view, turn.Boss)
 	if turn.BossSlain then
@@ -109,6 +126,9 @@ Remotes.Community.OnClientEvent:Connect(function(view)
 end)
 
 Remotes.Sync.OnClientEvent:Connect(function(snapshot)
+	pcall(function()
+		VFX.SetCritical((snapshot.Critical or 0) > 0)
+	end)
 	pcall(function()
 		AudioManager.SetIntensity((snapshot.Boss and 1 or 0) + ((snapshot.Critical or 0) > 0 and 1 or 0)) -- the music rises for boss fights and Critical Mass
 	end)

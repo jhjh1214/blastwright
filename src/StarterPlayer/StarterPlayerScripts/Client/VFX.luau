@@ -105,4 +105,28 @@ function VFX.Beam(a, b, color, width)
 	end)
 end
 
+-- CRITICAL MASS grade: the whole screen warms up and gets punchier while it lasts (uses the cave's own colour correction).
+local criticalOn = false
+local savedGrade = nil
+function VFX.SetCritical(on)
+	if on == criticalOn then
+		return
+	end
+	criticalOn = on
+	pcall(function()
+		local Lighting = game:GetService("Lighting")
+		local TweenService = game:GetService("TweenService")
+		local cc = Lighting:FindFirstChild("CaveGrade")
+		if not cc then
+			return
+		end
+		if on then
+			savedGrade = { Tint = cc.TintColor, Saturation = cc.Saturation, Contrast = cc.Contrast }
+			TweenService:Create(cc, TweenInfo.new(0.5), { TintColor = Color3.fromRGB(255, 225, 170), Saturation = cc.Saturation + 0.25, Contrast = cc.Contrast + 0.12 }):Play()
+		elseif savedGrade then
+			TweenService:Create(cc, TweenInfo.new(0.8), { TintColor = savedGrade.Tint, Saturation = savedGrade.Saturation, Contrast = savedGrade.Contrast }):Play()
+		end
+	end)
+end
+
 return VFX
