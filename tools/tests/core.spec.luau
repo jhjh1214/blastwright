@@ -3075,5 +3075,25 @@ test("mastery: a title flagged false in the purchased list is not offered", func
 	eq(titles[1], "Kept", "kept")
 end)
 
+test("expedition: WouldCollapse matches FloorEnded (too little cleared AND no charges), so a revive can be offered before committing", function()
+	eq(Expedition.WouldCollapse(0.49, 0, ExpCfg), true, "under the line, no charges")
+	eq(Expedition.WouldCollapse(0.5, 0, ExpCfg), false, "exactly on the line survives")
+	eq(Expedition.WouldCollapse(0.49, 1, ExpCfg), false, "a charge left")
+	eq(Expedition.WouldCollapse(0.9, 0, ExpCfg), false, "mostly cleared")
+	for _, case in { { 0.1, 0 }, { 0.5, 0 }, { 0.2, 2 }, { 1, 0 } } do
+		local run = startRun(4)
+		local outcome = Expedition.FloorEnded(run, 10, case[1], case[2], lcg(2), ExpCfg)
+		eq(outcome == "Collapse", Expedition.WouldCollapse(case[1], case[2], ExpCfg), "consistent for " .. case[1] .. "/" .. case[2])
+	end
+end)
+
+test("grants: the month number changes exactly at the UTC month boundary", function()
+	local jan31 = 1706745599 -- 2024-01-31 23:59:59 UTC
+	local feb1 = 1706745600 -- 2024-02-01 00:00:00 UTC
+	eq(Grants.MonthNumber(feb1), Grants.MonthNumber(jan31) + 1, "next month")
+	eq(Grants.MonthNumber(jan31), Grants.MonthNumber(jan31 - 86400 * 20), "same month earlier")
+	eq(Grants.MonthNumber(1704067199) + 1, Grants.MonthNumber(1704067200), "year rollover (Dec 2023 to Jan 2024) is one step")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

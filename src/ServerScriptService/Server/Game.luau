@@ -22,6 +22,7 @@ local Lurker = require(Shared.Lurker)
 local Power = require(Shared.Power)
 local Boss = require(Shared.Boss)
 local Mastery = require(Shared.Mastery)
+local Grants = require(Shared.Grants)
 local Data = require(script.Parent.Data)
 local Leaderboard = require(script.Parent.Leaderboard)
 local Purchases = require(script.Parent.Purchases)
@@ -49,6 +50,8 @@ local LurkerConfig = Config.Lurkers
 local BossConfig = Config.Bosses
 local PowerConfig = Config.Bosses.Power
 local MasteryConfig = Config.Mastery
+local FinisherConfig = Config.Finishers
+local ClubConfig = Config.Products.Club
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -77,6 +80,8 @@ type SeamState = {
 	RelicReward: boolean?, -- an Elite room: killing its Lurker grants a relic
 	MonsterHPMult: number?,
 	BossStats: { Volleys: number, HeartsLost: number }?, -- metrics for boss mastery
+	AwaitRevive: boolean?, -- the floor collapsed and the player is choosing whether to spend a Revive
+	Revived: boolean?, -- a Revive was offered or used on this floor (only one)
 	Hidden: { Kind: string, X: number, Z: number }?, -- a Lurker hiding under a crystal: SECRET, never sent to clients
 	Monster: Lurker.Monster?, -- an awake Lurker on the grid
 	Defeated: boolean?, -- the rig was knocked out
@@ -246,6 +251,30 @@ local function snapshot(player: Player): { [string]: any }?
 		ChargesLeft = seam and seam.Charges or 0,
 		ChargesMax = seam and seam.ChargesMax or 0,
 		Hearts = seam and seam.Hearts or 0,
+		Boosts = {
+			Shards = { Left = Grants.BoostRemaining(data.Boosts, "Shards", os.time()), Mult = Grants.BoostMult(data.Boosts, "Shards", os.time()) },
+			Luck = { Left = Grants.BoostRemaining(data.Boosts, "Luck", os.time()), Mult = Grants.BoostMult(data.Boosts, "Luck", os.time()) },
+		},
+		Inventory = { Revive = data.Inventory.Revive, Charge = data.Inventory.Charge },
+		Finishers = (function()
+			local color = FinisherConfig.Defs[1].Color
+			for _, def in FinisherConfig.Defs do
+				if def.Id == data.Finishers.Equipped then
+					color = def.Color
+				end
+			end
+			return { Equipped = data.Finishers.Equipped, Owned = data.Finishers.Owned, Color = color }
+		end)(),
+		Club = (function()
+			local active = Purchases.IsClub(player)
+			return {
+				Configured = ClubConfig.SubscriptionId ~= nil,
+				Active = active,
+				CanClaim = active and Grants.MonthNumber(os.time()) > data.Club.LastMonth,
+				MonthlyShards = ClubConfig.MonthlyShards,
+			}
+		end)(),
+		AwaitRevive = seam ~= nil and seam.AwaitRevive == true,
 		Collection = Mastery.CollectionView(data.Collection, LurkerConfig, BossConfig, ExpeditionConfig),
 		Mastery = { Objectives = Mastery.View(data.Mastery, MasteryConfig), Titles = Mastery.Titles(data.Mastery, MasteryConfig), Title = data.Mastery.Title },
 		Critical = seam and seam.Critical or 0,
@@ -342,6 +371,9 @@ local function sendRunState(player: Player)
 	if seam and seam.Run then
 		local view = Expedition.View(seam.Run, ExpeditionConfig)
 		view.Active = true
+		local data = Data.Get(player)
+		view.AwaitRevive = seam.AwaitRevive == true
+		view.Revives = data and data.Inventory.Revive or 0
 		Remotes.RunState:FireClient(player, view)
 	else
 		Remotes.RunState:FireClient(player, { Active = false })
@@ -358,7 +390,7 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 	seamCounter += 1
 	local stratum = run and Expedition.FloorStratum(run.Floor, data.Progress.StrataUnlocked, ExpeditionConfig) or WorldConfig.Sites[siteId].Stratum
 	local fx = Events.Combine(activeEvents())
-	local chance = Tuning.MutationChance * (Purchases.Owns(player, "PrismaticLuck") and 2 or 1) * fx.MutationMult * (run and Expedition.Modifiers(run, ExpeditionConfig).MutationChanceMult or 1)
+	local chance = Tuning.MutationChance * (Purchases.Owns(player, "PrismaticLuck") and 2 or 1) * fx.MutationMult * Grants.BoostMult(data.Boosts, "Luck", os.time()) * (run and Expedition.Modifiers(run, ExpeditionConfig).MutationChanceMult or 1)
 	local grid
 	if puzzle then
 		stratum = PuzzleConfig.Stratum
@@ -540,7 +572,24 @@ local function endFloor(player: Player, seam: SeamState)
 		fraction = 0 -- a knocked-out rig, or a boss still standing when the charges run out, collapses the run
 	end
 	run.Hearts = seam.Hearts
-	local outcome = Expedition.FloorEnded(run, seam.Earned, fraction, (seam.Defeated or seam.Boss) and 0 or seam.Charges, runRng, ExpeditionConfig)
+	local chargesLeft = (seam.Defeated or seam.Boss) and 0 or seam.Charges
+	if Expedition.WouldCollapse(fraction, chargesLeft, ExpeditionConfig) and not seam.Revived and (data.Inventory.Revive or 0) > 0 and Seam.CountValuable(seam.Grid, Crystals) > 0 then
+		-- Offer a Revive instead of collapsing (once per floor). No answer in 25 seconds counts as no.
+		seam.AwaitRevive = true
+		seam.InFlight = true
+		notify(player, ("The tunnel is collapsing! Use a Revive token to keep going? (you have %d)"):format(data.Inventory.Revive), "Error")
+		sendRunState(player)
+		sync(player)
+		task.delay(25, function()
+			if seams[player] == seam and seam.AwaitRevive then
+				seam.AwaitRevive = nil
+				seam.Revived = true
+				endFloor(player, seam)
+			end
+		end)
+		return
+	end
+	local outcome = Expedition.FloorEnded(run, seam.Earned, fraction, chargesLeft, runRng, ExpeditionConfig)
 	data.Stats.BestDepth = math.max(data.Stats.BestDepth, run.Floor)
 
 	if outcome == "Choose" then
@@ -840,7 +889,7 @@ local function onDetonate(player: Player, payload: any)
 			data.Codex.Mutated[ev.Kind] = true
 		end
 	end
-	local multiplier = (Purchases.Owns(player, "DoubleShards") and 2 or 1) * Events.Combine(activeEvents()).ShardMult * Community.Mult(goal, os.clock(), CommunityConfig)
+	local multiplier = (Purchases.Owns(player, "DoubleShards") and 2 or 1) * Events.Combine(activeEvents()).ShardMult * Community.Mult(goal, os.clock(), CommunityConfig) * Grants.BoostMult(data.Boosts, "Shards", os.time())
 	local power, powerName = Power.Multiplier(result.Pops, seam.Critical, PowerConfig), select(2, Power.Tier(result.Pops, PowerConfig))
 	local relicMods = seam.Run and Expedition.Modifiers(seam.Run, ExpeditionConfig) or nil
 	if relicMods then
@@ -1010,6 +1059,68 @@ local function onFarmAction(player: Player, action: any)
 		notify(player, ("Crystal Farm upgraded to level %d!%s"):format(data.Farm.Level, paid > 0 and (" (collected %d first)"):format(paid) or ""), "Reward")
 	end
 	announceGoals(player)
+	sync(player)
+end
+
+-- The player answers the Revive offer. Accepting spends a token and restores the rig; declining collapses as normal.
+local function onRunRevive(player: Player, accept: any)
+	local data = Data.Get(player)
+	local seam = seams[player]
+	if not data or not seam or not seam.AwaitRevive or not seam.Run then
+		return
+	end
+	seam.AwaitRevive = nil
+	if accept == true and Grants.Spend(data, "Revive") then
+		seam.Revived = true
+		seam.Defeated = nil
+		seam.Hearts = math.min(seam.HeartsMax, 2)
+		seam.Charges = math.max(seam.Charges, 3)
+		seam.ChargesMax = math.max(seam.ChargesMax, seam.Charges)
+		seam.InFlight = false
+		notify(player, "Revived! Back in the fight.", "Reward")
+		sendRunState(player)
+		sync(player)
+	else
+		seam.Revived = true
+		endFloor(player, seam)
+	end
+end
+
+-- One emergency charge from the stock (never in the Daily Puzzle, which has fixed rules).
+local function onUseCharge(player: Player)
+	local data = Data.Get(player)
+	local seam = seams[player]
+	if not data or not seam or seam.Puzzle or seam.InFlight or seam.AwaitRevive then
+		return
+	end
+	if Grants.Spend(data, "Charge") then
+		seam.Charges += 1
+		notify(player, "Emergency charge added.", "Reward")
+		sync(player)
+	end
+end
+
+local function onEquipFinisher(player: Player, id: any)
+	local data = Data.Get(player)
+	if data and Grants.EquipFinisher(data, id, FinisherConfig) then
+		sync(player)
+	end
+end
+
+-- Club members claim their monthly allotment once per UTC month. The subscription is re-checked with Roblox right now.
+local function onClubClaim(player: Player)
+	local data = Data.Get(player)
+	if not data or not Purchases.RefreshClub(player) then
+		return
+	end
+	local month = Grants.MonthNumber(os.time())
+	if month <= data.Club.LastMonth then
+		return notify(player, "You already claimed this month's Club allotment.", "Info")
+	end
+	data.Club.LastMonth = month
+	award(data, ClubConfig.MonthlyShards)
+	data.Mastery.Extra[ClubConfig.Title] = true
+	notify(player, ("Club allotment: +%d shards and the %s title!"):format(ClubConfig.MonthlyShards, ClubConfig.Title), "Reward")
 	sync(player)
 end
 
@@ -1337,6 +1448,7 @@ local function onPlayerAdded(player: Player)
 	Leaderboard.Submit(player.UserId, session.Data.Stats.BestChain)
 	Achievements.NewlyComplete(session.Data, AchievementsConfig, seenGoals[player]) -- silent: old completions are not announced
 	Purchases.LoadPasses(player)
+	task.spawn(Purchases.RefreshClub, player)
 	player:LoadCharacter()
 	sync(player)
 	Remotes.Community:FireClient(player, Community.View(goal, os.clock(), CommunityConfig))
@@ -1396,6 +1508,10 @@ function Game.Init()
 	Remotes.Equip.OnServerEvent:Connect(guarded("Equip", 5, 8, onEquip))
 	Remotes.Setting.OnServerEvent:Connect(guarded("Setting", 5, 8, onSetting))
 	Remotes.RunPick.OnServerEvent:Connect(guarded("RunPick", 5, 8, onRunPick))
+	Remotes.RunRevive.OnServerEvent:Connect(guarded("RunRevive", 3, 5, onRunRevive))
+	Remotes.UseCharge.OnServerEvent:Connect(guarded("UseCharge", 3, 5, onUseCharge))
+	Remotes.EquipFinisher.OnServerEvent:Connect(guarded("EquipFinisher", 3, 5, onEquipFinisher))
+	Remotes.ClubClaim.OnServerEvent:Connect(guarded("ClubClaim", 1, 2, onClubClaim))
 	Remotes.EquipTitle.OnServerEvent:Connect(guarded("EquipTitle", 3, 5, onEquipTitle))
 	Remotes.Dodge.OnServerEvent:Connect(guarded("Dodge", 4, 6, onDodge))
 	Remotes.FarmAction.OnServerEvent:Connect(guarded("FarmAction", 3, 5, onFarmAction))

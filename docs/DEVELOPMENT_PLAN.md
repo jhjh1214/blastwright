@@ -35,7 +35,7 @@ Status against that order:
 - 3 done as a grid fight: Crystal Titan (floors 4 and 8). Real-time arena and boss music are not built.
 - 4 built (unseen in Studio; balance and sims pending): Expedition room types (mining, combat, elite, treasure, event, heal, challenge, mini-boss, boss), Safe/Greed/Chaos/Relic path choices, relic families (Echo, Explosion, Beam, Risk, Combo) with rule-changing effects instead of +%.
 - 5-6 next: boss mastery objectives and trophies, Codex for enemies/bosses/relics, titles, visible cosmetics, hub showcase.
-- 7 after the loop is proven: product ladder (5-25, 49-99, 149-299, 399-799, 999+ Robux), cosmetic-first shop, bundles, Club subscription, all via the existing ProcessReceipt path with IDs left nil until the developer creates them. Never gate core play; no purchase prompts mid-run.
+- 7 built as configuration and server plumbing (all ids nil, unseen in Studio): product ladder (5-25, 49-99, 149-299, 399-799, 999+ Robux), cosmetic-first shop, bundles, Club subscription, all via the existing ProcessReceipt path with IDs left nil until the developer creates them. Never gate core play; no purchase prompts mid-run.
 - 8 last: live events and rotating modifiers (the Events config already supports the architecture), shared boss events.
 
 Rule for every step: prove it is fun with a test or a sim first, then widen. Do not build 30 enemies or 200 relics before the loop is proven.

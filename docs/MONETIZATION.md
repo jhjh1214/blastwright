@@ -22,6 +22,25 @@ Shard amounts scale with areas unlocked so a pack stays worth buying later in th
 
 **Suggested Robux prices (my recommendation, not a fact about the platform; you decide):** Neon Pink 49, Pouch 49, Satchel 199, Chest 599, Vault 1,999; 2x Shards 499, Prismatic Luck 299. Consider tuning after seeing real player behavior.
 
+## The full ladder (added 2026-09-21, all in `Config/Products.luau` `Offers`; IDs all nil)
+Design rules from the developer brief: cheap impulse buys, a ladder of tiers, cosmetics as a pillar, premium bundles that are COLLECTIONS (not "10x currency"), no purchase prompts mid-run, nothing that gates core play. Prices below are hints for you when creating the products (the real price is set in the Creator Dashboard; code never reads it).
+
+| Tier | Item (key) | What it gives |
+|---|---|---|
+| Tiny (~15) | Emergency Charges (`EmergencyCharge`) | 3 emergency-charge tokens: press the button when running dry, +1 charge each (not in the Daily Puzzle) |
+| Small (~49) | 2x Shards 15 min (`ShardBoost`) | Timed x2 shards, stacks up to 2 hours |
+| Small (~49) | 2x Prismatic Luck 15 min (`LuckBoost`) | Timed x2 rare-crystal chance |
+| Small (~49) | Expedition Revive (`ReviveToken`) | One Revive token: when an Expedition floor is about to collapse, spend it to continue with 2 hearts and 3 charges (offer appears once per floor, only if crystals remain) |
+| Small (~99) | Starter Blast (`StarterBlast`) | Shards + 15 min boost + 3 emergency charges |
+| Medium (~199) | Expedition Kit (`ExpeditionKit`) | 3 revives, 5 emergency charges, 30 min boost |
+| Medium (~249) | Celestial / Inferno Finish (`CelestialFinisher`, `InfernoFinisher`) | The colours of your boss FINAL BLAST (cosmetic) |
+| Large (~499) | Boss Hunter Pack (`BossHunter`) | Void finisher, "Boss Hunter" title, 5 revives, shards |
+| Premium (~1,499) | Ultimate Blastwright (`UltimateBlastwright`) | All finishers, Void + Toxic blasts, title, 10 revives, 20 charges, 60,000 shards x areas |
+| Cosmetic | Neon Pink / Void / Toxic / Golden Blasts (`CosmeticProducts`) | Blast colors |
+| Subscription | Blastwright Club (`Club.SubscriptionId`) | Monthly 25,000 shards and the "Club Member" title; claim in Shop (Roblox is asked at claim time whether the subscription is active) |
+
+Grants live in pure `Shared/Grants.luau` (tested, mutation-checked: boosts stack and cap, tokens cap, invalid grants are ignored entirely). Receipts stay idempotent through the existing path. Not built: Blastwright Plus pass, price optimisation hooks, private-server features, rotating shop and analytics (conversion / spend tracking) beyond what Roblox itself reports.
+
 ## How a purchase is processed (Server/Purchases.luau)
 1. Player buys through the Roblox prompt (opened from the Shop tab).
 2. Roblox calls `ProcessReceipt`. We find the player, check their data is loaded, look up the product, and record the `PurchaseId` in `data.Purchases` (`Receipts.Apply`). A repeated id is a duplicate and grants nothing.

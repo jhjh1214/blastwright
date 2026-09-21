@@ -84,10 +84,11 @@ Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
 	if turn.BossSlain then
 		-- FINAL BLAST: the arena erupts.
 		local core = Geometry.CellPosition(view.Origin, 5, 5) + Vector3.new(0, 4, 0)
+		local fin = State.Data and State.Data.Finishers and State.Data.Finishers.Color or { 255, 205, 90 } -- the equipped finisher colours the FINAL BLAST
 		for i = 1, 6 do
 			task.delay(i * 0.12, function()
-				VFX.Burst(core + Vector3.new(math.random(-8, 8), math.random(0, 6), math.random(-8, 8)), Color3.fromRGB(255, 200 - i * 20, 90), 30, 40)
-				VFX.Ring(view.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(255, 205, 90), view.Extent * (0.6 + i * 0.25), 0.9)
+				VFX.Burst(core + Vector3.new(math.random(-8, 8), math.random(0, 6), math.random(-8, 8)), Color3.fromRGB(math.max(0, fin[1] - i * 8), math.max(0, fin[2] - i * 12), math.max(0, fin[3] - i * 6)), 30, 40)
+				VFX.Ring(view.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(fin[1], fin[2], fin[3]), view.Extent * (0.6 + i * 0.25), 0.9)
 			end)
 		end
 		UI.ShowTier("Boss defeated")

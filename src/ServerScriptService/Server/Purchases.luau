@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Shared").Config)
 local Data = require(script.Parent.Data)
 local Receipts = require(script.Parent.Receipts)
+local Grants = require(ReplicatedStorage:WaitForChild("Shared").Grants)
 
 local Products = Config.Products
 local Decision = Enum.ProductPurchaseDecision
@@ -24,7 +25,11 @@ local productIndex = Receipts.ProductIndex(Products.DeveloperProducts)
 for id, key in Receipts.ProductIndex(Products.CosmeticProducts) do
 	productIndex[id] = key -- shard packs and cosmetic products share one receipt path
 end
+for id, key in Receipts.ProductIndex(Products.Offers) do
+	productIndex[id] = key -- consumables, finishers and bundles too
+end
 local passIndex = Receipts.ProductIndex(Products.Gamepasses)
+local clubActive = {} -- [Player] = true while the Club subscription is active
 local hooks = {
 	Notify = function(player, text, kind) end,
 	OnChanged = function(player) end,
@@ -55,9 +60,41 @@ end
 
 function Purchases.Forget(player)
 	owned[player] = nil
+	clubActive[player] = nil
+end
+
+-- Ask Roblox whether the player has an active Club subscription (false while no subscription id is configured).
+function Purchases.RefreshClub(player)
+	local id = Products.Club.SubscriptionId
+	if id == nil then
+		clubActive[player] = nil
+		return false
+	end
+	local ok, status = pcall(function()
+		return MarketplaceService:GetUserSubscriptionStatusAsync(player, id)
+	end)
+	if ok and status and status.IsSubscribed then
+		clubActive[player] = true
+	else
+		clubActive[player] = nil
+		if not ok then
+			warn(("[Purchases] Could not check the Club subscription for %s: %s"):format(player.Name, tostring(status)))
+		end
+	end
+	return clubActive[player] == true
+end
+
+function Purchases.IsClub(player)
+	return clubActive[player] == true
 end
 
 local function grant(player, data, key)
+	local offer = Products.Offers[key]
+	if offer then
+		local messages = Grants.Apply(data, offer.Grants, os.time(), data.Progress.StrataUnlocked)
+		hooks.Notify(player, ("%s: %s"):format(offer.Name, table.concat(messages, ", ")), "Reward")
+		return
+	end
 	local cosmetic = Products.CosmeticProducts[key]
 	if cosmetic then
 		Receipts.GrantCosmetic(data, cosmetic.Cosmetic)

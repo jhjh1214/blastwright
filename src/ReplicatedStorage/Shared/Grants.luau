@@ -102,6 +102,12 @@ function Grants.Apply(data: any, grants: { Grant }, now: number, strata: number)
 	return messages
 end
 
+-- A number that changes once per UTC calendar month (for the once-a-month Club allotment).
+function Grants.MonthNumber(now: number): number
+	local t = os.date("!*t", now)
+	return t.year * 12 + t.month
+end
+
 -- Spend one token. Returns whether there was one.
 function Grants.Spend(data: any, token: string): boolean
 	if not TOKENS[token] or (data.Inventory[token] or 0) <= 0 then

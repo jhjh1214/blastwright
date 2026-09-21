@@ -132,12 +132,17 @@ function Expedition.Choices(run: Run, rng: () -> number, cfg: any): { Card }
 	return cards
 end
 
+-- Would a floor that ends now collapse the run? (Used to offer a Revive before anything is committed.)
+function Expedition.WouldCollapse(clearedFraction: number, chargesLeft: number, cfg: any): boolean
+	return clearedFraction < cfg.ClearToAdvance and chargesLeft <= 0
+end
+
 -- Called when a floor ends. Adds the floor's payout to the haul and decides what happens next:
 -- "Collapse" (too little cleared AND no charges left), "Victory" (final floor cleared) or "Choose".
 function Expedition.FloorEnded(run: Run, payout: number, clearedFraction: number, chargesLeft: number, rng: () -> number, cfg: any): string
 	run.Haul += payout
 	run.Charges = chargesLeft
-	if clearedFraction < cfg.ClearToAdvance and chargesLeft <= 0 then
+	if Expedition.WouldCollapse(clearedFraction, chargesLeft, cfg) then
 		run.Phase = "Ended"
 		return "Collapse"
 	end

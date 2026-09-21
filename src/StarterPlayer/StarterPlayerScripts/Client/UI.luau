@@ -93,6 +93,7 @@ local toastHolder, tierLabel, chargeColumn, panel, panelScroll, detonateButton
 local roamGroup, blastGroup
 local runLabel, runModal, runCards, runTitle, runBank, rigLabel
 local bossFrame, bossName, bossFill, bossHint, dodgeButton, criticalLabel
+local boostLabel, chargeButton, reviveModal, reviveText, reviveYes, reviveNo
 local activeTab = "Forge"
 local displayShards = 0
 local chargeButtons = {}
@@ -191,6 +192,23 @@ function UI.Init()
 		Remotes.Dodge:FireServer()
 	end)
 	criticalLabel = label(blastGroup, "", 22, Color3.fromRGB(255, 210, 80), { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 160), Size = UDim2.fromOffset(340, 30), Font = Enum.Font.GothamBlack, Visible = false })
+
+	-- Active boosts (top right, always visible), the emergency-charge button, and the Revive offer.
+	boostLabel = label(gui, "", 13, THEME.Gold, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 132), Size = UDim2.fromOffset(220, 34), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Right, TextYAlignment = Enum.TextYAlignment.Top, Visible = false })
+	chargeButton = button(blastGroup, "", THEME.Panel, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -140), Size = UDim2.fromOffset(190, 40), TextSize = 16, Visible = false })
+	chargeButton.Activated:Connect(function()
+		Remotes.UseCharge:FireServer()
+	end)
+	reviveModal = mk("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.4, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 30, Active = true }, gui)
+	reviveText = label(reviveModal, "", 24, THEME.Gold, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.4), Size = UDim2.new(1, -40, 0, 120), TextWrapped = true, Font = Enum.Font.GothamBlack, ZIndex = 31 })
+	reviveYes = button(reviveModal, "", THEME.Accent, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.58), Size = UDim2.fromOffset(320, 52), ZIndex = 31 })
+	reviveNo = button(reviveModal, "Give up (keep 40% of the haul)", THEME.Panel, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.68), Size = UDim2.fromOffset(320, 44), ZIndex = 31 })
+	reviveYes.Activated:Connect(function()
+		Remotes.RunRevive:FireServer(true)
+	end)
+	reviveNo.Activated:Connect(function()
+		Remotes.RunRevive:FireServer(false)
+	end)
 
 	-- Between-floor choice: three cards and "Bank & leave". Covers the screen while choosing (blasting is paused anyway).
 	runModal = mk("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 20, Active = true }, gui)
@@ -648,6 +666,44 @@ local function rebuildPanel()
 	elseif activeTab == "Shop" then
 		titleLabel.Text = "Shop"
 		local order = 0
+		local function offerRow(key)
+			local def = Products.Offers[key]
+			order += 1
+			row(order, def.Name, def.Description, def.Id and "Buy" or "Not for sale yet", def.Id ~= nil, function()
+				if def.Id then MarketplaceService:PromptProductPurchase(Players.LocalPlayer, def.Id) end
+			end)
+		end
+		local function offersOf(category)
+			for _, key in Products.OfferOrder do
+				if Products.Offers[key].Category == category then offerRow(key) end
+			end
+		end
+		-- Club (monthly subscription)
+		local club = d.Club
+		if club then
+			header(order, "Blastwright Club (monthly)")
+			order += 1
+			local text = not club.Configured and "Not for sale yet" or (club.Active and (club.CanClaim and ("Claim  ◆ " .. commas(club.MonthlyShards)) or "Claimed this month") or "Subscribe")
+			row(order, Products.Club.Name, Products.Club.Description, text, club.Configured and (not club.Active or club.CanClaim), function()
+				if not club.Configured then return end
+				if club.Active and club.CanClaim then
+					Remotes.ClubClaim:FireServer()
+				elseif not club.Active then
+					pcall(function() MarketplaceService:PromptSubscriptionPurchase(Players.LocalPlayer, Products.Club.SubscriptionId) end)
+				end
+			end)
+		end
+		order += 1
+		header(order, "Boosts and run support")
+		offersOf("Boosts")
+		offersOf("Support")
+		order += 1
+		header(order, "Boss finishers (your FINAL BLAST)")
+		offersOf("Finishers")
+		order += 1
+		header(order, "Bundles")
+		offersOf("Bundles")
+		order += 1
 		header(order, "Permanent perks")
 		for _, key in Products.GamepassOrder do
 			order += 1
@@ -681,7 +737,7 @@ local function rebuildPanel()
 			end)
 		end
 		order += 1
-		header(order, "Everything is earnable by playing. The shop only saves time.")
+		header(order, "Everything is earnable by playing. The shop only saves time and adds style.")
 	else
 		titleLabel.Text = "Codex"
 		local found = 0
@@ -724,6 +780,19 @@ local function rebuildPanel()
 			for _, r in col.Relics do
 				order += 1
 				row(order, r.Found and ("%s  [%s]"):format(r.Name, r.Family) or "???", r.Found and r.Description or "Find it in an Expedition", nil, false, nil, r.Found and THEME.Text or THEME.Dim)
+			end
+		end
+		local fin = d.Finishers
+		if fin then
+			order += 1
+			header(order, "Boss finishers (the look of your FINAL BLAST)")
+			for _, def in Config.Finishers.Defs do
+				order += 1
+				local owned = def.Id == Config.Finishers.DefaultId or fin.Owned[def.Id] == true
+				local worn = fin.Equipped == def.Id
+				row(order, def.Name, owned and "Owned" or "Sold in the Shop", worn and "Worn" or (owned and "Wear" or "Locked"), owned and not worn, function()
+					if owned and not worn then Remotes.EquipFinisher:FireServer(def.Id) end
+				end, Color3.fromRGB(def.Color[1], def.Color[2], def.Color[3]))
 			end
 		end
 		local mastery = d.Mastery
@@ -787,6 +856,28 @@ function UI.Refresh()
 		rig = rig .. "\nSomething stirs beneath the rocks..."
 	end
 	rigLabel.Text = rig
+	-- boosts, emergency charges and the revive offer
+	local boostBits = {}
+	if d.Boosts then
+		local passed = os.clock() - (State.EventsAt or os.clock())
+		for _, kind in { "Shards", "Luck" } do
+			local b = d.Boosts[kind]
+			local left = b and (b.Left - passed) or 0
+			if left > 0 then
+				table.insert(boostBits, ("%sx %s  %d:%02d"):format(tostring(b.Mult), kind == "Shards" and "shards" or "luck", left // 60, left % 60))
+			end
+		end
+	end
+	boostLabel.Text = table.concat(boostBits, "\n")
+	boostLabel.Visible = #boostBits > 0
+	local stock = d.Inventory and d.Inventory.Charge or 0
+	chargeButton.Visible = stock > 0 and not (d.Puzzle and d.Puzzle.Active) and (d.ChargesLeft - #State.Placed) <= 1
+	chargeButton.Text = ("+1 emergency charge (%d)"):format(stock)
+	reviveModal.Visible = d.AwaitRevive == true
+	if d.AwaitRevive then
+		reviveText.Text = "THE TUNNEL IS COLLAPSING!\nUse a Revive to keep fighting?"
+		reviveYes.Text = ("Use a Revive (%d left)"):format(d.Inventory and d.Inventory.Revive or 0)
+	end
 	local boss = d.Boss
 	bossFrame.Visible = boss ~= nil
 	dodgeButton.Visible = boss ~= nil
