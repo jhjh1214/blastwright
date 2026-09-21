@@ -176,7 +176,9 @@ function UI.Init()
 	corner(tag, 8)
 	mk("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3 }, tag)
 	Kit.Label(tag, "OBJECTIVE", 16, { Size = UDim2.fromScale(0.92, 0.8), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5) })
-	objectiveText = label(objectiveCard, "", 16, THEME.Text, { NoOutline = true, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = 2, Font = Theme.Font.Body })
+	objectiveText = label(objectiveCard, "", 16, THEME.Text, { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = 2, Font = Theme.Font.Body })
+	local objectiveStroke = objectiveText:FindFirstChildOfClass("UIStroke") -- plain text reads best on the dark card
+	if objectiveStroke then objectiveStroke:Destroy() end
 
 	-- A small help button in the corner; every feature has its own button in the dock along the bottom.
 	Kit.Button(roamGroup, { Name = "Help", Size = UDim2.fromOffset(54, 60), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Color = Theme.Colors.Codex, Text = "?", TextSize = 34, Depth = 5, Corner = 12, OnClick = function() UI.ShowWelcome(true) end })
