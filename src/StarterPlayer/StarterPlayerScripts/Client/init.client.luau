@@ -109,6 +109,9 @@ Remotes.Community.OnClientEvent:Connect(function(view)
 end)
 
 Remotes.Sync.OnClientEvent:Connect(function(snapshot)
+	pcall(function()
+		AudioManager.SetIntensity((snapshot.Boss and 1 or 0) + ((snapshot.Critical or 0) > 0 and 1 or 0)) -- the music rises for boss fights and Critical Mass
+	end)
 	-- The boss markers (armor nodes, weak points, marked attack cells) follow the server's snapshot.
 	local view = CavernView.Get(localPlayer.UserId)
 	if view then

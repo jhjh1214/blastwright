@@ -94,7 +94,8 @@ Everything below was written without being run in Studio (the automated tests co
 - ENRAGE: two lines at once; body turns red. FINISHER: 12+ pops or a Critical Mass volley ends it; a smaller chain heals it slightly.
 - Win: "Crystal Titan DEFEATED", bursts, rings, big camera punch, +6,000 to the haul, then the run continues (or bank). Lose all hearts or run out of charges/crystals: the Expedition collapses.
 - Critical Mass: any chain of 15+ pops shows the CRITICAL MASS banner and a gold "CRITICAL MASS x2" HUD counter for two volleys with higher damage/shards. Watch for: camera punch too strong, label overlapping the boss bar, marker parts hidden under rocks, boss body blocking the hover ghost.
-- Not built: boss-specific music intensity, the real-time arena, a boss outside Expeditions.
+- Music: during a boss fight or Critical Mass the music should get about 15% louder and a little higher in pitch (twice that with both), then relax afterwards. If the pitch effect sounds bad, the switch is `AudioManager.SetIntensity`.
+- Not built: the real-time arena, a boss outside Expeditions.
 
 ### E7. Expedition rooms, chaos and relics (unseen in Studio)
 - Between floors each of the 3 cards now lists ROOM, ROUTE and RELIC (with family). Before floor 4 and floor 8 every card says "Boss Arena".

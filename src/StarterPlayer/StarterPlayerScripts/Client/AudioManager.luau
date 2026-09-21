@@ -12,6 +12,8 @@ local groups = {}
 local pool = {}
 local loops = {} -- [cueName] = { Sound = Sound, Base = number }
 local duckFactor = 1
+local intensity = 0 -- 0 calm, 1 boss fight or Critical Mass, 2 both: the music gets louder and a little higher
+local pitchEffect = nil
 local musicEnabled = true
 local sfxEnabled = true
 local musicStarted = false
@@ -52,7 +54,7 @@ function AudioManager.SetEnabled(kind, on)
 end
 
 local function musicTarget()
-	return MusicConfig.Volume * (0.5 + 0.5 * duckFactor)
+	return MusicConfig.Volume * (0.5 + 0.5 * duckFactor) * (1 + 0.15 * intensity)
 end
 
 -- Plays one track with a fade in; schedules its own fade out and cleanup. Returns seconds until the next track
@@ -74,6 +76,10 @@ local function playTrack(track)
 			s:Destroy()
 			return nil
 		end
+		local pitch = Instance.new("PitchShiftSoundEffect")
+		pitch.Octave = 1 + 0.05 * intensity -- a pitch lift that does not change the speed, so track timing stays right
+		pitch.Parent = s
+		pitchEffect = pitch
 		s:Play()
 		currentMusic = s
 		TweenService:Create(s, TweenInfo.new(fade), { Volume = musicTarget() }):Play()
@@ -157,6 +163,21 @@ function AudioManager.Duck(factor)
 	end
 	if currentMusic then
 		TweenService:Create(currentMusic, TweenInfo.new(0.8), { Volume = musicTarget() }):Play()
+	end
+end
+
+-- Turn the music up for danger: 0 calm, 1 a boss fight or Critical Mass, 2 both. Safe to call every sync.
+function AudioManager.SetIntensity(level)
+	level = math.clamp(level or 0, 0, 2)
+	if level == intensity then
+		return
+	end
+	intensity = level
+	if currentMusic then
+		TweenService:Create(currentMusic, TweenInfo.new(0.6), { Volume = musicTarget() }):Play()
+	end
+	if pitchEffect and pitchEffect.Parent then
+		TweenService:Create(pitchEffect, TweenInfo.new(0.6), { Octave = 1 + 0.05 * intensity }):Play()
 	end
 end
 
