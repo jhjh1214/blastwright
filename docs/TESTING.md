@@ -126,6 +126,13 @@ Everything below was written without being run in Studio (the automated tests co
 ### E11. Hub boards (unseen in Studio; need a published game with API access)
 - Three boards now stand by the spawn: LONGEST CHAINS, DEEPEST EXPEDITIONS, BOSS SLAYERS (each an OrderedDataStore, refreshed every 90 s, written at most every 30 s). Check they do not clip into other hub decor, face the spawn, and show "Unavailable" (not an error) in an unpublished Studio place. After reaching a new depth or slaying the Titan, the right board should list you within a couple of minutes.
 
+### E12. UI polish (unseen in Studio)
+- Everything now has depth and colour: buttons have a light top and shade and grow on hover / squash on press; the Menu panel has a gradient background and a slowly travelling rainbow-ish border; each tab has its own colour; section headers are colour banners; toasts are coloured pills with a star or "!"; Detonate has a light band sweeping across it; the boss bar glows and changes colour per phase; CRITICAL MASS is a gold-to-orange gradient; the shard counter glows.
+- Rows have a glowing icon tile and an accent strip; Daily, Weekly and Goals rows have progress bars (a full bar shimmers and a claimable button glows).
+- Codex: crystals are spinning 3D gems in their rarity colour (grey and still until discovered); Lurkers/Bosses/Relics/finishers/titles/blast colors have coloured icon tiles (relic tiles use the family colour). Shop rows are tinted by price tier.
+- Expedition choice cards are tinted per room (red Nest, purple Elite, gold Treasure, magenta Chaos, dark red Boss) with a colour band naming the room.
+- Watch for: gems flickering or not spinning (ViewportFrames inside the scroll list), performance while the Codex is open (about 12 gems), text overflowing the toast pills or headers on a phone, the shimmer overlay covering button text, hover scaling on touch devices.
+
 ### F. Multi-player and phones (Test > 2 players, and the Device emulator)
 23. Two players use different pads and see each other's grids and blasts (distant grids appear only when you are near: level of detail). A pad in use is labelled "In use". Walking 130+ studs away for a minute releases it.
 24. Phone-size window (for example 390 x 844): top bar (shards, Menu, ?) does not overlap; the Menu panel's 5 tabs fit; the grid is fully visible in the free band; buttons are tappable; text readable.

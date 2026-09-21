@@ -15,6 +15,7 @@ local Products = Config.Products
 local AudioManager = require(script.Parent.AudioManager)
 local CameraFeedback = require(script.Parent.CameraFeedback)
 local State = require(script.Parent.State)
+local Fx = require(script.Parent.Fx)
 
 local UI = {}
 
@@ -74,6 +75,8 @@ local function button(parent, text, color, props)
 	end
 	local b = mk("TextButton", p, parent)
 	corner(b, 12)
+	Fx.Depth(b, 0.28) -- top light, bottom shade
+	Fx.Hover(b) -- grows on hover, squashes on press
 	return b
 end
 
@@ -117,6 +120,8 @@ function UI.Init()
 	-- Always visible: shards (top-left) and toasts / tier banner
 	local shardFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.2, Position = UDim2.new(0, 12, 0, 8), Size = UDim2.fromOffset(140, 40) }, gui)
 	corner(shardFrame, 12)
+	Fx.Depth(shardFrame, 0.3)
+	Fx.Glow(shardFrame, THEME.Gold, 2, 2)
 	shardLabel = label(shardFrame, "◆ 0", 24, THEME.Gold, { Size = UDim2.fromScale(1, 1) })
 
 	toastHolder = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 96), Size = UDim2.fromOffset(440, 120) }, gui)
@@ -141,7 +146,8 @@ function UI.Init()
 	cacheLabel = label(roamGroup, "", 16, THEME.Dim, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.fromOffset(170, 22), TextXAlignment = Enum.TextXAlignment.Left })
 	objectiveCard = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.2, Position = UDim2.new(0, 12, 0, 80), Size = UDim2.fromOffset(250, 0), AutomaticSize = Enum.AutomaticSize.Y, Visible = false }, roamGroup)
 	corner(objectiveCard, 12)
-	mk("UIStroke", { Color = THEME.Gold, Thickness = 2, Transparency = 0.35 }, objectiveCard)
+	Fx.Depth(objectiveCard, 0.3)
+	Fx.Glow(objectiveCard, THEME.Gold, 2.5, 1.2) -- the objective breathes so it is easy to spot
 	mk("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, objectiveCard)
 	mk("UIListLayout", { Padding = UDim.new(0, 2) }, objectiveCard)
 	label(objectiveCard, "OBJECTIVE", 13, THEME.Gold, { Size = UDim2.new(1, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 1 })
@@ -179,8 +185,10 @@ function UI.Init()
 	rigLabel = label(blastGroup, "", 16, Color3.fromRGB(255, 130, 130), { Position = UDim2.new(0, 14, 0, 112), Size = UDim2.fromOffset(280, 40), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top })
 
 	-- Boss bar (top centre) with a hint for the current phase, the Dodge button, and the CRITICAL MASS label.
-	bossFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.25, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 90), Size = UDim2.fromOffset(380, 66), Visible = false }, blastGroup)
+	bossFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.15, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 90), Size = UDim2.fromOffset(380, 66), Visible = false }, blastGroup)
 	corner(bossFrame, 10)
+	Fx.Depth(bossFrame, 0.35)
+	Fx.Glow(bossFrame, Color3.fromRGB(255, 90, 70), 2.5, 1.1)
 	bossName = label(bossFrame, "", 16, Color3.fromRGB(255, 200, 90), { Position = UDim2.fromOffset(0, 2), Size = UDim2.new(1, 0, 0, 20), Font = Enum.Font.GothamBlack })
 	local bossBack = mk("Frame", { BackgroundColor3 = Color3.fromRGB(30, 30, 40), Position = UDim2.fromOffset(12, 26), Size = UDim2.new(1, -24, 0, 12), BorderSizePixel = 0 }, bossFrame)
 	corner(bossBack, 6)
@@ -191,7 +199,8 @@ function UI.Init()
 	dodgeButton.Activated:Connect(function()
 		Remotes.Dodge:FireServer()
 	end)
-	criticalLabel = label(blastGroup, "", 22, Color3.fromRGB(255, 210, 80), { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 160), Size = UDim2.fromOffset(340, 30), Font = Enum.Font.GothamBlack, Visible = false })
+	criticalLabel = label(blastGroup, "", 22, Color3.new(1, 1, 1), { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 160), Size = UDim2.fromOffset(340, 30), Font = Enum.Font.GothamBlack, Visible = false, TextStrokeTransparency = 0.2, TextStrokeColor3 = Color3.fromRGB(120, 40, 0) })
+	mk("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 240, 130), Color3.fromRGB(255, 110, 30)), Rotation = 90 }, criticalLabel)
 
 	-- Active boosts (top right, always visible), the emergency-charge button, and the Revive offer.
 	boostLabel = label(gui, "", 13, THEME.Gold, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 132), Size = UDim2.fromOffset(220, 34), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Right, TextYAlignment = Enum.TextYAlignment.Top, Visible = false })
@@ -217,9 +226,13 @@ function UI.Init()
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 10) }, row)
 	runCards = {}
 	for i = 1, 3 do
-		local card = button(row, "", THEME.Panel, { Size = UDim2.fromOffset(200, 250), TextSize = 13, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 22, LayoutOrder = i })
-		mk("UIStroke", { Color = THEME.Gold, Thickness = 2, Transparency = 0.4 }, card)
-		mk("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, card)
+		local card = button(row, "", THEME.Panel, { Size = UDim2.fromOffset(200, 270), TextSize = 13, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 22, LayoutOrder = i })
+		mk("UIStroke", { Name = "RoomStroke", Color = THEME.Gold, Thickness = 3, Transparency = 0.15 }, card)
+		mk("UIPadding", { PaddingTop = UDim.new(0, 60), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, card)
+		local band = mk("Frame", { Name = "Band", BackgroundColor3 = THEME.Gold, Size = UDim2.new(1, 0, 0, 52), BorderSizePixel = 0, ZIndex = 23 }, card)
+		corner(band, 12)
+		Fx.Depth(band, 0.35)
+		mk("TextLabel", { Name = "RoomName", BackgroundTransparency = 1, Position = UDim2.fromOffset(8, 0), Size = UDim2.new(1, -16, 1, 0), Font = Enum.Font.GothamBlack, TextSize = 17, TextColor3 = Color3.new(1, 1, 1), TextStrokeTransparency = 0.4, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Text = "" }, band)
 		card.Activated:Connect(function()
 			AudioManager.Play("Click")
 			Remotes.RunPick:FireServer(i)
@@ -252,16 +265,18 @@ function UI.Init()
 	end)
 
 	detonateButton = button(blastGroup, "DETONATE", THEME.Hot, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -12), Size = UDim2.fromOffset(190, 62), TextSize = 26, Font = Enum.Font.GothamBlack })
+	Fx.Shimmer(detonateButton, 2.2, 0.55) -- a light band sweeps across the button
 	detonateStroke = mk("UIStroke", { Color = THEME.Gold, Thickness = 4, Enabled = false }, detonateButton)
 	detonateButton.Activated:Connect(function()
 		if UI.OnDetonate then UI.OnDetonate() end
 	end)
 
 	----------------------------------------------------------- Forge / Codex panel
-	panel = mk("Frame", { BackgroundColor3 = THEME.Bg, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.92, 0, 0.78, 0), Visible = false, ZIndex = 10 }, gui)
+	panel = mk("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.92, 0, 0.78, 0), Visible = false, ZIndex = 10 }, gui)
 	corner(panel, 16)
 	mk("UISizeConstraint", { MaxSize = Vector2.new(560, 460) }, panel)
-	mk("UIStroke", { Color = THEME.Accent, Thickness = 2, Transparency = 0.4 }, panel)
+	Fx.Gradient(panel, Color3.fromRGB(32, 36, 68), Color3.fromRGB(14, 16, 28), 90)
+	Fx.AnimatedBorder(panel, { THEME.Accent, Color3.fromRGB(255, 100, 200), THEME.Gold, THEME.Accent }, 3, 7)
 	label(panel, "", 26, THEME.Text, { Name = "Title", Position = UDim2.fromOffset(16, 8), Size = UDim2.new(1, -80, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11 })
 	local close = button(panel, "X", THEME.Row, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), Size = UDim2.fromOffset(48, 48), ZIndex = 11 })
 	close.Activated:Connect(function()
@@ -271,6 +286,8 @@ function UI.Init()
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, tabBar)
 	for i, name in { "Forge", "Daily", "Farm", "Goals", "Shop", "Codex" } do
 		local tab = button(tabBar, name, THEME.Row, { Size = UDim2.new(1 / 6, -5, 1, 0), TextSize = 14, LayoutOrder = i, ZIndex = 12 })
+		tab.TextColor3 = Fx.Tab[name]
+		mk("UIStroke", { Color = Fx.Tab[name], Thickness = 1.5, Transparency = 0.5 }, tab)
 		tabButtons[name] = tab
 		tab.Activated:Connect(function()
 			AudioManager.Play("Click")
@@ -296,7 +313,9 @@ function UI.Init()
 	welcomeFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.92, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Visible = false, ZIndex = 20 }, gui)
 	corner(welcomeFrame, 16)
 	mk("UISizeConstraint", { MaxSize = Vector2.new(460, 9999) }, welcomeFrame)
-	mk("UIStroke", { Color = THEME.Gold, Thickness = 2, Transparency = 0.3 }, welcomeFrame)
+	Fx.AnimatedBorder(welcomeFrame, { THEME.Gold, Color3.fromRGB(255, 100, 200), THEME.Accent, THEME.Gold }, 3, 6)
+	welcomeFrame.BackgroundColor3 = Color3.new(1, 1, 1)
+	Fx.Gradient(welcomeFrame, Color3.fromRGB(36, 34, 66), Color3.fromRGB(16, 18, 30), 90)
 	mk("UIPadding", { PaddingTop = UDim.new(0, 16), PaddingBottom = UDim.new(0, 16), PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18) }, welcomeFrame)
 	mk("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, HorizontalAlignment = Enum.HorizontalAlignment.Center }, welcomeFrame)
 	label(welcomeFrame, "Welcome to Blastwright", 26, THEME.Gold, { Size = UDim2.new(1, 0, 0, 34), LayoutOrder = 1, ZIndex = 21 })
@@ -389,7 +408,13 @@ function UI.SetRun(view)
 			local c = view.Choices[i]
 			card.Visible = c ~= nil
 			if c then
-				card.Text = ("%s\n%s\n\n%s\n%s\n\n+ %s%s\n%s"):format(c.RoomName, c.RoomDescription, c.RouteName, c.RouteDescription, c.RelicName ~= "" and c.RelicName or "(no relic)", c.RelicFamily ~= "" and ("  [" .. c.RelicFamily .. "]") or "", c.RelicDescription)
+				local roomColor = Fx.Room[c.Room] or THEME.Gold
+				card.Text = ("%s\n\n%s\n%s\n\n+ %s%s\n%s"):format(c.RoomDescription, c.RouteName, c.RouteDescription, c.RelicName ~= "" and c.RelicName or "(no relic)", c.RelicFamily ~= "" and ("  [" .. c.RelicFamily .. "]") or "", c.RelicDescription)
+				card.BackgroundColor3 = Fx.Darken(roomColor, 0.78)
+				card:FindFirstChild("RoomStroke").Color = roomColor
+				card.Band.BackgroundColor3 = roomColor
+				card.Band.RoomName.Text = c.RoomName
+				card.TextColor3 = Fx.Lighten(Fx.Family[c.RelicFamily] or THEME.Text, 0.75)
 			end
 		end
 		runBank.Text = ("Bank %s shards & leave"):format(commas(view.BankNow))
@@ -508,23 +533,63 @@ end
 
 function UI.Toast(text, kind)
 	if not toastHolder then return end
-	local color = kind == "Reward" and THEME.Gold or (kind == "Error" and THEME.Bad or THEME.Text)
-	local t = label(toastHolder, text, 19, color, { Size = UDim2.new(1, 0, 0, 26), TextTransparency = 1 })
+	local color = kind == "Reward" and THEME.Gold or (kind == "Error" and THEME.Bad or THEME.Accent)
+	local pill = mk("Frame", { BackgroundColor3 = Fx.Darken(color, 0.7), BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y }, toastHolder)
+	corner(pill, 14)
+	Fx.Depth(pill, 0.25)
+	mk("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, pill)
+	local stroke = mk("UIStroke", { Color = color, Thickness = 2, Transparency = 1 }, pill)
+	local glyph = kind == "Reward" and "★ " or (kind == "Error" and "! " or "• ")
+	local t = label(pill, glyph .. text, 17, Fx.Lighten(color, 0.6), { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextTransparency = 1 })
+	TweenService:Create(pill, TweenInfo.new(0.2), { BackgroundTransparency = 0.12 }):Play()
+	TweenService:Create(stroke, TweenInfo.new(0.2), { Transparency = 0.15 }):Play()
 	TweenService:Create(t, TweenInfo.new(0.2), { TextTransparency = 0 }):Play()
 	AudioManager.Play(kind == "Error" and "Error" or "Reward")
 	task.delay(2.8, function()
+		TweenService:Create(pill, TweenInfo.new(0.4), { BackgroundTransparency = 1 }):Play()
+		TweenService:Create(stroke, TweenInfo.new(0.4), { Transparency = 1 }):Play()
 		TweenService:Create(t, TweenInfo.new(0.4), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
-		task.delay(0.45, function() t:Destroy() end)
+		task.delay(0.45, function() pill:Destroy() end)
 	end)
 end
 
-local function row(order, titleText, desc, buttonText, enabled, onClick, titleColor)
-	local f = mk("Frame", { BackgroundColor3 = THEME.Row, Size = UDim2.new(1, -8, 0, 76), LayoutOrder = order, ZIndex = 11 }, panelScroll)
+local TAB_GLYPH = { Forge = "▲", Daily = "★", Farm = "●", Goals = "★", Shop = "◆", Codex = "◆" }
+
+-- One list row: a glowing icon tile (or a spinning gem), title and description, an optional progress bar, and a button.
+-- opts = { Icon = glyph, IconColor = Color3, Gem = Color3 (spinning crystal), Dim = greyed out, Progress = 0..1, Accent = Color3 }
+local function row(order, titleText, desc, buttonText, enabled, onClick, titleColor, opts)
+	opts = opts or {}
+	local accent = opts.Accent or Fx.Tab[activeTab] or THEME.Accent
+	local hasBar = opts.Progress ~= nil
+	local height = hasBar and 90 or 78
+	local f = mk("Frame", { BackgroundColor3 = THEME.Row, Size = UDim2.new(1, -8, 0, height), LayoutOrder = order, ZIndex = 11 }, panelScroll)
 	corner(f, 12)
-	label(f, titleText, 19, titleColor or THEME.Text, { Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -150, 0, 26), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
-	label(f, desc, 15, THEME.Dim, { Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -150, 0, 38), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 12 })
+	Fx.Depth(f, 0.25)
+	mk("UIStroke", { Color = opts.Dim and THEME.Dim or accent, Thickness = 1.5, Transparency = opts.Dim and 0.85 or 0.5 }, f)
+	local strip = mk("Frame", { BackgroundColor3 = opts.Dim and THEME.Dim or accent, Position = UDim2.fromOffset(6, 10), Size = UDim2.new(0, 4, 1, -20), BorderSizePixel = 0, ZIndex = 12 }, f)
+	corner(strip, 2)
+	local iconY = (height - 56) // 2
+	if opts.Gem then
+		local holder = mk("Frame", { BackgroundColor3 = Fx.Darken(opts.Gem, 0.78), Position = UDim2.fromOffset(16, iconY), Size = UDim2.fromOffset(56, 56), BorderSizePixel = 0, ZIndex = 12 }, f)
+		corner(holder, 14)
+		mk("UIStroke", { Color = opts.Dim and THEME.Dim or opts.Gem, Thickness = 2, Transparency = opts.Dim and 0.7 or 0.2 }, holder)
+		local gem = Fx.Gem(holder, opts.Gem, 56, opts.Dim)
+		gem.ZIndex = 13
+	else
+		Fx.Icon(f, opts.Icon or TAB_GLYPH[activeTab] or "◆", opts.Dim and Color3.fromRGB(70, 76, 96) or (opts.IconColor or accent), 52, { Position = UDim2.fromOffset(18, iconY + 2), ZIndex = 12 })
+	end
+	label(f, titleText, 19, titleColor or THEME.Text, { Position = UDim2.fromOffset(82, 6), Size = UDim2.new(1, -212, 0, 26), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
+	label(f, desc, 14, THEME.Dim, { Position = UDim2.fromOffset(82, 32), Size = UDim2.new(1, -212, 0, hasBar and 32 or 40), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 12 })
+	if hasBar then
+		Fx.Progress(f, opts.Progress, accent, { Position = UDim2.new(0, 82, 0, height - 20), Size = UDim2.new(1, -212, 0, 10), ZIndex = 12 })
+	end
 	if buttonText then
-		local b = button(f, buttonText, enabled and THEME.Accent or THEME.Panel, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(120, 52), TextSize = 16, ZIndex = 12, TextColor3 = enabled and THEME.Bg or THEME.Dim })
+		local ready = enabled and string.sub(buttonText, 1, 5) == "Claim"
+		local b = button(f, buttonText, enabled and Fx.Lighten(accent, 0.1) or THEME.Panel, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(120, 52), TextSize = 16, ZIndex = 12, TextColor3 = enabled and THEME.Bg or THEME.Dim })
+		if ready then
+			Fx.Shimmer(b, 1.6, 0.7)
+			Fx.Glow(b, Fx.Lighten(accent, 0.5), 2.5, 0.9)
+		end
 		b.Activated:Connect(function()
 			if onClick then onClick() end
 		end)
@@ -533,7 +598,13 @@ local function row(order, titleText, desc, buttonText, enabled, onClick, titleCo
 end
 
 local function header(order, text)
-	label(panelScroll, text, 18, THEME.Accent, { Size = UDim2.new(1, 0, 0, 26), LayoutOrder = order, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
+	local c = Fx.Tab[activeTab] or THEME.Accent
+	local f = mk("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.new(1, -8, 0, 30), LayoutOrder = order, ZIndex = 11 }, panelScroll)
+	corner(f, 8)
+	Fx.Gradient(f, Fx.Darken(c, 0.4), Color3.fromRGB(24, 28, 44), 0)
+	mk("UIStroke", { Color = c, Thickness = 1, Transparency = 0.6 }, f)
+	local t = label(f, "◆  " .. text, 16, Fx.Lighten(c, 0.55), { Position = UDim2.fromOffset(10, 0), Size = UDim2.new(1, -20, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, TextScaled = true, ZIndex = 12 })
+	mk("UITextSizeConstraint", { MaxTextSize = 16, MinTextSize = 9 }, t)
 end
 
 local function rebuildPanel()
@@ -543,10 +614,11 @@ local function rebuildPanel()
 	end
 	local d = State.Data
 	local titleLabel = panel:FindFirstChild("Title")
+	titleLabel.TextColor3 = Fx.Lighten(Fx.Tab[activeTab] or THEME.Accent, 0.35)
 	for name, tab in tabButtons do
 		local selected = name == activeTab
-		tab.BackgroundColor3 = selected and THEME.Accent or THEME.Row
-		tab.TextColor3 = selected and THEME.Bg or THEME.Text
+		tab.BackgroundColor3 = selected and Fx.Tab[name] or THEME.Row
+		tab.TextColor3 = selected and THEME.Bg or Fx.Tab[name]
 	end
 
 	if activeTab == "Forge" then
@@ -560,7 +632,7 @@ local function rebuildPanel()
 			local cost = def.Costs[level + 1]
 			row(order, ("%s  Lv %d/%d"):format(def.Name, level, #def.Costs), def.Description, cost and ("Buy  ◆ " .. commas(cost)) or "MAX", cost ~= nil and d.Shards >= cost, function()
 				Remotes.Buy:FireServer("Upgrade", id)
-			end)
+			end, nil, { Progress = level / math.max(1, #def.Costs), Icon = "▲", Accent = Color3.fromRGB(255, 150, 60) })
 		end
 		order += 1
 		header(order, "Charges")
@@ -571,7 +643,7 @@ local function rebuildPanel()
 				local owned = d.UnlockedCharges[id]
 				row(order, def.Name, def.Description, owned and "Owned" or ("Unlock  ◆ " .. commas(def.UnlockCost)), not owned and d.Shards >= def.UnlockCost, function()
 					if not owned then Remotes.Buy:FireServer("Charge", id) end
-				end)
+				end, nil, { Icon = ({ Basic = "o", Shaft = "|", Cross = "+" })[id] or "*", Accent = ({ Basic = Color3.fromRGB(255, 160, 60), Shaft = Color3.fromRGB(90, 200, 255), Cross = Color3.fromRGB(255, 100, 220) })[id], Dim = false })
 			end
 		end
 		order += 1
@@ -582,7 +654,7 @@ local function rebuildPanel()
 			local can = n == d.StrataUnlocked + 1 and d.Shards >= s.Cost
 			row(order, ("%d. %s"):format(n, s.Name), s.Description, unlocked and "Open" or ("Unlock  ◆ " .. commas(s.Cost)), can, function()
 				if not unlocked then Remotes.Buy:FireServer("Stratum", tostring(n)) end
-			end)
+			end, nil, { Icon = tostring(n), Accent = ({ Color3.fromRGB(90, 200, 255), Color3.fromRGB(190, 120, 255), Color3.fromRGB(255, 120, 60), Color3.fromRGB(110, 230, 190) })[n], Dim = not unlocked and not can })
 		end
 	elseif activeTab == "Daily" then
 		titleLabel.Text = "Daily objectives"
@@ -593,7 +665,7 @@ local function rebuildPanel()
 			local btnText = item.Claimed and "Claimed" or (done and ("Claim  ◆ " .. commas(item.Reward)) or ("%d / %d"):format(item.Progress, item.Target))
 			row(item.Slot, item.Text, ("Reward: ◆ %s"):format(commas(item.Reward)), btnText, done and not item.Claimed, function()
 				if done and not item.Claimed then Remotes.Claim:FireServer(item.Slot) end
-			end)
+			end, nil, { Progress = item.Progress / math.max(1, item.Target), Icon = "★", Accent = item.Claimed and THEME.Dim or nil, Dim = item.Claimed })
 		end
 		-- Daily Puzzle: same grid for everyone, one try, medal by score against par.
 		local pz = d.Puzzle
@@ -611,7 +683,7 @@ local function rebuildPanel()
 			end
 			row(21, "Today's puzzle", desc, btn, canPlay, function()
 				if canPlay then Remotes.PuzzleStart:FireServer() end
-			end)
+			end, nil, { Icon = "P", Accent = Color3.fromRGB(255, 200, 60), Dim = not canPlay })
 		end
 		-- Weekly challenges: bigger targets and rewards, reset Monday 00:00 UTC.
 		local weekSecs = math.max(0, math.floor((State.WeeklyResetAt or 0) - os.clock()))
@@ -621,7 +693,7 @@ local function rebuildPanel()
 			local btnText = item.Claimed and "Claimed" or (done and ("Claim  ◆ " .. commas(item.Reward)) or ("%s / %s"):format(commas(item.Progress), commas(item.Target)))
 			row(10 + item.Slot, item.Text, ("Reward: ◆ %s"):format(commas(item.Reward)), btnText, done and not item.Claimed, function()
 				if done and not item.Claimed then Remotes.ClaimWeekly:FireServer(item.Slot) end
-			end)
+			end, nil, { Progress = item.Progress / math.max(1, item.Target), Icon = "W", Accent = Color3.fromRGB(190, 120, 255), Dim = item.Claimed })
 		end
 	elseif activeTab == "Farm" then
 		local f = d.Farm
@@ -656,7 +728,7 @@ local function rebuildPanel()
 					local btnText = g.Claimed and "Claimed" or (g.Complete and ("Claim  ◆ " .. commas(g.Reward)) or ("%s / %s"):format(commas(g.Progress), commas(g.Target)))
 					row(order, g.Name, g.Description .. ("  Reward: ◆ %s"):format(commas(g.Reward)), btnText, g.Complete and not g.Claimed, function()
 						if g.Complete and not g.Claimed then Remotes.ClaimGoal:FireServer(g.Id) end
-					end, g.Claimed and THEME.Dim or nil)
+					end, g.Claimed and THEME.Dim or nil, { Progress = g.Progress / math.max(1, g.Target), Icon = g.Claimed and "✓" or "★", Dim = g.Claimed })
 				end
 			end
 		end
@@ -669,9 +741,11 @@ local function rebuildPanel()
 		local function offerRow(key)
 			local def = Products.Offers[key]
 			order += 1
+			local tierColor = ({ Tiny = Color3.fromRGB(120, 220, 170), Small = Color3.fromRGB(90, 190, 255), Medium = Color3.fromRGB(190, 120, 255), Large = Color3.fromRGB(255, 150, 60), Premium = Color3.fromRGB(255, 205, 90) })[def.Tier] or THEME.Accent
+			local glyph = ({ Boosts = "x2", Support = "+", Finishers = "✦", Bundles = "◆" })[def.Category] or "◆"
 			row(order, def.Name, def.Description, def.Id and "Buy" or "Not for sale yet", def.Id ~= nil, function()
 				if def.Id then MarketplaceService:PromptProductPurchase(Players.LocalPlayer, def.Id) end
-			end)
+			end, nil, { Icon = glyph, Accent = tierColor })
 		end
 		local function offersOf(category)
 			for _, key in Products.OfferOrder do
@@ -720,12 +794,16 @@ local function rebuildPanel()
 			order += 1
 			local def = Products.CosmeticProducts[key]
 			local owned = false
+			local swatch = THEME.Accent
 			for _, style in d.Styles or {} do
-				if style.Id == def.Cosmetic and style.Owned then owned = true end
+				if style.Id == def.Cosmetic then
+					swatch = Color3.fromRGB(style.Color[1], style.Color[2], style.Color[3])
+					if style.Owned then owned = true end
+				end
 			end
 			row(order, def.Name, def.Description, owned and "Owned" or (def.Id and "Buy" or "Not for sale yet"), (not owned) and def.Id ~= nil, function()
 				if def.Id and not owned then MarketplaceService:PromptProductPurchase(Players.LocalPlayer, def.Id) end
-			end)
+			end, nil, { Icon = "●", Accent = swatch, Dim = owned })
 		end
 		order += 1
 		header(order, "Shard packs (amount x areas unlocked)")
@@ -747,7 +825,7 @@ local function rebuildPanel()
 			if known then found += 1 end
 			local rc = Config.Rarities.Info[def.Rarity].Color
 			local mut = d.Codex.Mutated[id] and "   Prismatic found" or ""
-			row(index, known and (def.Name .. "  (" .. def.Rarity .. ")" .. mut) or "???", known and def.Description or ("Found in stratum " .. def.Stratum), nil, false, nil, known and Color3.fromRGB(rc[1], rc[2], rc[3]) or THEME.Dim)
+			row(index, known and (def.Name .. "  (" .. def.Rarity .. ")" .. mut) or "???", known and def.Description or ("Found in stratum " .. def.Stratum), nil, false, nil, known and Color3.fromRGB(rc[1], rc[2], rc[3]) or THEME.Dim, { Gem = Color3.fromRGB(def.Color[1], def.Color[2], def.Color[3]), Dim = not known, Accent = Color3.fromRGB(rc[1], rc[2], rc[3]) })
 		end
 		-- Blast colors: owned styles can be equipped; locked ones say how to get them.
 		local order = #Config.Crystals.Order + 1
@@ -758,7 +836,7 @@ local function rebuildPanel()
 			local btnText = style.Equipped and "Equipped" or (style.Owned and "Equip" or "Locked")
 			row(order, style.Name, style.Owned and "Owned" or style.Unlock, btnText, style.Owned and not style.Equipped, function()
 				if style.Owned and not style.Equipped then Remotes.Equip:FireServer(style.Id) end
-			end, Color3.fromRGB(c[1], c[2], c[3]))
+			end, Color3.fromRGB(c[1], c[2], c[3]), { Icon = "●", Accent = Color3.fromRGB(c[1], c[2], c[3]), Dim = not style.Owned })
 		end
 		-- Monsters, bosses, relics and boss mastery: the long-term "I have not seen everything yet" list.
 		local col = d.Collection
@@ -767,19 +845,19 @@ local function rebuildPanel()
 			header(order, "Lurkers (kills)")
 			for _, r in col.Lurkers do
 				order += 1
-				row(order, r.Found and ("%s  x%d"):format(r.Name, r.Kills) or "???", r.Found and r.Description or "Not met yet", nil, false, nil, r.Found and THEME.Text or THEME.Dim)
+				row(order, r.Found and ("%s  x%d"):format(r.Name, r.Kills) or "???", r.Found and r.Description or "Not met yet", nil, false, nil, r.Found and THEME.Text or THEME.Dim, { Icon = string.sub(r.Name, 1, 1), Accent = Color3.fromRGB(235, 90, 90), Dim = not r.Found })
 			end
 			order += 1
 			header(order, "Bosses")
 			for _, r in col.Bosses do
 				order += 1
-				row(order, r.Found and ("%s  x%d"):format(r.Name, r.Kills) or "???", r.Found and r.Description or "Reach floor 4 of an Expedition", nil, false, nil, r.Found and THEME.Gold or THEME.Dim)
+				row(order, r.Found and ("%s  x%d"):format(r.Name, r.Kills) or "???", r.Found and r.Description or "Reach floor 4 of an Expedition", nil, false, nil, r.Found and THEME.Gold or THEME.Dim, { Icon = "★", Accent = Color3.fromRGB(200, 40, 60), Dim = not r.Found })
 			end
 			order += 1
 			header(order, ("Relics found %d/%d"):format(col.RelicsFound, col.RelicsTotal))
 			for _, r in col.Relics do
 				order += 1
-				row(order, r.Found and ("%s  [%s]"):format(r.Name, r.Family) or "???", r.Found and r.Description or "Find it in an Expedition", nil, false, nil, r.Found and THEME.Text or THEME.Dim)
+				row(order, r.Found and ("%s  [%s]"):format(r.Name, r.Family) or "???", r.Found and r.Description or "Find it in an Expedition", nil, false, nil, r.Found and THEME.Text or THEME.Dim, { Icon = "◆", Accent = Fx.Family[r.Family] or THEME.Accent, Dim = not r.Found })
 			end
 		end
 		local fin = d.Finishers
@@ -792,7 +870,7 @@ local function rebuildPanel()
 				local worn = fin.Equipped == def.Id
 				row(order, def.Name, owned and "Owned" or "Sold in the Shop", worn and "Worn" or (owned and "Wear" or "Locked"), owned and not worn, function()
 					if owned and not worn then Remotes.EquipFinisher:FireServer(def.Id) end
-				end, Color3.fromRGB(def.Color[1], def.Color[2], def.Color[3]))
+				end, Color3.fromRGB(def.Color[1], def.Color[2], def.Color[3]), { Icon = "✦", Accent = Color3.fromRGB(def.Color[1], def.Color[2], def.Color[3]), Dim = not owned })
 			end
 		end
 		local mastery = d.Mastery
@@ -805,7 +883,7 @@ local function rebuildPanel()
 				local btnText = not obj.Done and "Locked" or (worn and "Worn" or "Wear")
 				row(order, obj.Name .. "  [" .. obj.Title .. "]", obj.Description .. ("  Reward: %s"):format(commas(obj.Reward)), btnText, obj.Done and not worn, function()
 					if obj.Done and not worn then Remotes.EquipTitle:FireServer(obj.Title) end
-				end, obj.Done and THEME.Gold or THEME.Dim)
+				end, obj.Done and THEME.Gold or THEME.Dim, { Icon = obj.Done and "★" or "?", Accent = THEME.Gold, Dim = not obj.Done })
 			end
 			if mastery.Title ~= "" then
 				order += 1
@@ -833,7 +911,10 @@ local function rebuildCharges()
 		if State.Data.UnlockedCharges[id] then
 			local def = Config.Charges.Defs[id]
 			local selected = State.SelectedCharge == id
-			local b = button(chargeColumn, def.Name, selected and THEME.Accent or THEME.Panel, { Size = UDim2.fromOffset(150, 42), TextSize = 15, LayoutOrder = i, TextColor3 = selected and THEME.Bg or THEME.Text })
+			local kindColor = ({ Basic = Color3.fromRGB(255, 160, 60), Shaft = Color3.fromRGB(90, 200, 255), Cross = Color3.fromRGB(255, 100, 220) })[id] or THEME.Accent
+			local kindGlyph = ({ Basic = "o", Shaft = "|", Cross = "+" })[id] or "*"
+			local b = button(chargeColumn, ("[%s] %s"):format(kindGlyph, def.Name), selected and kindColor or THEME.Panel, { Size = UDim2.fromOffset(150, 42), TextSize = 15, LayoutOrder = i, TextColor3 = selected and THEME.Bg or Fx.Lighten(kindColor, 0.35) })
+			mk("UIStroke", { Color = kindColor, Thickness = selected and 3 or 1.5, Transparency = selected and 0.05 or 0.5 }, b)
 			b.Activated:Connect(function()
 				AudioManager.Play("Click")
 				State.SelectedCharge = id
@@ -884,6 +965,8 @@ function UI.Refresh()
 	if boss then
 		bossName.Text = ("%s   %d / %d   [%s]"):format(boss.Name, boss.HP, boss.MaxHP, string.upper(boss.Phase))
 		bossFill.Size = UDim2.fromScale(math.clamp(boss.HP / boss.MaxHP, 0, 1), 1)
+		local phaseColor = { Armor = Color3.fromRGB(255, 200, 60), Attack = Color3.fromRGB(240, 80, 80), Weak = Color3.fromRGB(255, 70, 220), Enrage = Color3.fromRGB(255, 40, 40), Finisher = Color3.fromRGB(120, 255, 255) }
+		bossFill.BackgroundColor3 = phaseColor[boss.Phase] or Color3.fromRGB(230, 70, 70)
 		local hints = {
 			Armor = "Pop the glowing GOLD armor nodes to break its armor.",
 			Attack = "Hit the core! Red tiles = its next attack: pop 3+ crystals on them to CUT it, or Dodge (Q).",
