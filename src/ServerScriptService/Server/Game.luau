@@ -21,6 +21,7 @@ local Farm = require(Shared.Farm)
 local Lurker = require(Shared.Lurker)
 local Power = require(Shared.Power)
 local Boss = require(Shared.Boss)
+local BossRT = require(Shared.BossRT)
 local Mastery = require(Shared.Mastery)
 local Grants = require(Shared.Grants)
 local Data = require(script.Parent.Data)
@@ -88,7 +89,7 @@ type SeamState = {
 	Boss: Boss.State?, -- an Expedition boss fight (the floor is the arena)
 	BossDefeated: boolean?,
 	Critical: number, -- volleys of CRITICAL MASS left
-	DodgeArmed: boolean?, -- the player pressed Dodge: the next volley's marked attack will not hurt
+	BossRT: BossRT.State?, -- real-time boss attacks (threats on a clock, shield window)
 }
 
 local Game = {}
@@ -278,8 +279,16 @@ local function snapshot(player: Player): { [string]: any }?
 		Collection = Mastery.CollectionView(data.Collection, LurkerConfig, BossConfig, ExpeditionConfig),
 		Mastery = { Objectives = Mastery.View(data.Mastery, MasteryConfig), Titles = Mastery.Titles(data.Mastery, MasteryConfig), Title = data.Mastery.Title },
 		Critical = seam and seam.Critical or 0,
-		DodgeArmed = seam and seam.DodgeArmed or false,
-		Boss = seam and seam.Boss and Boss.View(seam.Boss, BossConfig) or nil,
+		Boss = seam and seam.Boss and (function()
+			local view = Boss.View(seam.Boss, BossConfig)
+			if seam.BossRT then
+				view.RT = BossRT.View(seam.BossRT, os.clock(), BossConfig, seam.Boss.Kind)
+				view.DodgeReady = view.RT.DodgeReady
+				view.DodgeCooldown = view.RT.DodgeLeft
+				view.Telegraph = {} -- (the turn-based marker list is unused: the client draws view.RT.Threats)
+			end
+			return view
+		end)() or nil,
 		HeartsMax = seam and seam.HeartsMax or LurkerConfig.Hearts,
 		Monster = seam and seam.Monster and (function()
 			local m = seam.Monster
@@ -436,6 +445,7 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 	if bossKind then
 		seam.Boss = Boss.New(bossKind, grid, { Crystals = Config.Context.Crystals }, BossConfig, runRng)
 		seam.BossStats = { Volleys = 0, HeartsLost = 0 }
+		seam.BossRT = BossRT.New(os.clock(), bossKind, BossConfig)
 		seam.Valuable = Seam.CountValuable(grid, Crystals) -- the core was cleared
 		seam.Charges = math.max(seam.Charges, run.StartCharges) -- a boss fight always starts with a full rig
 		seam.ChargesMax = math.max(seam.ChargesMax, run.StartCharges)
@@ -793,41 +803,84 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 			turn.PhaseChanged = boss.Phase
 			notify(player, ("PHASE: %s (+%d charge)"):format(string.upper(boss.Phase), out.Refund), "Reward")
 		end
-		local act = Boss.Act(boss, seam.Grid, mctx, BossConfig, seam.DodgeArmed == true, runRng)
-		seam.DodgeArmed = false
-		for _, e in act.Eaten do
-			table.insert(turn.Eaten, { X = e.X, Z = e.Z })
-		end
-		if act.Dodged then
-			notify(player, "Dodged!", "Reward")
-			turn.Dodged = true
-		elseif act.HeartsLost > 0 then
-			seam.Hearts = math.max(0, seam.Hearts - act.HeartsLost)
-			turn.HeartsLost = act.HeartsLost
-			stats.HeartsLost += act.HeartsLost
-			notify(player, ("The Titan's slam hit your rig! Hearts left: %d"):format(seam.Hearts), "Error")
-			if seam.Hearts <= 0 then
-				seam.Defeated = true
-			end
-		end
+		-- (its attacks are real-time now: see bossTick and BossRT; a volley only answers them, in onDetonate)
 	end
 	turn.Hearts = seam.Hearts
 	turn.Boss = seam.Boss and Boss.View(seam.Boss, BossConfig) or nil
+	if turn.Boss and seam.BossRT then
+		turn.Boss.RT = BossRT.View(seam.BossRT, os.clock(), BossConfig, seam.Boss.Kind)
+	end
 	Remotes.MonsterTurn:FireClient(player, turn)
 	sync(player)
 end
 
--- The player pressed Dodge: it protects against the attack the boss has marked, when the volley after this resolves.
+-- Dodge: a short shield window against the boss's landing attacks (hearts only; crystals still fall). Has a cooldown.
 local function onDodge(player: Player)
 	local seam = seams[player]
-	if not seam or not seam.Boss or seam.InFlight or seam.DodgeArmed then
+	if not seam or not seam.Boss or not seam.BossRT or seam.AwaitRevive then
 		return
 	end
-	if not Boss.CanDodge(seam.Boss) then
-		return notify(player, "Nothing to dodge yet (or your dodge is recharging).", "Info")
+	if BossRT.Shield(seam.BossRT, os.clock(), seam.Boss.Kind, BossConfig) then
+		notify(player, "Shield up!", "Info")
+		sync(player)
+	else
+		notify(player, "Dodge is recharging.", "Info")
 	end
-	seam.DodgeArmed = true
-	sync(player)
+end
+
+-- The boss's clock, several times a second: wind up the next attack when it is due, and land the ones whose time has come.
+local function bossTick(player: Player, seam: SeamState)
+	local boss = seam.Boss
+	if not boss or not seam.BossRT or seam.AwaitRevive or seam.Defeated or seam.BossDefeated then
+		return
+	end
+	local ctx = { Crystals = Config.Context.Crystals }
+	local now = os.clock()
+	local changed = false
+	local threat = BossRT.Spawn(seam.BossRT, boss.Phase, boss.Kind, seam.Grid, ctx, now, runRng, BossConfig)
+	if threat then
+		changed = true
+		local warning = {
+			Slam = "SLAM incoming! Pop 3+ crystals on the red line, or Dodge.",
+			Meteor = "METEORS incoming! Pop a Lensglass (prism) crystal to deflect them, or Dodge.",
+			Corruption = "CORRUPTION! Pop the purple crystals before it lands.",
+		}
+		notify(player, warning[threat.Type], "Error")
+	end
+	for _, landed in BossRT.Due(seam.BossRT, now) do
+		changed = true
+		local r = BossRT.Resolve(landed, seam.Grid, ctx, BossRT.IsShielded(seam.BossRT, now), BossConfig)
+		local turn = { UserId = player.UserId, Eaten = r.Destroyed, Corrupted = r.Corrupted, Hearts = seam.Hearts }
+		if r.Cancelled then
+			turn.Cut = true
+		elseif r.Blocked then
+			turn.Dodged = true
+			notify(player, "Shield! The hit was blocked.", "Reward")
+		elseif r.HeartsLost > 0 then
+			seam.Hearts = math.max(0, seam.Hearts - r.HeartsLost)
+			turn.HeartsLost = r.HeartsLost
+			turn.Hearts = seam.Hearts
+			if seam.BossStats then
+				seam.BossStats.HeartsLost += r.HeartsLost
+			end
+			notify(player, ("The Titan's %s hit your rig! Hearts left: %d"):format(string.lower(landed.Type), seam.Hearts), "Error")
+			if seam.Hearts <= 0 then
+				seam.Defeated = true
+			end
+		end
+		if #r.Corrupted > 0 then
+			notify(player, ("%d crystals were corrupted into Dreadgeodes!"):format(#r.Corrupted), "Error")
+		end
+		turn.Boss = Boss.View(boss, BossConfig)
+		turn.Boss.RT = BossRT.View(seam.BossRT, now, BossConfig, boss.Kind)
+		Remotes.MonsterTurn:FireClient(player, turn)
+	end
+	if changed then
+		sync(player)
+	end
+	if seam.Defeated and not seam.InFlight then
+		endSeam(player, seam)
+	end
 end
 
 local function onDetonate(player: Player, payload: any)
@@ -897,6 +950,20 @@ local function onDetonate(player: Player, payload: any)
 		data.Codex.Discovered[ev.Kind] = true
 		if ev.Mutated then
 			data.Codex.Mutated[ev.Kind] = true
+		end
+	end
+	if seam.BossRT and seam.Boss then
+		-- The volley answers the boss's wound-up attacks: crystals popped on a line cut a slam, prisms deflect meteors, marked
+		-- crystals popped are purified.
+		local counter = BossRT.Counter(seam.BossRT, result.Events, { Crystals = Config.Context.Crystals }, seam.Boss.Kind, BossConfig)
+		if counter.Cut > 0 then
+			notify(player, "Slam cut!", "Reward")
+		end
+		if counter.Deflected > 0 then
+			notify(player, ("Prism beam deflected %d meteor zone%s!"):format(counter.Deflected, counter.Deflected > 1 and "s" or ""), "Reward")
+		end
+		if counter.Purified > 0 then
+			notify(player, ("Purified %d crystal%s!"):format(counter.Purified, counter.Purified > 1 and "s" or ""), "Reward")
 		end
 	end
 	local multiplier = (Purchases.Owns(player, "DoubleShards") and 2 or 1) * Events.Combine(activeEvents()).ShardMult * Community.Mult(goal, os.clock(), CommunityConfig) * Grants.BoostMult(data.Boosts, "Shards", os.time())
@@ -1521,6 +1588,19 @@ function Game.Init()
 	Remotes.Equip.OnServerEvent:Connect(guarded("Equip", 5, 8, onEquip))
 	Remotes.Setting.OnServerEvent:Connect(guarded("Setting", 5, 8, onSetting))
 	Remotes.RunPick.OnServerEvent:Connect(guarded("RunPick", 5, 8, onRunPick))
+	task.spawn(function()
+		while true do
+			task.wait(0.2)
+			for player, seam in seams do
+				if seam.BossRT then
+					local ok, err = pcall(bossTick, player, seam)
+					if not ok then
+						warn("[Game] bossTick failed: " .. tostring(err))
+					end
+				end
+			end
+		end
+	end)
 	Remotes.RunRevive.OnServerEvent:Connect(guarded("RunRevive", 3, 5, onRunRevive))
 	Remotes.UseCharge.OnServerEvent:Connect(guarded("UseCharge", 3, 5, onUseCharge))
 	Remotes.EquipFinisher.OnServerEvent:Connect(guarded("EquipFinisher", 3, 5, onEquipFinisher))

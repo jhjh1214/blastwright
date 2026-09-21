@@ -34,7 +34,16 @@ Pure phase machine in `Shared/Boss.luau`; numbers in `Config/Bosses.luau`. The 3
 Each phase change refunds a charge. Defeat = the Expedition collapses; victory pays a 6,000 shard bounty into the haul, the "Titan Slayer" goals, and a FINAL BLAST (bursts, rings, camera punch).
 Balance evidence (`tools/sim/boss.luau`, greedy one-charge bot, no planning): at 30 HP it wins about 33% with Basic charges only and about 68% with all charges; humans who plan multi-charge volleys should do better. At 60 HP it won 2-4%, so HP was cut.
 
-## Not built yet (stage 2: real-time boss arena)
+## Real-time boss attacks (built; `Shared/BossRT.luau`)
+The Titan no longer waits for your turn. From its Attack phase on it winds up attacks on a clock (every 6.5 s, faster in later phases, two at once in Enrage), telegraphs them on the grid with a live countdown, and they land whether or not you have fired. Each attack is answered by the crystal system you already play with:
+- **SLAM** (red line, 2.6 s): pop 3 or more crystals on the line, from any charge or chain, to cut it.
+- **METEOR** (orange 3x3 zones, 3.2 s, from the Weak phase): pop a **Lensglass** (prism) crystal; each prism pop deflects one zone. Uncut zones wreck the crystals under them and cost one heart in total.
+- **CORRUPTION** (purple-marked crystals, 4.5 s, Enrage and Finisher): pop the marked crystals before it lands; each survivor becomes a Dreadgeode hazard (no heart lost, but your multiplier suffers).
+- **DODGE** (Q or the button): a 1.2 s shield with a 7 s cooldown. It blocks the heart loss (crystals still fall), so you can also just time it as a reaction.
+So the board is read for the threat as well as the payout: "which crystal answers this attack?" The volley damage phases (armor nodes, weak points, finisher) are unchanged. This is a real-time layer on the same grid, not a free-roaming 3D arena: there is no character movement or physics dodge, by design, so the fight stays the same game.
+
+## Not built
+A free-roaming 3D arena with character movement, and a second boss with different attacks (the attack types are data in `Config/Bosses.luau` `RT`, so a new boss is mostly configuration).
 Expedition bosses (floors 4 and 8) pull the player into a small real-time arena inside the seam. Needs its own design pass (movement, dodging, throwing/planting explosives live, boss telegraphs, server-side hit validation). Nothing of it exists yet. The grid Lurkers do not depend on it.
 
 ## Numbers are placeholders

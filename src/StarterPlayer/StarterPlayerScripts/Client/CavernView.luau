@@ -273,6 +273,11 @@ local function ensureCreatureLoop()
 	creatureLoop = RunService.Heartbeat:Connect(function()
 		local t = os.clock()
 		for _, view in views do
+			for _, entry in view.ThreatLabels or {} do
+				if entry.Label.Parent then
+					entry.Label.Text = ("%s  %.1f"):format(entry.Name, math.max(0, entry.LandsAt - t))
+				end
+			end
 			local m = view.MonsterModel
 			if m and m.Parent and view.MonsterBase then
 				local rise = math.clamp((t - view.MonsterBorn) / 0.5, 0, 1)
@@ -425,11 +430,67 @@ function CavernView.SetBoss(view, boss)
 	for _, cell in boss.Weak do
 		marker(view, cell, Color3.fromRGB(255, 70, 230), 6, 3.4, 0.2) -- weak point: chain through BOTH
 	end
-	for _, cell in boss.Telegraph do
-		local tile = marker(view, cell, Color3.fromRGB(255, 40, 40), 0.3, CellSize * 0.95, 0.55) -- next attack lands here
+	-- real-time threats: every wound-up attack is drawn on the grid with a live countdown
+	view.ThreatLabels = {}
+	local function pulse(part, speed)
 		pcall(function()
-			TweenService:Create(tile, TweenInfo.new(0.45, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.15 }):Play() -- it pulses: danger
+			TweenService:Create(part, TweenInfo.new(speed, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.15 }):Play()
 		end)
+	end
+	local function countdown(centre, text, color, landsAt)
+		local anchor = Instance.new("Part")
+		anchor.Anchored, anchor.CanCollide, anchor.CanQuery, anchor.Transparency, anchor.Size = true, false, false, 1, Vector3.new(1, 1, 1)
+		anchor.Position = centre + Vector3.new(0, 9, 0)
+		anchor.Parent = view.BossFx
+		local gui = Instance.new("BillboardGui")
+		gui.Size = UDim2.fromOffset(200, 28)
+		gui.AlwaysOnTop = true
+		gui.Parent = anchor
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.GothamBold
+		label.TextSize = 18
+		label.TextColor3 = color
+		label.TextStrokeTransparency = 0.5
+		label.Parent = gui
+		table.insert(view.ThreatLabels, { Label = label, Name = text, LandsAt = landsAt })
+	end
+	local receivedAt = os.clock()
+	for _, threat in ((boss.RT and boss.RT.Threats) or {}) do
+		local landsAt = receivedAt + threat.LandsIn
+		local speed = math.clamp(threat.LandsIn / 4, 0.25, 0.7) -- it blinks faster as it gets closer
+		if threat.Type == "Slam" then
+			for _, cell in threat.Cells do
+				pulse(marker(view, cell, threat.Cancelled and Color3.fromRGB(80, 255, 150) or Color3.fromRGB(255, 40, 40), 0.3, CellSize * 0.95, 0.55), speed)
+			end
+			local mid = threat.Cells[math.ceil(#threat.Cells / 2)]
+			countdown(Geometry.CellPosition(view.Origin, mid.X, mid.Z), threat.Cancelled and "SLAM CUT" or "SLAM", threat.Cancelled and Color3.fromRGB(120, 255, 170) or Color3.fromRGB(255, 120, 120), landsAt)
+		elseif threat.Type == "Meteor" then
+			for _, zone in threat.Zones do
+				local color = zone.Cancelled and Color3.fromRGB(90, 220, 255) or Color3.fromRGB(255, 130, 40)
+				local disc = marker(view, { X = zone.X, Z = zone.Z }, color, 0.3, CellSize * 2.9, 0.5)
+				pulse(disc, speed)
+				countdown(Geometry.CellPosition(view.Origin, zone.X, zone.Z), zone.Cancelled and "DEFLECTED" or "METEOR", color, landsAt)
+			end
+		elseif threat.Type == "Corruption" then
+			for _, cell in threat.Marks do
+				pulse(marker(view, cell, Color3.fromRGB(190, 70, 255), 7, 3.0, 0.3), speed)
+			end
+			if threat.Marks[1] then
+				countdown(Geometry.CellPosition(view.Origin, threat.Marks[1].X, threat.Marks[1].Z), "CORRUPTION", Color3.fromRGB(215, 130, 255), landsAt)
+			end
+		end
+	end
+end
+
+-- A crystal corrupted into a Dreadgeode by the boss: the old model pops, a hazard crystal takes its place.
+function CavernView.Corrupt(view, x, z)
+	local key = (z - 1) * view.Size + x
+	CavernView.Pop(view, key)
+	view.Grid.Cells[key] = { Kind = "Dreadgeode" }
+	if view.Built then
+		view.Models[key] = buildCrystal(view.Folder, "Dreadgeode", false, Geometry.CellPosition(view.Origin, x, z), key)
 	end
 end
 

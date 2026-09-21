@@ -200,6 +200,26 @@ function UI.Init()
 	dodgeButton.Activated:Connect(function()
 		Remotes.Dodge:FireServer()
 	end)
+	-- The Dodge button counts down between server updates (the server only sends a snapshot when something happens).
+	local tickAccumulator = 0
+	RunService.Heartbeat:Connect(function(dt)
+		tickAccumulator += dt
+		if tickAccumulator < 0.2 then return end
+		tickAccumulator = 0
+		local boss = State.Data and State.Data.Boss
+		if boss and boss.RT and dodgeButton.Visible then
+			local passed = os.clock() - (State.EventsAt or os.clock())
+			if boss.RT.ShieldLeft - passed > 0 then
+				dodgeButton.Text = "SHIELD UP"
+			elseif boss.RT.DodgeLeft - passed > 0 then
+				dodgeButton.Text = ("Dodge %ds"):format(math.ceil(boss.RT.DodgeLeft - passed))
+				dodgeButton.BackgroundColor3 = THEME.Panel
+			else
+				dodgeButton.Text = "DODGE (Q)"
+				dodgeButton.BackgroundColor3 = Fx.Tab.Codex
+			end
+		end
+	end)
 	criticalLabel = label(blastGroup, "", 22, Color3.new(1, 1, 1), { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 160), Size = UDim2.fromOffset(340, 30), Font = Enum.Font.GothamBlack, Visible = false, TextStrokeTransparency = 0.2, TextStrokeColor3 = Color3.fromRGB(120, 40, 0) })
 	mk("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 240, 130), Color3.fromRGB(255, 110, 30)), Rotation = 90 }, criticalLabel)
 
@@ -223,17 +243,32 @@ function UI.Init()
 	-- Between-floor choice: three cards and "Bank & leave". Covers the screen while choosing (blasting is paused anyway).
 	runModal = mk("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 20, Active = true }, gui)
 	runTitle = label(runModal, "", 26, THEME.Gold, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 40), Size = UDim2.new(1, -24, 0, 70), TextWrapped = true, Font = Enum.Font.GothamBlack, ZIndex = 21 })
-	local row = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -24, 0, 260), ZIndex = 21 }, runModal)
+	local row = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -24, 0, 310), ZIndex = 21 }, runModal)
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 10) }, row)
 	runCards = {}
 	for i = 1, 3 do
-		local card = button(row, "", THEME.Panel, { Size = UDim2.fromOffset(200, 270), TextSize = 13, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 22, LayoutOrder = i })
-		mk("UIStroke", { Name = "RoomStroke", Color = THEME.Gold, Thickness = 3, Transparency = 0.15 }, card)
-		mk("UIPadding", { PaddingTop = UDim.new(0, 60), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, card)
-		local band = mk("Frame", { Name = "Band", BackgroundColor3 = THEME.Gold, Size = UDim2.new(1, 0, 0, 52), BorderSizePixel = 0, ZIndex = 23 }, card)
+		local card = button(row, "", THEME.Panel, { Size = UDim2.fromOffset(210, 300), ZIndex = 22, LayoutOrder = i })
+		mk("UIStroke", { Name = "RoomStroke", Color = THEME.Gold, Thickness = 2, Transparency = 0.25 }, card)
+		local band = mk("Frame", { Name = "Band", BackgroundColor3 = THEME.Gold, Size = UDim2.new(1, 0, 0, 40), BorderSizePixel = 0, ZIndex = 23 }, card)
 		corner(band, 12)
-		Fx.Depth(band, 0.35)
-		mk("TextLabel", { Name = "RoomName", BackgroundTransparency = 1, Position = UDim2.fromOffset(8, 0), Size = UDim2.new(1, -16, 1, 0), Font = Enum.Font.GothamBlack, TextSize = 17, TextColor3 = Color3.new(1, 1, 1), TextStrokeTransparency = 0.4, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Text = "" }, band)
+		mk("TextLabel", { Name = "RoomName", BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -24, 1, 0), Font = Enum.Font.GothamBold, TextSize = 17, TextColor3 = Color3.new(1, 1, 1), TextStrokeTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Text = "" }, band)
+		-- plain, readable text: a small grey caption, then the name, then the description, for each of the three parts
+		local body = mk("Frame", { Name = "Body", BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 48), Size = UDim2.new(1, -24, 1, -56), ZIndex = 23 }, card)
+		mk("UIListLayout", { Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder }, body)
+		local function line(name, order, size, color, font, wrapped)
+			return mk("TextLabel", { Name = name, LayoutOrder = order, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Font = font or Enum.Font.Gotham, TextSize = size, TextColor3 = color, TextStrokeTransparency = 1, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 24, Text = "" }, body)
+		end
+		local caption = Color3.fromRGB(130, 140, 165)
+		line("CapRoom", 1, 11, caption, Enum.Font.GothamBold)
+		line("RoomDesc", 2, 13, Color3.fromRGB(215, 222, 240))
+		mk("Frame", { Name = "Gap1", LayoutOrder = 3, BackgroundTransparency = 1, Size = UDim2.fromOffset(1, 8), ZIndex = 23 }, body)
+		line("CapRoute", 4, 11, caption, Enum.Font.GothamBold)
+		line("RouteName", 5, 15, Color3.new(1, 1, 1), Enum.Font.GothamBold)
+		line("RouteDesc", 6, 13, Color3.fromRGB(215, 222, 240))
+		mk("Frame", { Name = "Gap2", LayoutOrder = 7, BackgroundTransparency = 1, Size = UDim2.fromOffset(1, 8), ZIndex = 23 }, body)
+		line("CapRelic", 8, 11, caption, Enum.Font.GothamBold)
+		line("RelicName", 9, 15, Color3.new(1, 1, 1), Enum.Font.GothamBold)
+		line("RelicDesc", 10, 13, Color3.fromRGB(215, 222, 240))
 		card.Activated:Connect(function()
 			AudioManager.Play("Click")
 			Remotes.RunPick:FireServer(i)
@@ -410,12 +445,20 @@ function UI.SetRun(view)
 			card.Visible = c ~= nil
 			if c then
 				local roomColor = Fx.Room[c.Room] or THEME.Gold
-				card.Text = ("%s\n\n%s\n%s\n\n+ %s%s\n%s"):format(c.RoomDescription, c.RouteName, c.RouteDescription, c.RelicName ~= "" and c.RelicName or "(no relic)", c.RelicFamily ~= "" and ("  [" .. c.RelicFamily .. "]") or "", c.RelicDescription)
-				card.BackgroundColor3 = Fx.Darken(roomColor, 0.78)
+				local body = card.Body
+				card.BackgroundColor3 = Fx.Darken(roomColor, 0.82)
 				card:FindFirstChild("RoomStroke").Color = roomColor
-				card.Band.BackgroundColor3 = roomColor
+				card.Band.BackgroundColor3 = Fx.Darken(roomColor, 0.15)
 				card.Band.RoomName.Text = c.RoomName
-				card.TextColor3 = Fx.Lighten(Fx.Family[c.RelicFamily] or THEME.Text, 0.75)
+				body.CapRoom.Text = "NEXT FLOOR"
+				body.RoomDesc.Text = c.RoomDescription
+				body.CapRoute.Text = "PATH"
+				body.RouteName.Text = c.RouteName
+				body.RouteDesc.Text = c.RouteDescription
+				body.CapRelic.Text = c.RelicName ~= "" and ("RELIC" .. (c.RelicFamily ~= "" and ("  -  " .. string.upper(c.RelicFamily)) or "")) or "RELIC"
+				body.RelicName.Text = c.RelicName ~= "" and c.RelicName or "None this time"
+				body.RelicName.TextColor3 = Fx.Lighten(Fx.Family[c.RelicFamily] or THEME.Text, 0.4)
+				body.RelicDesc.Text = c.RelicDescription
 			end
 		end
 		runBank.Text = ("Bank %s shards & leave"):format(commas(view.BankNow))
@@ -1027,14 +1070,15 @@ function UI.Refresh()
 		bossFill.BackgroundColor3 = phaseColor[boss.Phase] or Color3.fromRGB(230, 70, 70)
 		local hints = {
 			Armor = "Pop the glowing GOLD armor nodes to break its armor.",
-			Attack = "Hit the core! Red tiles = its next attack: pop 3+ crystals on them to CUT it, or Dodge (Q).",
-			Weak = "Chain through BOTH magenta weak points for a massive hit!",
-			Enrage = "ENRAGED: two attacks at once. Keep hitting the core!",
+			Attack = "Hit the core! SLAM (red line): pop 3+ crystals on it to cut it, or Dodge (Q).",
+			Weak = "Chain through BOTH magenta weak points! METEORS (orange): pop a Lensglass to deflect. SLAM: cut it.",
+			Enrage = "ENRAGED! SLAM = pop 3+ on the line. METEOR = pop Lensglass. CORRUPTION (purple) = pop the marked crystals. Dodge (Q) shields.",
 			Finisher = "FINISHER: one huge chain (12+ pops) or Critical Mass ends it!",
 		}
 		bossHint.Text = hints[boss.Phase] or ""
-		dodgeButton.Text = d.DodgeArmed and "DODGE ARMED" or (boss.DodgeReady and "DODGE (Q)" or (boss.DodgeCooldown > 0 and "Dodge recharging" or "Dodge (no attack yet)"))
-		dodgeButton.BackgroundColor3 = d.DodgeArmed and THEME.Accent or THEME.Panel
+		local shielded = boss.RT and boss.RT.Shielded
+		dodgeButton.Text = shielded and "SHIELD UP" or (boss.DodgeReady and "DODGE (Q)" or ("Dodge %ds"):format(math.ceil(boss.DodgeCooldown or 0)))
+		dodgeButton.BackgroundColor3 = shielded and THEME.Accent or (boss.DodgeReady and Fx.Tab.Codex or THEME.Panel)
 	end
 	criticalLabel.Visible = (d.Critical or 0) > 0
 	if (d.Critical or 0) > 0 then

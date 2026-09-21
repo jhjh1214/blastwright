@@ -96,6 +96,20 @@ Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
 	if turn.HeartsLost or turn.Stolen then
 		UI.Flash(Color3.fromRGB(255, 40, 40), 0.45) -- the rig took a hit
 	end
+	for _, c in turn.Corrupted or {} do
+		CavernView.Corrupt(view, c.X, c.Z)
+	end
+	if turn.Cut then
+		local at = CavernView.BossPosition(view)
+		if at then
+			FloatingNumbers.Show(at + Vector3.new(0, 10, 0), "CUT!", Color3.fromRGB(120, 255, 170), 1.5)
+		end
+	elseif turn.Dodged then
+		local at = CavernView.BossPosition(view)
+		if at then
+			FloatingNumbers.Show(at + Vector3.new(0, 10, 0), "BLOCKED", Color3.fromRGB(120, 200, 255), 1.5)
+		end
+	end
 	CavernView.SetMonster(view, turn.Monster)
 	CavernView.SetBoss(view, turn.Boss)
 	if turn.BossSlain then
