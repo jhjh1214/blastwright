@@ -37,6 +37,12 @@ return {
 		goal("Prism2", "Prismatic Collector", "Find Prismatic versions of 3 kinds.", "Prismatic", 3, 4500),
 		goal("Prism3", "Prismatic Master", "Find Prismatic versions of 5 kinds.", "Prismatic", 5, 15000),
 
+		goal("Dive1", "Deep Diver", "Reach floor 3 of an Expedition.", "BestDepth", 3, 2500),
+		goal("Dive2", "Abyss Walker", "Reach floor 6 of an Expedition.", "BestDepth", 6, 7500),
+		goal("Won1", "Expedition Complete", "Clear every floor of an Expedition.", "ExpeditionsWon", 1, 5000),
+		goal("Won2", "Veteran Explorer", "Complete 5 Expeditions.", "ExpeditionsWon", 5, 20000),
+		goal("Won3", "Legend of the Deep", "Complete 25 Expeditions.", "ExpeditionsWon", 25, 75000),
+
 		goal("Area1", "Going Deeper", "Unlock the second mine area.", "Strata", 2, 2500),
 		goal("Area2", "Into the Embers", "Unlock the third mine area.", "Strata", 3, 10000),
 		goal("Area3", "Echoes Below", "Unlock the fourth mine area.", "Strata", 4, 17500),

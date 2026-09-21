@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 6
+Schema.CURRENT_VERSION = 7
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -12,7 +12,7 @@ function Schema.Default(): { [string]: any }
 		UnlockedCharges = { Basic = true },
 		Progress = { StrataUnlocked = 1, ActiveStratum = 1 },
 		Codex = { Discovered = {}, Mutated = {} }, -- [crystalId] = true
-		Stats = { SeamsCleared = 0, BestChain = 0, TotalPops = 0, TotalShards = 0 },
+		Stats = { SeamsCleared = 0, BestChain = 0, TotalPops = 0, TotalShards = 0, BestDepth = 0, ExpeditionsWon = 0 },
 		Settings = { Music = true, Sfx = true, Shake = true },
 		Caches = {}, -- [cacheId] = true for geode caches this player has looted
 		Daily = { Day = 0, Progress = {}, Claimed = {} }, -- see Shared/Dailies.luau (string slot keys)
@@ -53,6 +53,17 @@ local Migrations: { [number]: (data: { [string]: any }) -> () } = {
 	[6] = function(data)
 		if type(data.Weekly) ~= "table" then
 			data.Weekly = { Day = 0, Progress = {}, Claimed = {} }
+		end
+	end,
+	-- v7: expeditions. Adds the deepest floor reached and the number of completed dives to Stats (existing stats untouched).
+	[7] = function(data)
+		if type(data.Stats) == "table" then
+			if type(data.Stats.BestDepth) ~= "number" then
+				data.Stats.BestDepth = 0
+			end
+			if type(data.Stats.ExpeditionsWon) ~= "number" then
+				data.Stats.ExpeditionsWon = 0
+			end
 		end
 	end,
 }

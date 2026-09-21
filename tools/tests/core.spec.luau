@@ -752,7 +752,7 @@ local function serverData(over)
 end
 
 test("goals: config is valid, unique, increasing within a stat, and reachable", function()
-	local KNOWN = { TotalPops = true, BestChain = true, SeamsCleared = true, TotalShards = true, Caches = true, Codex = true, Prismatic = true, Strata = true }
+	local KNOWN = { TotalPops = true, BestChain = true, SeamsCleared = true, TotalShards = true, Caches = true, Codex = true, Prismatic = true, Strata = true, BestDepth = true, ExpeditionsWon = true }
 	local valued = 0
 	for _, def in Crystals.Defs do if def.Value > 0 then valued += 1 end end
 	local limit = {
@@ -760,6 +760,7 @@ test("goals: config is valid, unique, increasing within a stat, and reachable", 
 		Codex = #Crystals.Order,
 		Prismatic = valued,
 		Strata = #Strata,
+		BestDepth = require("../../src/ReplicatedStorage/Shared/Config/Expedition").Floors,
 	}
 	local seen, lastTarget, lastReward = {}, {}, {}
 	for _, def in AchCfg.Defs do
@@ -1803,6 +1804,30 @@ test("expedition: stacked relics of the same kind multiply (or add, for radii) i
 	eq(m.MutationChanceMult, 6, "3 x 2")
 	eq(m.VolatileRadiusBonus, 0.75, "0.5 + 0.25")
 	eq(m.MomentumPopsDelta, -3, "-2 + -1")
+end)
+
+test("schema: v6 saves migrate to v7 with expedition stats and keep every other stat", function()
+	local d = Schema.Migrate({ SchemaVersion = 6, Shards = 5, Stats = { TotalPops = 99, BestChain = 21, SeamsCleared = 3, TotalShards = 700 } })
+	eq(d.SchemaVersion, Schema.CURRENT_VERSION, "version")
+	eq(Schema.CURRENT_VERSION >= 7, true, "v7 exists")
+	eq(d.Stats.BestDepth, 0, "best depth defaults to 0")
+	eq(d.Stats.ExpeditionsWon, 0, "wins default to 0")
+	eq(d.Stats.TotalPops, 99, "existing stats kept")
+	eq(d.Stats.BestChain, 21, "existing stats kept")
+	eq(Schema.Default().Stats.BestDepth, 0, "new profiles start at 0")
+end)
+
+test("goals: expedition depth and wins are readable stats", function()
+	local d = serverData()
+	d.Stats.BestDepth, d.Stats.ExpeditionsWon = 6, 3
+	eq(Achievements.Value(d, "BestDepth"), 6, "depth")
+	eq(Achievements.Value(d, "ExpeditionsWon"), 3, "wins")
+	local seenDepth, seenWins = false, false
+	for _, def in AchCfg.Defs do
+		if def.Stat == "BestDepth" then seenDepth = true end
+		if def.Stat == "ExpeditionsWon" then seenWins = true end
+	end
+	eq(seenDepth and seenWins, true, "goals exist for both")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))
