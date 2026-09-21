@@ -11,10 +11,10 @@
 | Tier | Item | Type | What it does |
 |---|---|---|---|
 | Tiny | Neon Pink Blasts | Developer Product | Unlocks the Neon Pink blast color (cosmetic only) |
-| Tiny | Shard Pouch | Developer Product | +500 shards x areas unlocked |
-| Small | Shard Satchel | Developer Product | +2,500 x areas |
-| Medium | Shard Chest | Developer Product | +8,000 x areas |
-| Premium | Shard Vault | Developer Product | +30,000 x areas |
+| Tiny | Shard Pouch | Developer Product | +2,500 shards x areas unlocked |
+| Small | Shard Satchel | Developer Product | +12,500 x areas |
+| Medium | Shard Chest | Developer Product | +40,000 x areas |
+| Premium | Shard Vault | Developer Product | +150,000 x areas |
 | Permanent | 2x Shards | Gamepass | Doubles shards earned from blasting (payouts and clear bonus; not daily or cache rewards) |
 | Permanent | Prismatic Luck | Gamepass | Doubles the chance crystals spawn Prismatic (4% to 8%) |
 

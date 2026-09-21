@@ -5,7 +5,7 @@ The game is a walkable mine, not a single screen. Layout data and tests: `Config
 - **Blastwright Depot (hub):** spawn plaza with a beacon and signposts to each biome.
 - **Four biomes,** each with 4 blast pads and a landmark beacon, linked to the hub by lantern-lit roads: Glimmer Shallows (west, stratum 1), Prism Veins (east, stratum 2), Ember Hollows (north, stratum 3), Echo Caverns (south, stratum 4). You can walk into any biome at any time; you can only *blast* there once its stratum is unlocked in the Forge. Seeing where you are heading is part of the pull.
 - **Blast pads:** round cavern floors (34-stud radius) ringed by rocks and crystal clusters, open on the station side. Walk to a pad's station and use its prompt. The camera lifts to the fixed top-down view of that pad's grid and your movement locks; "Leave" (or X) returns to free roaming. A pad is reserved for you until you take another pad, leave the game, or wander more than 130 studs away for 60s.
-- **Geode caches:** 22 hidden caches (5 per biome, 2 near the hub) reward shards once per player (100 hub / 60 Shallows / 150 Prism / 400 Ember / 800 Echo). They sit off the roads, so exploring pays.
+- **Geode caches:** 22 hidden caches (5 per biome, 2 near the hub) reward shards once per player (500 hub / 300 Shallows / 750 Prism / 2,000 Ember / 4,000 Echo). They sit off the roads, so exploring pays.
 - **Terrain and look:** Roblox Terrain rock, cliffs, spires and mounds, glowing crystal clusters, lanterns, and drifting motes tinted by area.
 
 ## Daily objectives
@@ -21,7 +21,7 @@ Menu > Codex > Blast colors. Styles recolor your planting markers and your deton
 A "Longest Chains" board stands beside the hub spawn: the top 10 best chains across all players (names resolved from Roblox). Your best chain is queued after every volley and written at most every 30 seconds (only improvements are stored); the board refreshes every 90 seconds. It needs a published game with API access; otherwise it says it is unavailable and nothing else is affected. Ranking and text are pure, tested code (`Shared/Board.luau`); the DataStore part (`Server/Leaderboard.luau`) is best-effort and untested.
 
 ## Goals
-Menu > Goals lists permanent milestones (pops, chain records, seams cleared, shards earned, geode caches, Codex, Prismatic finds, areas unlocked) in three or so rising tiers each, 23 in total. Progress is derived from stats the save already keeps, so nothing extra is tracked; only "claimed" is stored. Each pays shards once (about 46,700 in total across all goals). Ready goals are listed first. The moment a goal becomes claimable a "Goal ready" toast appears (never for goals that were already done when you joined), and a dot on the Menu button plus a pulsing objective say one can be claimed. Adding a goal is one line in `Config/Achievements.luau`.
+Menu > Goals lists permanent milestones (pops, chain records, seams cleared, shards earned, geode caches, Codex, Prismatic finds, areas unlocked) in three or so rising tiers each, 23 in total. Progress is derived from stats the save already keeps, so nothing extra is tracked; only "claimed" is stored. Each pays shards once (about 233,500 in total across all goals). Ready goals are listed first. The moment a goal becomes claimable a "Goal ready" toast appears (never for goals that were already done when you joined), and a dot on the Menu button plus a pulsing objective say one can be claimed. Adding a goal is one line in `Config/Achievements.luau`.
 
 ## Guidance
 `Shared/Objectives.luau` (pure, tested) decides the next step: go to a blast pad, open the Forge for a first upgrade, earn shards for the next area, unlock it, then hunt caches. The client `Guide` shows it as an objective card, a gold floating marker with distance, a glowing dot trail on the ground, an edge-of-screen arrow when the target is off-view, and a pulsing Forge button. In blast mode a short hint says "Tap the grid to plant a charge" then "Press DETONATE" until the player has popped 40 crystals. New players get a welcome panel; the "?" button reopens it. Caches deliberately get no arrow.
@@ -50,7 +50,7 @@ The multiplier is applied in pop order, so hitting Resonite *before* the valuabl
 
 ## Charges (`Config/Charges.luau`)
 - **Blasting Cap:** radius blast (1.5 cells; Fat Fuse upgrade widens it).
-- **Shaft Charge:** whole column, 4 cells each way. Unlocked for 400 shards.
+- **Shaft Charge:** whole column, 4 cells each way. Unlocked for 2,000 shards.
 
 ## Chain tiers
 Rumble (5 pops, +10%), Cascade (10, +25%), Avalanche (20, +50%), Cataclysm (35, +100%).

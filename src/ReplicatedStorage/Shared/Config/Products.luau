@@ -10,10 +10,10 @@ export type CosmeticProduct = { Id: number?, Name: string, Description: string, 
 return {
 	-- Consumables (Developer Products). Amount is shards per stratum unlocked, so a pack stays worth buying later.
 	DeveloperProducts = {
-		ShardPouch = { Id = nil, Name = "Shard Pouch", Description = "A small pouch of shards.", Amount = 500 },
-		ShardSatchel = { Id = nil, Name = "Shard Satchel", Description = "A satchel of shards.", Amount = 2500 },
-		ShardChest = { Id = nil, Name = "Shard Chest", Description = "A heavy chest of shards.", Amount = 8000 },
-		ShardVault = { Id = nil, Name = "Shard Vault", Description = "A whole vault of shards.", Amount = 30000 },
+		ShardPouch = { Id = nil, Name = "Shard Pouch", Description = "A small pouch of shards.", Amount = 2500 },
+		ShardSatchel = { Id = nil, Name = "Shard Satchel", Description = "A satchel of shards.", Amount = 12500 },
+		ShardChest = { Id = nil, Name = "Shard Chest", Description = "A heavy chest of shards.", Amount = 40000 },
+		ShardVault = { Id = nil, Name = "Shard Vault", Description = "A whole vault of shards.", Amount = 150000 },
 	} :: { [string]: DeveloperProduct },
 	DeveloperProductOrder = { "ShardPouch", "ShardSatchel", "ShardChest", "ShardVault" },
 

@@ -337,6 +337,15 @@ local function snap(over)
 	return d
 end
 
+-- Prices come from the config so these tests survive any rebalance.
+local CHEAPEST_UPGRADE = math.huge
+for _, def in Upgrades.Defs do CHEAPEST_UPGRADE = math.min(CHEAPEST_UPGRADE, def.Costs[1]) end
+local AREA2_COST = Strata[2].Cost
+local function withCommas(n)
+	local out = tostring(n):reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	return (out:gsub("^,", ""))
+end
+
 test("objectives: brand-new player is sent to the nearest stratum-1 pad", function()
 	local o = Objectives.Roam(snap(), 0, 0, ocfg)
 	eq(o.Id, "GoBlast", "id")
@@ -350,10 +359,10 @@ test("objectives: brand-new player is sent to the nearest stratum-1 pad", functi
 end)
 
 test("objectives: affordable first upgrade highlights the Forge", function()
-	local o = Objectives.Roam(snap({ Shards = 150, Stats = { TotalPops = 12 } }), 0, 0, ocfg)
+	local o = Objectives.Roam(snap({ Shards = CHEAPEST_UPGRADE, Stats = { TotalPops = 12 } }), 0, 0, ocfg)
 	eq(o.Id, "FirstUpgrade", "id")
 	eq(o.Highlight, "Forge", "highlight")
-	local poor = Objectives.Roam(snap({ Shards = 149, Stats = { TotalPops = 12 } }), 0, 0, ocfg)
+	local poor = Objectives.Roam(snap({ Shards = CHEAPEST_UPGRADE - 1, Stats = { TotalPops = 12 } }), 0, 0, ocfg)
 	eq(poor.Id, "Earn", "cannot afford yet")
 end)
 
@@ -362,14 +371,14 @@ test("objectives: earning toward the next area points at a pad and names the are
 	eq(o.Id, "Earn", "id")
 	eq(o.Target ~= nil, true, "target")
 	eq(o.Text:find("Prism Veins", 1, true) ~= nil, true, "names next area")
-	eq(o.Text:find("900", 1, true) ~= nil, true, "1200 - 300 = 900 more")
+	eq(o.Text:find(withCommas(AREA2_COST - 300), 1, true) ~= nil, true, "shows how many more shards are needed")
 end)
 
 test("objectives: enough shards to unlock the next area highlights the Forge", function()
-	local o = Objectives.Roam(snap({ Shards = 1200, Upgrades = { ExtraCharge = 1 }, Stats = { TotalPops = 50 } }), 0, 0, ocfg)
+	local o = Objectives.Roam(snap({ Shards = AREA2_COST, Upgrades = { ExtraCharge = 1 }, Stats = { TotalPops = 50 } }), 0, 0, ocfg)
 	eq(o.Id, "UnlockArea", "id")
 	eq(o.Highlight, "Forge", "highlight")
-	eq(o.Text:find("1,200", 1, true) ~= nil, true, "thousands separator")
+	eq(o.Text:find(withCommas(AREA2_COST), 1, true) ~= nil, true, "thousands separator")
 end)
 
 test("objectives: everything unlocked falls back to exploring for caches", function()
@@ -1207,6 +1216,31 @@ test("settings: screen shake is a valid boolean setting, defaults on, and old sa
 	local old = Schema.Migrate({ SchemaVersion = 5, Settings = { Music = false, Sfx = true } })
 	eq(old.Settings.Shake, true, "an old save without the key gets the default")
 	eq(old.Settings.Music, false, "existing choices are kept")
+end)
+
+test("balance: one charge never clears the grid on average (planning matters) and chains still happen", function()
+	-- Measured with tools/sim/balance.luau after the rebalance: about 26%, 36%, 45%, 52% of the grid for areas 1 to 4.
+	-- Thresholds sit above that so ordinary tuning is fine, but bringing back supercritical chains (every charge
+	-- cascading across the whole grid, as with 18% Kindlequartz) fails here.
+	local ceiling = { 0.40, 0.50, 0.60, 0.66 }
+	local floor = { 0.12, 0.15, 0.18, 0.20 }
+	for stratum = 1, 4 do
+		local sum = 0
+		for seed = 1, 24 do
+			local g = Seam.Generate(Crystals, Tuning, stratum, seed * 31337 + 5)
+			local valuable = Seam.CountValuable(g, Crystals)
+			local best = 0
+			for z = 1, N do
+				for x = 1, N do
+					best = math.max(best, ChainSim.Run(g, { cap(x, z) }, ctx).Pops)
+				end
+			end
+			sum += best / valuable
+		end
+		local mean = sum / 24
+		if mean > ceiling[stratum] then error(("area %d: the best single charge pops %.0f%% of the grid on average (limit %.0f%%): chains are too easy"):format(stratum, mean * 100, ceiling[stratum] * 100)) end
+		if mean < floor[stratum] then error(("area %d: the best single charge pops only %.0f%% (floor %.0f%%): chains are too weak"):format(stratum, mean * 100, floor[stratum] * 100)) end
+	end
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

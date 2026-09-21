@@ -20,6 +20,6 @@ return {
 		{ Id = "Volleys", Kind = "Volleys", Targets = { 4, 8, 14 }, Text = "Detonate %d volleys" },
 	} :: { Template },
 	SlotCount = 3,
-	SlotRewards = { 120, 250, 450 }, -- shards by slot (difficulty), independent of which template was drawn
+	SlotRewards = { 600, 1250, 2250 }, -- shards by slot (difficulty), independent of which template was drawn
 	TierPops = 10,
 }

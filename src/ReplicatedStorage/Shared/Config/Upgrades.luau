@@ -11,25 +11,25 @@ local Defs: { [string]: UpgradeDef } = {
 	ExtraCharge = {
 		Name = "Deep Satchel",
 		Description = "+1 charge every seam.",
-		Costs = { 150, 500, 1500 },
+		Costs = { 750, 2500, 7500 },
 		PerLevel = 1,
 	},
 	BlastRadius = {
 		Name = "Fat Fuse",
 		Description = "Blasting Caps reach 0.5 cells further.",
-		Costs = { 250, 800, 2500 },
+		Costs = { 1200, 4000, 12000 },
 		PerLevel = 0.5,
 	},
 	Momentum = {
 		Name = "Momentum Coil",
 		Description = "A charge is refunded at a shorter chain (10 > 8 > 6).",
-		Costs = { 600, 2000 },
+		Costs = { 3000, 10000 },
 		PerLevel = 2,
 	},
 	Seismograph = {
 		Name = "Seismograph",
 		Description = "Preview the full chain, not just the direct hits.",
-		Costs = { 900 },
+		Costs = { 4500 },
 		PerLevel = 1,
 	},
 }

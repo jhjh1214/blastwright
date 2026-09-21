@@ -9,9 +9,9 @@
 | 5 Game feel | Hooks exist (VFX, shake, tiers); tuning needs playtest |
 | 6 Progression | Basic (upgrades, charges, strata, Codex) |
 | 7 World/content | Explorable mine built (hub, 4 biomes, 16 pads, 22 caches, terrain); **unseen in Studio** |
-| Retention | Daily objectives, weekly challenges and 24 goals (unseen in Studio) |
-| 8 Collection | Codex, 24 milestone Goals and 7 blast colors (unseen in Studio) |
-| 9 Economy | Paper math only |
+| Retention | Daily objectives, weekly challenges and 23 goals (unseen in Studio) |
+| 8 Collection | Codex, 23 milestone Goals and 7 blast colors (unseen in Studio) |
+| 9 Economy | Simulated with real rules (tools/sim); prices and crystal mix rebalanced from it; not playtested |
 | 10 Monetization | Framework built (products, ProcessReceipt, shop tab); **no IDs, never tested live** |
 | 11 UI polish | Blast HUD moved to screen corners; roam HUD separate; further polish pending |
 | 12 Audio/VFX polish | SFX, ambience and a shuffled classical music playlist wired (unheard); music/effects switches saved |

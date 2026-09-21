@@ -20,6 +20,6 @@ return {
 		{ Id = "Volleys", Kind = "Volleys", Targets = { 20, 45, 90 }, Text = "Detonate %d volleys this week" },
 	} :: { Template },
 	SlotCount = 3,
-	SlotRewards = { 600, 1400, 3000 },
+	SlotRewards = { 3000, 7000, 15000 },
 	TierPops = 10,
 }

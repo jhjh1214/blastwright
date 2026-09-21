@@ -33,7 +33,7 @@ local Defs: { [string]: CrystalDef } = {
 		Params = { Radius = 1.5 },
 		Color = { 255, 140, 50 },
 		Stratum = 1,
-		Weight = 20,
+		Weight = 7,
 	},
 	Resonite = {
 		Name = "Resonite",
@@ -44,7 +44,7 @@ local Defs: { [string]: CrystalDef } = {
 		Params = { MultAdd = 0.5 },
 		Color = { 190, 120, 255 },
 		Stratum = 1,
-		Weight = 8,
+		Weight = 10,
 	},
 	Lensglass = {
 		Name = "Lensglass",
@@ -55,7 +55,7 @@ local Defs: { [string]: CrystalDef } = {
 		Params = { Range = 5 },
 		Color = { 255, 240, 150 },
 		Stratum = 2,
-		Weight = 8,
+		Weight = 4,
 	},
 	Dreadgeode = {
 		Name = "Dreadgeode",
@@ -66,7 +66,7 @@ local Defs: { [string]: CrystalDef } = {
 		Params = { MultScale = 0.5 },
 		Color = { 220, 50, 80 },
 		Stratum = 2,
-		Weight = 10,
+		Weight = 14,
 	},
 	Slowburn = {
 		Name = "Slowburn",
@@ -77,7 +77,7 @@ local Defs: { [string]: CrystalDef } = {
 		Params = { Delay = 1.0, Radius = 2 },
 		Color = { 255, 80, 170 },
 		Stratum = 3,
-		Weight = 8,
+		Weight = 4,
 	},
 	Echostone = {
 		Name = "Echostone",
@@ -88,7 +88,7 @@ local Defs: { [string]: CrystalDef } = {
 		Params = { Radius = 1 },
 		Color = { 120, 255, 190 },
 		Stratum = 4,
-		Weight = 6,
+		Weight = 3,
 	},
 }
 

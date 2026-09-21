@@ -21,7 +21,7 @@ local Defs: { [string]: ChargeDef } = {
 		Description = "A vertical blast down the whole column, 4 cells each way.",
 		Shape = "Column",
 		Range = 4,
-		UnlockCost = 400,
+		UnlockCost = 2000,
 	},
 }
 

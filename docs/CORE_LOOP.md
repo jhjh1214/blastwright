@@ -13,8 +13,8 @@
 ## First 10 minutes
 - **0:00-0:30:** The player spawns on the hub plaza under a glowing beacon and reads the hint "Find a glowing blast pad". A short walk down the Glimmer Shallows road leads to the nearest pad; using its station lifts the camera over the grid ("Tap the cavern to plant a charge"). One tap, one Detonate: the first cascade.
 - **0:30-2:00:** First seam cleared. Shards pile up, Kindlequartz chains show what "volatile" means, and a toast says the clear bonus was earned.
-- **2:00-5:00:** First decision in the Forge: Deep Satchel (150), Fat Fuse (250) or saving for the Shaft Charge (400). Resonite teaches "amplifier before payload".
-- **5:00-10:00:** First milestone: Shaft Charge or the Seismograph (900), which changes how planning feels. Stratum 2 (1200) is the next goal.
+- **2:00-5:00:** First decision in the Forge: Deep Satchel (750) or Fat Fuse (1,200); the Shaft Charge (2,000) follows around minute 10. Resonite teaches "amplifier before payload".
+- **5:00-10:00:** First milestone: Shaft Charge, then the Seismograph (4,500, around minute 40), which changes how planning feels. Prism Veins (6,000, around minute 45) is the next goal.
 
 ## Untested
 The pacing above comes from the economy math in `ECONOMY.md`. It has **not** been playtested.
