@@ -356,18 +356,16 @@ local function contextFor(data: any, run: Expedition.Run?)
 	}
 end
 
--- The Expedition is over (banked, collapsed or won): drop back to normal blasting on the same pad after a short pause.
+-- The Expedition is over (banked, collapsed or won): the player leaves the pad (no normal seam follows).
 local function finishRun(player: Player, seam: SeamState)
 	if seam.Run then
 		seam.Run.Phase = "Ended"
 	end
 	seam.Run = nil
 	Remotes.RunState:FireClient(player, { Active = false })
-	task.delay(Tuning.SeamRegenDelay, function()
-		if seams[player] == seam and player.Parent then
-			startSeam(player)
-		end
-	end)
+	if seams[player] == seam then
+		releaseSite(player) -- frees the pad and tells the client to leave blast mode
+	end
 end
 
 local function award(data: any, amount: number)

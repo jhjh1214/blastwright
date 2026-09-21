@@ -65,7 +65,7 @@ Everything below was written without being run in Studio (the automated tests co
 - At any unlocked pad station a second prompt "Begin Expedition" (hold F) appears above "Start blasting". Holding it starts floor 1 of 8 on that pad; the HUD shows "EXPEDITION floor n / 8, Haul, Relics" under the shard counter.
 - Blast a floor. Shards do NOT go up while diving (they build the Haul). When charges run out or the grid is clear, a full-screen choice appears with three cards (route + relic) and a "Bank N shards & leave" button.
 - Each card changes the next floor: Steady Vein +1 charge, Rich Vein x2 payouts but -1 charge, Rest Stop full refill; the relic (e.g. Resonant Core, Echo Chamber) should visibly change chain results and the planning preview should match the real payout.
-- Bank: shards jump by haul x (1 + 0.15 x floors cleared) and you return to a normal seam. Collapse (under half cleared and no charges): only 40% of the haul, toast "The tunnel collapsed". Clear floor 8: x1.5 bonus and the "Expedition complete" toast.
+- Bank: shards jump by haul x (1 + 0.15 x floors cleared) and you leave the pad (blast mode ends). Collapse (under half cleared and no charges): only 40% of the haul, toast "The tunnel collapsed". Clear floor 8: x1.5 bonus and the "Expedition complete" toast.
 - Goals "Deep Diver" (depth) and "Expedition wins" progress. Tapping the grid or detonating while the cards show must do nothing. Using a different pad or "Start blasting" mid-run says "Finish or bank your expedition first."
 - Known: leaving the pad mid-run forfeits the unbanked haul (idle release).
 
