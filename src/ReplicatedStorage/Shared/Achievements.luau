@@ -30,6 +30,8 @@ function Achievements.Value(data: any, stat: string): number
 		return data.Stats.ExpeditionsWon
 	elseif stat == "LurkersSlain" then
 		return data.Stats.LurkersSlain
+	elseif stat == "BossesSlain" then
+		return data.Stats.BossesSlain
 	elseif stat == "Strata" then
 		return data.Progress.StrataUnlocked
 	elseif stat == "Codex" then

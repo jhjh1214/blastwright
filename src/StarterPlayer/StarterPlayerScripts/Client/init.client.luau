@@ -20,6 +20,8 @@ local Playback = require(script.Playback)
 local Preview = require(script.Preview)
 local State = require(script.State)
 local UI = require(script.UI)
+local VFX = require(script.VFX)
+local Geometry = require(Shared.Geometry)
 
 -- Optional presentation systems: a failure in one of these warns and the game still starts.
 local function optional(name, start)
@@ -78,6 +80,23 @@ Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
 		CavernView.Eat(view, e.X, e.Z)
 	end
 	CavernView.SetMonster(view, turn.Monster)
+	CavernView.SetBoss(view, turn.Boss)
+	if turn.BossSlain then
+		-- FINAL BLAST: the arena erupts.
+		local core = Geometry.CellPosition(view.Origin, 5, 5) + Vector3.new(0, 4, 0)
+		for i = 1, 6 do
+			task.delay(i * 0.12, function()
+				VFX.Burst(core + Vector3.new(math.random(-8, 8), math.random(0, 6), math.random(-8, 8)), Color3.fromRGB(255, 200 - i * 20, 90), 30, 40)
+				VFX.Ring(view.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(255, 205, 90), view.Extent * (0.6 + i * 0.25), 0.9)
+			end)
+		end
+		UI.ShowTier("Boss defeated")
+		CameraFeedback.Shake(2)
+		CameraFeedback.Punch(10)
+	elseif turn.PhaseChanged then
+		UI.ShowTier(turn.PhaseChanged .. " phase")
+		CameraFeedback.Punch(5)
+	end
 	if turn.Emerged or turn.Slain or turn.HeartsLost or #turn.Eaten > 0 then
 		CameraFeedback.Shake(turn.HeartsLost and 1.4 or 0.8)
 	end
@@ -86,6 +105,14 @@ end)
 Remotes.Community.OnClientEvent:Connect(function(view)
 	State.Community, State.CommunityAt = view, os.clock()
 	UI.SetCommunity(view, State.CommunityAt)
+end)
+
+Remotes.Sync.OnClientEvent:Connect(function(snapshot)
+	-- The boss markers (armor nodes, weak points, marked attack cells) follow the server's snapshot.
+	local view = CavernView.Get(localPlayer.UserId)
+	if view then
+		CavernView.SetBoss(view, snapshot.Boss)
+	end
 end)
 
 Remotes.SeamRemove.OnClientEvent:Connect(function(userId)

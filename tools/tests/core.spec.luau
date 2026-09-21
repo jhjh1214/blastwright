@@ -752,7 +752,7 @@ local function serverData(over)
 end
 
 test("goals: config is valid, unique, increasing within a stat, and reachable", function()
-	local KNOWN = { TotalPops = true, BestChain = true, SeamsCleared = true, TotalShards = true, Caches = true, Codex = true, Prismatic = true, Strata = true, BestDepth = true, ExpeditionsWon = true, LurkersSlain = true }
+	local KNOWN = { TotalPops = true, BestChain = true, SeamsCleared = true, TotalShards = true, Caches = true, Codex = true, Prismatic = true, Strata = true, BestDepth = true, ExpeditionsWon = true, LurkersSlain = true, BossesSlain = true }
 	local valued = 0
 	for _, def in Crystals.Defs do if def.Value > 0 then valued += 1 end end
 	local limit = {
@@ -2157,7 +2157,7 @@ test("schema: v9 saves migrate to v10 with a slain counter and keep every other 
 	eq(d.Stats.LurkersSlain, 0, "slain defaults to 0")
 	eq(d.Stats.TotalPops, 50, "existing stat kept")
 	eq(d.Stats.BestDepth, 4, "existing stat kept")
-	eq(Schema.CURRENT_VERSION, 10, "version")
+	eq(Schema.CURRENT_VERSION >= 10, true, "version")
 	eq(Schema.Default().Stats.LurkersSlain, 0, "new profiles start at 0")
 end)
 
@@ -2276,7 +2276,7 @@ test("boss: HP thresholds move it through weak, enrage and finisher, refunding a
 	eq(#b.Weak, TitanDef.Weak.Count, "weak points chosen")
 	b.Phase = "Weak"
 	b.Weak = { { X = 1, Z = 1 }, { X = 9, Z = 9 } }
-	setHP(TitanDef.WeakEnd)
+	b.HP = math.floor(b.MaxHP * TitanDef.WeakEnd) + TitanDef.Weak.One -- lands exactly on the threshold
 	Boss.Apply(b, {}, fakeResult(1, { { X = 1, Z = 1 } }), bctx, BossCfg, 1, g, lcg(1)) -- one weak point hit
 	eq(b.Phase, "Enrage", "into enrage")
 	eq(#b.Weak, 0, "weak points gone outside their phase")
@@ -2339,18 +2339,28 @@ test("boss: the finisher needs one big chain or Critical power; failing heals it
 	eq(Boss.Apply(b2, {}, fakeResult(2, {}), bctx, BossCfg, 2, fullGrid(), lcg(1)).Killed, true, "Critical Mass power also finishes it")
 end)
 
+local function markAttack(b, g, seed)
+	local turns = 0
+	repeat
+		local o = Boss.Act(b, g, bctx, BossCfg, false, lcg(seed + turns))
+		turns += 1
+		if o.HeartsLost > 0 then error("an attack landed before one was marked") end
+	until #b.Telegraph > 0 or turns > 6
+	return turns
+end
+
 test("boss: an attack is telegraphed a turn ahead, then lands: it wrecks crystals on the line and costs a heart", function()
 	local g = fullGrid()
 	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
 	b.Phase, b.Nodes = "Attack", {}
-	local first = Boss.Act(b, g, bctx, BossCfg, false, lcg(21))
-	eq(first.HeartsLost, 0, "nothing lands on the first turn")
+	local turns = markAttack(b, g, 21)
+	eq(turns, TitanDef.AttackEvery, "the attack phase marks a line every AttackEvery turns")
 	eq(#b.Telegraph, N, "one full line is marked")
 	local marked = {}
 	for _, c in b.Telegraph do marked[#marked + 1] = { X = c.X, Z = c.Z } end
-	local second = Boss.Act(b, g, bctx, BossCfg, false, lcg(22))
-	eq(second.HeartsLost, 1, "the marked line hits")
-	eq(#second.Hit, N, "the whole line")
+	local o = Boss.Act(b, g, bctx, BossCfg, false, lcg(99))
+	eq(o.HeartsLost, 1, "the marked line hits")
+	eq(#o.Hit, N, "the whole line")
 	for _, c in marked do eq(g.Cells[ChainSim.Key(N, c.X, c.Z)], nil, "line crystals destroyed") end
 end)
 
@@ -2358,16 +2368,45 @@ test("boss: a dodge cancels the heart loss, still wrecks the line, and goes on c
 	local g = fullGrid()
 	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
 	b.Phase, b.Nodes = "Attack", {}
-	Boss.Act(b, g, bctx, BossCfg, false, lcg(21))
+	markAttack(b, g, 21)
 	eq(Boss.CanDodge(b), true, "ready while an attack is marked")
 	local o = Boss.Act(b, g, bctx, BossCfg, true, lcg(22))
 	eq(o.Dodged, true, "dodged")
 	eq(o.HeartsLost, 0, "no heart lost")
+	eq(#o.Eaten > 0, true, "the line is still wrecked")
 	eq(b.DodgeCooldown, TitanDef.Dodge.Cooldown, "cooldown starts")
 	eq(Boss.CanDodge(b), false, "not ready")
-	Boss.Act(b, g, bctx, BossCfg, false, lcg(23))
-	Boss.Act(b, g, bctx, BossCfg, false, lcg(24))
+	for i = 1, TitanDef.Dodge.Cooldown do Boss.Act(b, g, bctx, BossCfg, false, lcg(30 + i)) end
 	eq(b.DodgeCooldown, 0, "cooldown runs down")
+end)
+
+test("boss: popping enough crystals on the marked line cuts the attack: no damage, nothing wrecked, no dodge spent", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes = "Attack", {}
+	markAttack(b, g, 21)
+	local events = {}
+	for i = 1, TitanDef.CutPops do events[i] = { X = b.Telegraph[i].X, Z = b.Telegraph[i].Z } end
+	eq(Boss.Cut(b, { Events = events }, BossCfg), true, "enough pops on the line")
+	local fewer = {}
+	for i = 1, TitanDef.CutPops - 1 do fewer[i] = events[i] end
+	eq(Boss.Cut(b, { Events = fewer }, BossCfg), false, "one short")
+	local off = {}
+	for z = 1, N do
+		for x = 1, N do
+			local onLine = false
+			for _, c in b.Telegraph do if c.X == x and c.Z == z then onLine = true end end
+			if not onLine and #off < TitanDef.CutPops + 2 then off[#off + 1] = { X = x, Z = z } end
+		end
+	end
+	eq(Boss.Cut(b, { Events = off }, BossCfg), false, "pops off the line (even in its row or column neighbours) do not count")
+	local o = Boss.Act(b, g, bctx, BossCfg, true, lcg(50), true)
+	eq(o.Cut, true, "cut")
+	eq(o.HeartsLost, 0, "no damage")
+	eq(#o.Eaten, 0, "nothing wrecked")
+	eq(b.DodgeCooldown, 0, "the dodge was not spent")
+	local quiet = Boss.New("Titan", fullGrid(), bctx, BossCfg, lcg(3))
+	eq(Boss.Cut(quiet, { Events = events }, BossCfg), false, "nothing marked, nothing to cut")
 end)
 
 test("boss: armor phase does not attack; enrage marks two lines", function()
@@ -2477,6 +2516,14 @@ test("boss: weak points avoid a crystal-filled core and still appear when crysta
 	b2.HP = math.floor(b2.MaxHP * TitanDef.AttackEnd) + 1
 	Boss.Apply(b2, { cap(5, 5) }, fakeResult(4, {}), bctx, BossCfg, 1, sparse, lcg(9))
 	eq(#b2.Weak, 2, "both points found even though they are adjacent")
+end)
+
+test("schema: v10 saves migrate to v11 with a bosses counter and keep every other stat", function()
+	local d = Schema.Migrate({ SchemaVersion = 10, Stats = { LurkersSlain = 7, TotalPops = 20 } })
+	eq(d.Stats.BossesSlain, 0, "defaults to 0")
+	eq(d.Stats.LurkersSlain, 7, "existing stat kept")
+	eq(d.Stats.TotalPops, 20, "existing stat kept")
+	eq(Schema.CURRENT_VERSION, 11, "version")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

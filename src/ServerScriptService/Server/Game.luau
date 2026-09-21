@@ -19,6 +19,8 @@ local Expedition = require(Shared.Expedition)
 local Puzzle = require(Shared.Puzzle)
 local Farm = require(Shared.Farm)
 local Lurker = require(Shared.Lurker)
+local Power = require(Shared.Power)
+local Boss = require(Shared.Boss)
 local Data = require(script.Parent.Data)
 local Leaderboard = require(script.Parent.Leaderboard)
 local Purchases = require(script.Parent.Purchases)
@@ -43,6 +45,8 @@ local ExpeditionConfig = Config.Expedition
 local PuzzleConfig = Config.Puzzle
 local FarmConfig = Config.Farm
 local LurkerConfig = Config.Lurkers
+local BossConfig = Config.Bosses
+local PowerConfig = Config.Bosses.Power
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -69,6 +73,10 @@ type SeamState = {
 	Hidden: { Kind: string, X: number, Z: number }?, -- a Lurker hiding under a crystal: SECRET, never sent to clients
 	Monster: Lurker.Monster?, -- an awake Lurker on the grid
 	Defeated: boolean?, -- the rig was knocked out
+	Boss: Boss.State?, -- an Expedition boss fight (the floor is the arena)
+	BossDefeated: boolean?,
+	Critical: number, -- volleys of CRITICAL MASS left
+	DodgeArmed: boolean?, -- the player pressed Dodge: the next volley's marked attack will not hurt
 }
 
 local Game = {}
@@ -198,6 +206,9 @@ local function snapshot(player: Player): { [string]: any }?
 		ChargesLeft = seam and seam.Charges or 0,
 		ChargesMax = seam and seam.ChargesMax or 0,
 		Hearts = seam and seam.Hearts or 0,
+		Critical = seam and seam.Critical or 0,
+		DodgeArmed = seam and seam.DodgeArmed or false,
+		Boss = seam and seam.Boss and Boss.View(seam.Boss, BossConfig) or nil,
 		HeartsMax = LurkerConfig.Hearts,
 		Monster = seam and seam.Monster and (function()
 			local m = seam.Monster
@@ -336,7 +347,18 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 	else
 		seam.Hearts = LurkerConfig.Hearts
 	end
-	if not puzzle and runRandom:NextNumber() < Lurker.SpawnChance(stratum, run and run.Floor or 0, LurkerConfig) then
+	seam.Critical = 0
+	local bossKind = run and BossConfig.BossFloors[run.Floor]
+	if bossKind then
+		seam.Boss = Boss.New(bossKind, grid, { Crystals = Config.Context.Crystals }, BossConfig, runRng)
+		seam.Valuable = Seam.CountValuable(grid, Crystals) -- the core was cleared
+		seam.Charges = math.max(seam.Charges, run.StartCharges) -- a boss fight always starts with a full rig
+		seam.ChargesMax = math.max(seam.ChargesMax, run.StartCharges)
+		task.defer(function()
+			notify(player, ("BOSS: %s! %s"):format(BossConfig.Defs[bossKind].Name, BossConfig.Defs[bossKind].Description), "Error")
+		end)
+	end
+	if not puzzle and not bossKind and runRandom:NextNumber() < Lurker.SpawnChance(stratum, run and run.Floor or 0, LurkerConfig) then
 		seam.Hidden = Lurker.Hide(grid, { Crystals = Config.Context.Crystals }, Lurker.PickKind(stratum, runRandom:NextNumber(), LurkerConfig), runRandom:NextNumber())
 	end
 	seams[player] = seam
@@ -444,11 +466,13 @@ local function endFloor(player: Player, seam: SeamState)
 		return
 	end
 	local fraction = seam.Valuable > 0 and seam.Popped / seam.Valuable or 1
-	if seam.Defeated then
-		fraction = 0 -- a knocked-out rig collapses the run
+	if seam.BossDefeated then
+		fraction = 1
+	elseif seam.Defeated or seam.Boss then
+		fraction = 0 -- a knocked-out rig, or a boss still standing when the charges run out, collapses the run
 	end
 	run.Hearts = seam.Hearts
-	local outcome = Expedition.FloorEnded(run, seam.Earned, fraction, seam.Defeated and 0 or seam.Charges, runRng, ExpeditionConfig)
+	local outcome = Expedition.FloorEnded(run, seam.Earned, fraction, (seam.Defeated or seam.Boss) and 0 or seam.Charges, runRng, ExpeditionConfig)
 	data.Stats.BestDepth = math.max(data.Stats.BestDepth, run.Floor)
 
 	if outcome == "Choose" then
@@ -504,7 +528,7 @@ end
 
 -- After a volley has played out: wake a hidden Lurker whose crystal popped, hurt the awake one, then let it act.
 -- Everything is decided here on the server; the client only receives the outcome (MonsterTurn).
-local function resolveMonster(player: Player, seam: SeamState, volley: any, result: any)
+local function resolveMonster(player: Player, seam: SeamState, volley: any, result: any, power: number)
 	local data = Data.Get(player)
 	if not data or (not seam.Hidden and not seam.Monster) then
 		return
@@ -521,6 +545,9 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 	elseif seam.Monster then
 		local m = seam.Monster
 		local damage = Lurker.Damage(m, volley, result, mctx, LurkerConfig)
+		if damage > 0 then
+			damage = math.max(1, math.floor(damage * power)) -- better chains hit harder
+		end
 		turn.Damage = damage
 		if not Lurker.Hit(m, damage) then
 			local bounty = Lurker.Bounty(m.Kind, LurkerConfig)
@@ -561,6 +588,71 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 	turn.Hearts = seam.Hearts
 	turn.Monster = seam.Monster and { Kind = seam.Monster.Kind, X = seam.Monster.X, Z = seam.Monster.Z, HP = seam.Monster.HP, MaxHP = seam.Monster.MaxHP, Warn = Lurker.Telegraph(seam.Monster, LurkerConfig) } or nil
 	Remotes.MonsterTurn:FireClient(player, turn)
+	sync(player)
+end
+
+-- After a volley has played out on a boss floor: hurt the boss (phase rules), then let it attack.
+local function resolveBoss(player: Player, seam: SeamState, volley: any, result: any, power: number)
+	local data = Data.Get(player)
+	local boss = seam.Boss
+	if not data or not boss then
+		return
+	end
+	local mctx = { Crystals = Config.Context.Crystals, Charges = Config.Context.Charges, BlastCells = ChainSim.BlastCells, Size = seam.Grid.Size }
+	local turn = { UserId = player.UserId, Eaten = {}, Hearts = seam.Hearts }
+	local out = Boss.Apply(boss, volley, result, mctx, BossConfig, power, seam.Grid, runRng)
+	turn.BossDamage = out.Damage
+	if out.NodesBroken > 0 then
+		notify(player, ("Armor node broken! %d left."):format(#boss.Nodes), "Reward")
+	end
+	if out.Killed then
+		local def = BossConfig.Defs[boss.Kind]
+		seam.Earned += def.Bounty
+		seam.BossDefeated = true
+		seam.Boss = nil
+		data.Stats.BossesSlain += 1
+		turn.BossSlain = true
+		notify(player, ("%s DEFEATED! +%d shards to the haul"):format(def.Name, def.Bounty), "Reward")
+		announceGoals(player)
+	else
+		if out.PhaseChanged then
+			seam.Charges = math.min(seam.ChargesMax, seam.Charges + out.Refund)
+			turn.PhaseChanged = boss.Phase
+			notify(player, ("PHASE: %s (+%d charge)"):format(string.upper(boss.Phase), out.Refund), "Reward")
+		end
+		local act = Boss.Act(boss, seam.Grid, mctx, BossConfig, seam.DodgeArmed == true, runRng)
+		seam.DodgeArmed = false
+		for _, e in act.Eaten do
+			table.insert(turn.Eaten, { X = e.X, Z = e.Z })
+		end
+		if act.Dodged then
+			notify(player, "Dodged!", "Reward")
+			turn.Dodged = true
+		elseif act.HeartsLost > 0 then
+			seam.Hearts = math.max(0, seam.Hearts - act.HeartsLost)
+			turn.HeartsLost = act.HeartsLost
+			notify(player, ("The Titan's slam hit your rig! Hearts left: %d"):format(seam.Hearts), "Error")
+			if seam.Hearts <= 0 then
+				seam.Defeated = true
+			end
+		end
+	end
+	turn.Hearts = seam.Hearts
+	turn.Boss = seam.Boss and Boss.View(seam.Boss, BossConfig) or nil
+	Remotes.MonsterTurn:FireClient(player, turn)
+	sync(player)
+end
+
+-- The player pressed Dodge: it protects against the attack the boss has marked, when the volley after this resolves.
+local function onDodge(player: Player)
+	local seam = seams[player]
+	if not seam or not seam.Boss or seam.InFlight or seam.DodgeArmed then
+		return
+	end
+	if not Boss.CanDodge(seam.Boss) then
+		return notify(player, "Nothing to dodge yet (or your dodge is recharging).", "Info")
+	end
+	seam.DodgeArmed = true
 	sync(player)
 end
 
@@ -634,6 +726,12 @@ local function onDetonate(player: Player, payload: any)
 		end
 	end
 	local multiplier = (Purchases.Owns(player, "DoubleShards") and 2 or 1) * Events.Combine(activeEvents()).ShardMult * Community.Mult(goal, os.clock(), CommunityConfig)
+	local power, powerName = Power.Multiplier(result.Pops, seam.Critical, PowerConfig), select(2, Power.Tier(result.Pops, PowerConfig))
+	if seam.Critical > 0 then
+		multiplier *= PowerConfig.CriticalPayout
+	end
+	local criticalLeft, criticalStarted = Power.Advance(seam.Critical, result.Pops, PowerConfig)
+	seam.Critical = criticalLeft
 	local payout = math.floor(result.Total * multiplier + 0.5)
 	seam.Popped += valuablePops
 	seam.Earned += payout
@@ -673,6 +771,9 @@ local function onDetonate(player: Player, payload: any)
 		Tier = result.Tier,
 		Duration = result.Duration,
 		Momentum = result.Momentum,
+		PowerName = powerName,
+		Critical = criticalLeft,
+		CriticalStarted = criticalStarted,
 	})
 	sync(player)
 
@@ -680,10 +781,14 @@ local function onDetonate(player: Player, payload: any)
 		if seams[player] ~= seam then
 			return
 		end
-		resolveMonster(player, seam, volley, result)
+		resolveMonster(player, seam, volley, result, power)
+		resolveBoss(player, seam, volley, result, power)
 		seam.InFlight = false
 		local remaining = Seam.CountValuable(seam.Grid, Crystals)
-		if seam.Defeated or seam.Charges <= 0 or (remaining == 0 and not seam.Monster) then
+		if seam.Boss and remaining == 0 then
+			seam.Charges = 0 -- nothing left to chain: the fight is lost
+		end
+		if seam.Defeated or seam.BossDefeated or seam.Charges <= 0 or (remaining == 0 and not seam.Monster and not seam.Boss) then
 			endSeam(player, seam)
 		else
 			sync(player)
@@ -1146,6 +1251,7 @@ function Game.Init()
 	Remotes.Equip.OnServerEvent:Connect(guarded("Equip", 5, 8, onEquip))
 	Remotes.Setting.OnServerEvent:Connect(guarded("Setting", 5, 8, onSetting))
 	Remotes.RunPick.OnServerEvent:Connect(guarded("RunPick", 5, 8, onRunPick))
+	Remotes.Dodge.OnServerEvent:Connect(guarded("Dodge", 4, 6, onDodge))
 	Remotes.FarmAction.OnServerEvent:Connect(guarded("FarmAction", 3, 5, onFarmAction))
 	Remotes.PuzzleStart.OnServerEvent:Connect(guarded("PuzzleStart", 2, 3, onPuzzleStart))
 	optional("Purchases", function()

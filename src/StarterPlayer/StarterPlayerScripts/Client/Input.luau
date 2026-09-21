@@ -113,6 +113,8 @@ function Input.Init()
 			clear()
 		elseif State.Engaged and input.KeyCode == Enum.KeyCode.X then
 			Blasting.Leave()
+		elseif State.Engaged and input.KeyCode == Enum.KeyCode.Q and State.Data and State.Data.Boss then
+			Remotes.Dodge:FireServer()
 		end
 	end)
 

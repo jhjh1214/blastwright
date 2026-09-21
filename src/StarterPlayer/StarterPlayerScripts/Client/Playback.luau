@@ -112,7 +112,12 @@ local function step()
 			if run.Own then
 				State.Busy = false
 				UI.SetChain(0, 1)
-				if run.Result.Tier then
+				if run.Result.CriticalStarted then
+					UI.ShowTier("Critical Mass")
+					CameraFeedback.Shake(1.4)
+					CameraFeedback.Punch(9)
+					VFX.Ring(run.View.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(255, 150, 40), run.View.Extent * 1.8, 0.9)
+				elseif run.Result.Tier then
 					UI.ShowTier(run.Result.Tier, run.Result.Bonus, run.Result.Total)
 					CameraFeedback.Shake(0.9)
 					CameraFeedback.Punch(6)

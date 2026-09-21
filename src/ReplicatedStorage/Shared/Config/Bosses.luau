@@ -21,7 +21,8 @@ return {
 		Titan = {
 			Name = "Crystal Titan",
 			Description = "A colossus grown into the mine. Break its armor nodes, then out-chain it.",
-			MaxHP = 60,
+			MaxHP = 30,
+			Bounty = 6000, -- shards added to the haul when it falls
 			Core = { X = 5, Z = 5 }, -- the 3x3 body in the middle of the grid; charges must reach it
 			Nodes = 4, -- armor nodes (crystals) that must be popped in phase 1
 			ArmorBreakDamage = 6,
@@ -36,6 +37,8 @@ return {
 			Weak = { Count = 2, MinDist = 4, One = 8, Both = 24, PopsPerMiss = 6 }, -- weak-point phase damage
 			Finisher = { Pops = 12, Tries = 3, HealOnFail = 4 }, -- one big chain (or Critical Mass) ends it
 			Dodge = { Cooldown = 2 }, -- volleys before the dodge is ready again
+			AttackEvery = 2, -- the attack phase marks a line every this many turns (enrage: every turn)
+			CutPops = 3, -- popping this many crystals on the marked cells cuts the attack (no damage, no dodge used)
 			EnrageLines = 2, -- telegraphed attack lines in the enrage phase
 			PhaseRefund = 1, -- charges refunded when a phase is broken
 		},

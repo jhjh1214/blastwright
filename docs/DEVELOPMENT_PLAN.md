@@ -26,3 +26,16 @@
 1. Developer confirms audio (`[Audio] ... OK` in Output), listens, and gives feel feedback; fix what breaks.
 2. Asset workflow for crystal/environment visuals, then music/ambience.
 3. Tune the economy from real play data.
+
+## Direction (developer brief, 2026-09-21): fun first, then retention, then monetization
+North star: the crystal system IS the combat system. Priority order: (1) moment-to-moment fun, (2) combat built from crystal mechanics, (3) one excellent boss, (4) replayable Expeditions, (5) progression, (6) collection and social flex, (7) monetization around things players already want, (8) content volume.
+
+Status against that order:
+- 1-2 done as a first slice (unseen in Studio): Lurkers, chain power tiers, CRITICAL MASS, hearts and stakes.
+- 3 done as a grid fight: Crystal Titan (floors 4 and 8). Real-time arena and boss music are not built.
+- 4 next: Expedition room types (mining, combat, elite, treasure, event, heal, challenge, mini-boss, boss), Safe/Greed/Chaos/Relic path choices, relic families (Echo, Explosion, Beam, Risk, Combo) with rule-changing effects instead of +%.
+- 5-6 next: boss mastery objectives and trophies, Codex for enemies/bosses/relics, titles, visible cosmetics, hub showcase.
+- 7 after the loop is proven: product ladder (5-25, 49-99, 149-299, 399-799, 999+ Robux), cosmetic-first shop, bundles, Club subscription, all via the existing ProcessReceipt path with IDs left nil until the developer creates them. Never gate core play; no purchase prompts mid-run.
+- 8 last: live events and rotating modifiers (the Events config already supports the architecture), shared boss events.
+
+Rule for every step: prove it is fun with a test or a sim first, then widen. Do not build 30 enemies or 200 relics before the loop is proven.

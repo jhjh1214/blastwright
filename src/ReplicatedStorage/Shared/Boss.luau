@@ -245,34 +245,56 @@ end
 
 -- The boss's turn. The attack telegraphed LAST turn lands now (unless dodged), destroying the crystals on it; then it
 -- telegraphs the next one. Returns { Hit = { cells }, HeartsLost, Dodged, Eaten = { cells } }.
-function Boss.Act(state: State, grid: any, ctx: any, cfg: any, dodged: boolean, rng: () -> number)
+-- True when the volley popped enough crystals on the marked cells to cut the attack before it lands.
+function Boss.Cut(state: State, result: any, cfg: any): boolean
 	local def = cfg.Defs[state.Kind]
-	local out = { Hit = {}, HeartsLost = 0, Dodged = false, Eaten = {} }
+	if #state.Telegraph == 0 then
+		return false
+	end
+	local n = 0
+	for _, ev in result.Events do
+		for _, c in state.Telegraph do
+			if c.X == ev.X and c.Z == ev.Z then
+				n += 1
+				break
+			end
+		end
+	end
+	return n >= def.CutPops
+end
+
+function Boss.Act(state: State, grid: any, ctx: any, cfg: any, dodged: boolean, rng: () -> number, cut: boolean?)
+	local def = cfg.Defs[state.Kind]
+	local out = { Hit = {}, HeartsLost = 0, Dodged = false, Cut = false, Eaten = {} }
 	state.Turn += 1
 	state.DodgeCooldown = math.max(0, state.DodgeCooldown - 1)
 
 	if #state.Telegraph > 0 then
 		out.Hit = state.Telegraph
-		for _, c in state.Telegraph do
-			local k = key(grid.Size, c.X, c.Z)
-			if grid.Cells[k] then
-				grid.Cells[k] = nil
-				table.insert(out.Eaten, { X = c.X, Z = c.Z })
+		if cut then
+			out.Cut = true -- the player's chain broke the attack apart
+		else
+			for _, c in state.Telegraph do
+				local k = key(grid.Size, c.X, c.Z)
+				if grid.Cells[k] then
+					grid.Cells[k] = nil
+					table.insert(out.Eaten, { X = c.X, Z = c.Z })
+				end
+			end
+			if dodged then
+				out.Dodged = true
+			else
+				out.HeartsLost = 1
 			end
 		end
-		if dodged then
-			out.Dodged = true
-		else
-			out.HeartsLost = 1
-		end
 	end
-	if dodged then
+	if dodged and not cut then
 		state.DodgeCooldown = def.Dodge.Cooldown
 	end
 
 	state.Telegraph = {}
 	local lines = 0
-	if state.Phase == "Attack" then
+	if state.Phase == "Attack" and state.Turn % def.AttackEvery == 0 then
 		lines = 1
 	elseif state.Phase == "Enrage" then
 		lines = def.EnrageLines

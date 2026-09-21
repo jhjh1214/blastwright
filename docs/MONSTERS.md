@@ -19,7 +19,20 @@ Why: the game was "blast, collect, repeat" with no way to lose. Lurkers add dang
 ## Built now (grid fights, stage 1)
 Pure rules in `Shared/Lurker.luau` (unit-tested and mutation-checked), server in `Game.luau` (`resolveMonster`), client: monster body with name and health bar (`CavernView.SetMonster`), rig hearts and monster line in the blast HUD, `MonsterTurn` remote for eaten crystals and camera shake. Only the owner of the seam sees their monster.
 
-## Not built yet (stage 2: boss arena, chosen by the developer)
+## Chain power and CRITICAL MASS (built)
+Better chains hit monsters and bosses harder (`Shared/Power.luau`, `Config/Bosses.Power`): 6+ pops x1.25 (Strong), 10+ x1.5 (Overcharge), 15+ x2 (Critical). A 15+ pop chain also starts **CRITICAL MASS** for the next 2 volleys: x1.5 damage and x1.25 shards, with a banner, camera punch and a HUD counter. It is earned by play, never sold.
+
+## Boss: the Crystal Titan (built as a grid fight, floors 4 and 8 of an Expedition)
+Pure phase machine in `Shared/Boss.luau`; numbers in `Config/Bosses.luau`. The 3x3 middle of the grid is the Titan's body. Phases, each with its own puzzle:
+1. **ARMOR**: it takes no damage. Pop the 4 glowing gold armor nodes (crystals on the grid). Breaking the last one hurts it and refunds a charge.
+2. **ATTACK**: hit the core (charges whose blast reaches it, crystals popping near it, long chains). Every 2nd turn it MARKS a row or column in red; the turn after, the slam lands (destroys the crystals on it and costs a rig heart). Defences: pop 3+ crystals on the marked line to CUT the attack (no cost), or press Dodge (Q / button, 2-volley cooldown), which saves the heart but not the crystals.
+3. **WEAK POINTS** (HP 65%): two magenta weak points appear on far-apart crystals. One hit is good, chaining through BOTH is massive (x3).
+4. **ENRAGE** (HP 35%): two lines marked every turn.
+5. **FINISHER** (HP 15%): one chain of 12+ pops, or any Critical-power volley, ends it. A failed try heals it a little.
+Each phase change refunds a charge. Defeat = the Expedition collapses; victory pays a 6,000 shard bounty into the haul, the "Titan Slayer" goals, and a FINAL BLAST (bursts, rings, camera punch).
+Balance evidence (`tools/sim/boss.luau`, greedy one-charge bot, no planning): at 30 HP it wins about 33% with Basic charges only and about 68% with all charges; humans who plan multi-charge volleys should do better. At 60 HP it won 2-4%, so HP was cut.
+
+## Not built yet (stage 2: real-time boss arena)
 Expedition bosses (floors 4 and 8) pull the player into a small real-time arena inside the seam. Needs its own design pass (movement, dodging, throwing/planting explosives live, boss telegraphs, server-side hit validation). Nothing of it exists yet. The grid Lurkers do not depend on it.
 
 ## Numbers are placeholders

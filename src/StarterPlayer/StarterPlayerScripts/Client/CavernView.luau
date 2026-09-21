@@ -317,6 +317,65 @@ function CavernView.SetMonster(view, monster)
 	gui.Back.Fill.Size = UDim2.fromScale(math.clamp(monster.HP / monster.MaxHP, 0, 1), 1)
 end
 
+-- The boss on the grid: a big core body over the middle 3x3, gold armor-node markers, magenta weak-point markers and red
+-- flat tiles on the cells its next attack will hit. boss = nil clears it all. Rebuilt on every update (it is only ~30 parts).
+local function marker(view, cell, color, height, size, transparency)
+	local p = Instance.new("Part")
+	p.Anchored, p.CanCollide, p.CanQuery, p.CastShadow = true, false, false, false
+	p.Material = Enum.Material.Neon
+	p.Color = color
+	p.Transparency = transparency
+	p.Size = Vector3.new(size, height, size)
+	p.Position = Geometry.CellPosition(view.Origin, cell.X, cell.Z) + Vector3.new(0, height / 2 + 0.3, 0)
+	p.Parent = view.BossFx
+	return p
+end
+
+function CavernView.SetBoss(view, boss)
+	if view.BossFx then
+		view.BossFx:Destroy()
+		view.BossFx = nil
+	end
+	if not boss then
+		return
+	end
+	local fx = Instance.new("Folder")
+	fx.Name = "BossFx"
+	fx.Parent = view.Folder
+	view.BossFx = fx
+	local body = Instance.new("Part")
+	body.Name = "BossCore"
+	body.Anchored, body.CanCollide, body.CanQuery = true, false, false
+	body.Material = Enum.Material.Slate
+	body.Color = boss.Phase == "Enrage" and Color3.fromRGB(150, 30, 40) or Color3.fromRGB(60, 50, 90)
+	body.Size = Vector3.new(CellSize * 2.6, CellSize * 2.2, CellSize * 2.6)
+	body.Position = Geometry.CellPosition(view.Origin, boss.Core.X, boss.Core.Z) + Vector3.new(0, CellSize * 1.1, 0)
+	body.Parent = fx
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromOffset(220, 30)
+	gui.StudsOffset = Vector3.new(0, CellSize * 1.7, 0)
+	gui.AlwaysOnTop = true
+	gui.Parent = body
+	local text = Instance.new("TextLabel")
+	text.BackgroundTransparency = 1
+	text.Size = UDim2.fromScale(1, 1)
+	text.Font = Enum.Font.GothamBlack
+	text.TextSize = 18
+	text.TextColor3 = Color3.fromRGB(255, 200, 90)
+	text.TextStrokeTransparency = 0.3
+	text.Text = ("%s  %d/%d"):format(boss.Name, boss.HP, boss.MaxHP)
+	text.Parent = gui
+	for _, cell in boss.Nodes do
+		marker(view, cell, Color3.fromRGB(255, 200, 60), 5, 3.2, 0.25) -- armor node: break these
+	end
+	for _, cell in boss.Weak do
+		marker(view, cell, Color3.fromRGB(255, 70, 230), 6, 3.4, 0.2) -- weak point: chain through BOTH
+	end
+	for _, cell in boss.Telegraph do
+		marker(view, cell, Color3.fromRGB(255, 40, 40), 0.3, CellSize * 0.95, 0.55) -- next attack lands here
+	end
+end
+
 -- An eaten crystal disappears without a chain.
 function CavernView.Eat(view, x, z)
 	local key = (z - 1) * view.Size + x

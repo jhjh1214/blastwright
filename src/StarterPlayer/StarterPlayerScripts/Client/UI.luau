@@ -92,6 +92,7 @@ local tabButtons = {}
 local toastHolder, tierLabel, chargeColumn, panel, panelScroll, detonateButton
 local roamGroup, blastGroup
 local runLabel, runModal, runCards, runTitle, runBank, rigLabel
+local bossFrame, bossName, bossFill, bossHint, dodgeButton, criticalLabel
 local activeTab = "Forge"
 local displayShards = 0
 local chargeButtons = {}
@@ -175,6 +176,21 @@ function UI.Init()
 	runLabel = label(blastGroup, "", 15, THEME.Gold, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.fromOffset(240, 54), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, Visible = false })
 
 	rigLabel = label(blastGroup, "", 16, Color3.fromRGB(255, 130, 130), { Position = UDim2.new(0, 14, 0, 112), Size = UDim2.fromOffset(280, 40), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top })
+
+	-- Boss bar (top centre) with a hint for the current phase, the Dodge button, and the CRITICAL MASS label.
+	bossFrame = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.25, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 90), Size = UDim2.fromOffset(380, 66), Visible = false }, blastGroup)
+	corner(bossFrame, 10)
+	bossName = label(bossFrame, "", 16, Color3.fromRGB(255, 200, 90), { Position = UDim2.fromOffset(0, 2), Size = UDim2.new(1, 0, 0, 20), Font = Enum.Font.GothamBlack })
+	local bossBack = mk("Frame", { BackgroundColor3 = Color3.fromRGB(30, 30, 40), Position = UDim2.fromOffset(12, 26), Size = UDim2.new(1, -24, 0, 12), BorderSizePixel = 0 }, bossFrame)
+	corner(bossBack, 6)
+	bossFill = mk("Frame", { BackgroundColor3 = Color3.fromRGB(230, 70, 70), Size = UDim2.fromScale(1, 1), BorderSizePixel = 0 }, bossBack)
+	corner(bossFill, 6)
+	bossHint = label(bossFrame, "", 13, THEME.Text, { Position = UDim2.fromOffset(6, 42), Size = UDim2.new(1, -12, 0, 20), TextWrapped = true })
+	dodgeButton = button(blastGroup, "DODGE (Q)", THEME.Panel, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -84), Size = UDim2.fromOffset(190, 48), TextSize = 20, Visible = false })
+	dodgeButton.Activated:Connect(function()
+		Remotes.Dodge:FireServer()
+	end)
+	criticalLabel = label(blastGroup, "", 22, Color3.fromRGB(255, 210, 80), { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 160), Size = UDim2.fromOffset(340, 30), Font = Enum.Font.GothamBlack, Visible = false })
 
 	-- Between-floor choice: three cards and "Bank & leave". Covers the screen while choosing (blasting is paused anyway).
 	runModal = mk("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 20, Active = true }, gui)
@@ -730,6 +746,27 @@ function UI.Refresh()
 		rig = rig .. "\nSomething stirs beneath the rocks..."
 	end
 	rigLabel.Text = rig
+	local boss = d.Boss
+	bossFrame.Visible = boss ~= nil
+	dodgeButton.Visible = boss ~= nil
+	if boss then
+		bossName.Text = ("%s   %d / %d   [%s]"):format(boss.Name, boss.HP, boss.MaxHP, string.upper(boss.Phase))
+		bossFill.Size = UDim2.fromScale(math.clamp(boss.HP / boss.MaxHP, 0, 1), 1)
+		local hints = {
+			Armor = "Pop the glowing GOLD armor nodes to break its armor.",
+			Attack = "Hit the core! Red tiles = its next attack: pop 3+ crystals on them to CUT it, or Dodge (Q).",
+			Weak = "Chain through BOTH magenta weak points for a massive hit!",
+			Enrage = "ENRAGED: two attacks at once. Keep hitting the core!",
+			Finisher = "FINISHER: one huge chain (12+ pops) or Critical Mass ends it!",
+		}
+		bossHint.Text = hints[boss.Phase] or ""
+		dodgeButton.Text = d.DodgeArmed and "DODGE ARMED" or (boss.DodgeReady and "DODGE (Q)" or (boss.DodgeCooldown > 0 and "Dodge recharging" or "Dodge (no attack yet)"))
+		dodgeButton.BackgroundColor3 = d.DodgeArmed and THEME.Accent or THEME.Panel
+	end
+	criticalLabel.Visible = (d.Critical or 0) > 0
+	if (d.Critical or 0) > 0 then
+		criticalLabel.Text = ("CRITICAL MASS  x%d"):format(d.Critical)
+	end
 	if d.Puzzle and d.Puzzle.Active then
 		runLabel.Text = "DAILY PUZZLE\nSame grid for everyone. Basic charges only, ONE volley: plant up to " .. Config.Puzzle.Charges .. ", then detonate."
 		runLabel.Size = UDim2.fromOffset(300, 70)
