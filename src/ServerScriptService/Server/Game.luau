@@ -70,6 +70,10 @@ type SeamState = {
 	Run: Expedition.Run?, -- set while this seam is a floor of an Expedition
 	Puzzle: { Day: number, Par: number }?, -- set while this seam is the Daily Puzzle
 	Hearts: number, -- rig hearts left (an Expedition keeps them in Run.Hearts)
+	HeartsMax: number, -- base hearts plus relic bonuses
+	BountyMult: number?, -- room and relic scaling of a Lurker's bounty
+	RelicReward: boolean?, -- an Elite room: killing its Lurker grants a relic
+	MonsterHPMult: number?,
 	Hidden: { Kind: string, X: number, Z: number }?, -- a Lurker hiding under a crystal: SECRET, never sent to clients
 	Monster: Lurker.Monster?, -- an awake Lurker on the grid
 	Defeated: boolean?, -- the rig was knocked out
@@ -209,7 +213,7 @@ local function snapshot(player: Player): { [string]: any }?
 		Critical = seam and seam.Critical or 0,
 		DodgeArmed = seam and seam.DodgeArmed or false,
 		Boss = seam and seam.Boss and Boss.View(seam.Boss, BossConfig) or nil,
-		HeartsMax = LurkerConfig.Hearts,
+		HeartsMax = seam and seam.HeartsMax or LurkerConfig.Hearts,
 		Monster = seam and seam.Monster and (function()
 			local m = seam.Monster
 			local def = LurkerConfig.Defs[m.Kind]
@@ -339,15 +343,25 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 		Valuable = Seam.CountValuable(grid, Crystals),
 		InFlight = false,
 	}
+	seam.HeartsMax = LurkerConfig.Hearts + (run and Expedition.HeartsBonus(run, ExpeditionConfig) or 0)
 	if run then
-		run.Hearts = run.Hearts or LurkerConfig.Hearts
+		run.Hearts = run.Hearts or seam.HeartsMax
 		seam.Hearts = run.Hearts
-	elseif puzzle then
-		seam.Hearts = LurkerConfig.Hearts
 	else
-		seam.Hearts = LurkerConfig.Hearts
+		seam.Hearts = seam.HeartsMax
 	end
 	seam.Critical = 0
+	local mods = run and Expedition.Modifiers(run, ExpeditionConfig) or nil
+	local roomFx = run and Expedition.RoomEffects(run, ExpeditionConfig) or nil
+	seam.BountyMult = (roomFx and roomFx.BountyMult or 1) * (mods and mods.BountyMult or 1)
+	seam.RelicReward = roomFx ~= nil and roomFx.RelicReward
+	seam.MonsterHPMult = (roomFx and roomFx.HPMult or 1) * (mods and mods.MonsterHPMult or 1)
+	if run and run.Chaos then
+		local event = ExpeditionConfig.ChaosEvents[run.Chaos]
+		task.defer(function()
+			notify(player, ("CHAOS RIFT: %s! %s"):format(event.Name, event.Description), "Error")
+		end)
+	end
 	local bossKind = run and BossConfig.BossFloors[run.Floor]
 	if bossKind then
 		seam.Boss = Boss.New(bossKind, grid, { Crystals = Config.Context.Crystals }, BossConfig, runRng)
@@ -358,7 +372,22 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 			notify(player, ("BOSS: %s! %s"):format(BossConfig.Defs[bossKind].Name, BossConfig.Defs[bossKind].Description), "Error")
 		end)
 	end
-	if not puzzle and not bossKind and runRandom:NextNumber() < Lurker.SpawnChance(stratum, run and run.Floor or 0, LurkerConfig) then
+	local noLurker = puzzle ~= nil or bossKind ~= nil or (roomFx ~= nil and roomFx.NoLurker)
+	if not noLurker and roomFx and roomFx.Awake then
+		-- A Lurker Nest, Elite room or Blood Rush: the Lurker is already out, standing where a crystal was.
+		local spot = Lurker.Hide(grid, { Crystals = Config.Context.Crystals }, Lurker.PickKind(stratum, runRandom:NextNumber(), LurkerConfig), runRandom:NextNumber())
+		if spot then
+			grid.Cells[(spot.Z - 1) * grid.Size + spot.X] = nil
+			local m = Lurker.New(spot.Kind, spot.X, spot.Z, LurkerConfig)
+			m.HP = math.max(1, math.floor(m.HP * (seam.MonsterHPMult or 1) + 0.5))
+			m.MaxHP = m.HP
+			seam.Monster = m
+			seam.Valuable = Seam.CountValuable(grid, Crystals)
+			task.defer(function()
+				notify(player, ("A %s is awake! %s"):format(LurkerConfig.Defs[m.Kind].Name, LurkerConfig.Defs[m.Kind].Description), "Error")
+			end)
+		end
+	elseif not noLurker and runRandom:NextNumber() < Lurker.SpawnChance(stratum, run and run.Floor or 0, LurkerConfig) then
 		seam.Hidden = Lurker.Hide(grid, { Crystals = Config.Context.Crystals }, Lurker.PickKind(stratum, runRandom:NextNumber(), LurkerConfig), runRandom:NextNumber())
 	end
 	seams[player] = seam
@@ -539,6 +568,8 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 	if seam.Hidden and Lurker.Revealed(seam.Hidden, result.Events) then
 		-- Its crystal popped: it bursts out and stays put this turn (no free hit on the player).
 		seam.Monster = Lurker.New(seam.Hidden.Kind, seam.Hidden.X, seam.Hidden.Z, LurkerConfig)
+		seam.Monster.HP = math.max(1, math.floor(seam.Monster.HP * (seam.MonsterHPMult or 1) + 0.5))
+		seam.Monster.MaxHP = seam.Monster.HP
 		seam.Hidden = nil
 		turn.Emerged = true
 		notify(player, ("A %s burst out of the rock! %s"):format(LurkerConfig.Defs[seam.Monster.Kind].Name, LurkerConfig.Defs[seam.Monster.Kind].Description), "Error")
@@ -550,7 +581,7 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 		end
 		turn.Damage = damage
 		if not Lurker.Hit(m, damage) then
-			local bounty = Lurker.Bounty(m.Kind, LurkerConfig)
+			local bounty = math.floor(Lurker.Bounty(m.Kind, LurkerConfig) * (seam.BountyMult or 1) + 0.5)
 			if seam.Run then
 				seam.Earned += bounty -- on an Expedition the bounty joins the haul
 			else
@@ -558,6 +589,25 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 				seam.Earned += bounty
 			end
 			data.Stats.LurkersSlain += 1
+			local slayMods = seam.Run and Expedition.Modifiers(seam.Run, ExpeditionConfig) or nil
+			if slayMods and slayMods.KillRefund > 0 then
+				seam.Charges = math.min(seam.ChargesMax, seam.Charges + slayMods.KillRefund)
+			end
+			if seam.Run and seam.RelicReward then
+				seam.RelicReward = false
+				local run = seam.Run
+				run.Hearts = seam.Hearts -- the relic may add a heart or a charge to the RUN; mirror it onto this floor
+				local beforeStart = run.StartCharges
+				local id = Expedition.GrantRelic(run, runRng, ExpeditionConfig)
+				if id then
+					seam.Hearts = run.Hearts or seam.Hearts
+					seam.HeartsMax = LurkerConfig.Hearts + Expedition.HeartsBonus(run, ExpeditionConfig)
+					local extra = run.StartCharges - beforeStart
+					seam.ChargesMax += extra
+					seam.Charges += extra
+					notify(player, ("ELITE REWARD: %s relic gained: %s. %s"):format(ExpeditionConfig.Relics[id].Family, ExpeditionConfig.Relics[id].Name, ExpeditionConfig.Relics[id].Description), "Reward")
+				end
+			end
 			turn.Slain = { X = m.X, Z = m.Z, Bounty = bounty }
 			notify(player, ("%s slain! +%d shards"):format(LurkerConfig.Defs[m.Kind].Name, bounty), "Reward")
 			seam.Monster = nil
@@ -607,12 +657,13 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 	end
 	if out.Killed then
 		local def = BossConfig.Defs[boss.Kind]
-		seam.Earned += def.Bounty
+		local reward = math.floor(def.Bounty * (seam.BountyMult or 1) + 0.5)
+		seam.Earned += reward
 		seam.BossDefeated = true
 		seam.Boss = nil
 		data.Stats.BossesSlain += 1
 		turn.BossSlain = true
-		notify(player, ("%s DEFEATED! +%d shards to the haul"):format(def.Name, def.Bounty), "Reward")
+		notify(player, ("%s DEFEATED! +%d shards to the haul"):format(def.Name, reward), "Reward")
 		announceGoals(player)
 	else
 		if out.PhaseChanged then
@@ -727,10 +778,20 @@ local function onDetonate(player: Player, payload: any)
 	end
 	local multiplier = (Purchases.Owns(player, "DoubleShards") and 2 or 1) * Events.Combine(activeEvents()).ShardMult * Community.Mult(goal, os.clock(), CommunityConfig)
 	local power, powerName = Power.Multiplier(result.Pops, seam.Critical, PowerConfig), select(2, Power.Tier(result.Pops, PowerConfig))
+	local relicMods = seam.Run and Expedition.Modifiers(seam.Run, ExpeditionConfig) or nil
+	if relicMods then
+		power *= relicMods.DamageMult
+		if seam.Hearts == 1 then
+			power *= relicMods.LastStandMult
+		end
+	end
 	if seam.Critical > 0 then
 		multiplier *= PowerConfig.CriticalPayout
 	end
-	local criticalLeft, criticalStarted = Power.Advance(seam.Critical, result.Pops, PowerConfig)
+	local criticalLeft, criticalStarted = Power.Advance(seam.Critical, result.Pops, PowerConfig, relicMods and relicMods.CriticalPopsDelta or 0)
+	if criticalStarted and relicMods and relicMods.HeartOnCritical > 0 then
+		seam.Hearts = math.min(seam.HeartsMax, seam.Hearts + relicMods.HeartOnCritical)
+	end
 	seam.Critical = criticalLeft
 	local payout = math.floor(result.Total * multiplier + 0.5)
 	seam.Popped += valuablePops
@@ -1076,8 +1137,9 @@ local function onRunPick(player: Player, choice: any)
 		sync(player)
 		return
 	end
-	if Expedition.Pick(run, choice, ExpeditionConfig) then
-		run.Hearts = math.min(LurkerConfig.Hearts, (run.Hearts or LurkerConfig.Hearts) + 1) -- a breather between floors
+	if Expedition.Pick(run, choice, ExpeditionConfig, runRng) then
+		local cap = LurkerConfig.Hearts + Expedition.HeartsBonus(run, ExpeditionConfig)
+		run.Hearts = math.min(cap, (run.Hearts or cap) + 1) -- a breather between floors
 		startSeam(player, run) -- descend: generates the next floor and tells everyone
 	end
 end

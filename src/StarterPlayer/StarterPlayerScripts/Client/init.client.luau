@@ -112,6 +112,7 @@ Remotes.Sync.OnClientEvent:Connect(function(snapshot)
 	local view = CavernView.Get(localPlayer.UserId)
 	if view then
 		CavernView.SetBoss(view, snapshot.Boss)
+		CavernView.SetMonster(view, snapshot.Monster) -- an awake Lurker from a Nest, Elite room or Blood Rush shows up at floor start
 	end
 end)
 

@@ -195,11 +195,11 @@ function UI.Init()
 	-- Between-floor choice: three cards and "Bank & leave". Covers the screen while choosing (blasting is paused anyway).
 	runModal = mk("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 20, Active = true }, gui)
 	runTitle = label(runModal, "", 26, THEME.Gold, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 40), Size = UDim2.new(1, -24, 0, 70), TextWrapped = true, Font = Enum.Font.GothamBlack, ZIndex = 21 })
-	local row = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -24, 0, 200), ZIndex = 21 }, runModal)
+	local row = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -24, 0, 260), ZIndex = 21 }, runModal)
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 10) }, row)
 	runCards = {}
 	for i = 1, 3 do
-		local card = button(row, "", THEME.Panel, { Size = UDim2.fromOffset(190, 190), TextSize = 15, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 22, LayoutOrder = i })
+		local card = button(row, "", THEME.Panel, { Size = UDim2.fromOffset(200, 250), TextSize = 13, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 22, LayoutOrder = i })
 		mk("UIStroke", { Color = THEME.Gold, Thickness = 2, Transparency = 0.4 }, card)
 		mk("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, card)
 		card.Activated:Connect(function()
@@ -361,7 +361,7 @@ function UI.SetRun(view)
 		runModal.Visible = false
 		return
 	end
-	runLabel.Text = ("EXPEDITION  floor %d / %d\nHaul %s  |  Relics %d"):format(view.Floor, view.Floors, commas(view.Haul), #view.Relics)
+	runLabel.Text = ("EXPEDITION  floor %d / %d  (%s%s)\nHaul %s  |  Relics %d"):format(view.Floor, view.Floors, view.RoomName or "", view.Chaos and (": " .. view.Chaos) or "", commas(view.Haul), #view.Relics)
 	runLabel.Visible = true
 	local choosing = view.Phase == "Choosing"
 	runModal.Visible = choosing
@@ -371,7 +371,7 @@ function UI.SetRun(view)
 			local c = view.Choices[i]
 			card.Visible = c ~= nil
 			if c then
-				card.Text = ("%s\n%s\n\n+ %s\n%s"):format(c.RouteName, c.RouteDescription, c.RelicName ~= "" and c.RelicName or "(no relic)", c.RelicDescription)
+				card.Text = ("%s\n%s\n\n%s\n%s\n\n+ %s%s\n%s"):format(c.RoomName, c.RoomDescription, c.RouteName, c.RouteDescription, c.RelicName ~= "" and c.RelicName or "(no relic)", c.RelicFamily ~= "" and ("  [" .. c.RelicFamily .. "]") or "", c.RelicDescription)
 			end
 		end
 		runBank.Text = ("Bank %s shards & leave"):format(commas(view.BankNow))
