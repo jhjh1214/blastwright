@@ -1,6 +1,9 @@
 --!nonstrict
 -- Client-side view state. Never authoritative: the server's Sync snapshot is the truth.
 local Players = game:GetService("Players")
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Loadout = require(Shared.Loadout)
 
 local State = {
 	UserId = Players.LocalPlayer.UserId,
@@ -24,6 +27,21 @@ function State.SetData(snapshot)
 		State.SelectedCharge = "Basic"
 	end
 	State.Changed:Fire("Data")
+end
+
+-- This player's effective charge definitions (base + owned traits + Fat Fuse), identical to what the server simulates.
+-- Cached per snapshot. The Daily Puzzle ignores upgrades and traits, so it gets the base definitions.
+local cachedFor, cached = nil, nil
+function State.Charges(puzzle)
+	if puzzle or not State.Data then
+		return Config.Charges.Defs
+	end
+	if cachedFor ~= State.Data then
+		local bonus = (State.Data.Upgrades.BlastRadius or 0) * Config.Upgrades.Defs.BlastRadius.PerLevel
+		cached = Loadout.Charges(Config.Charges.Defs, { Owned = State.Data.Traits or {} }, Config.Traits, bonus)
+		cachedFor = State.Data
+	end
+	return cached
 end
 
 function State.UpgradeLevel(id)

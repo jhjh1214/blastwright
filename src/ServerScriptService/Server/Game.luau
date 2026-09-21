@@ -21,6 +21,7 @@ local Contracts = require(Shared.Contracts)
 local WorldBoss = require(Shared.WorldBoss)
 local Plus = require(Shared.Plus)
 local Assay = require(Shared.Assay)
+local Loadout = require(Shared.Loadout)
 local Farm = require(Shared.Farm)
 local Lurker = require(Shared.Lurker)
 local Power = require(Shared.Power)
@@ -54,6 +55,7 @@ local ContractsConfig = Config.Contracts
 local WorldBossConfig = Config.WorldBoss
 local PlusConfig = Config.Plus
 local AssayConfig = Config.Assay
+local TraitsConfig = Config.Traits
 local FarmConfig = Config.Farm
 local LurkerConfig = Config.Lurkers
 local BossConfig = Config.Bosses
@@ -133,6 +135,12 @@ end
 
 local function upgradeLevel(data: any, id: string): number
 	return data.Upgrades[id] or 0
+end
+
+-- This player's charge definitions: the base ones plus their owned traits and the Fat Fuse radius bonus. Everything that
+-- turns a volley into a result (the chain sim, Lurker and boss combat) must use THIS, and so does the client's preview.
+local function chargesFor(data: any): { [string]: any }
+	return Loadout.Charges(Config.Charges.Defs, data.Traits, TraitsConfig, upgradeLevel(data, "BlastRadius") * Upgrades.Defs.BlastRadius.PerLevel)
 end
 
 -- What the calendar currently changes for everyone (see Config/Events.luau).
@@ -299,6 +307,7 @@ local function snapshot(player: Player): { [string]: any }?
 		end)(),
 		AwaitRevive = seam ~= nil and seam.AwaitRevive == true,
 		Assay = Assay.View(data.Assay, Crystals.Order, AssayConfig),
+		Traits = data.Traits.Owned,
 		Collection = Mastery.CollectionView(data.Collection, LurkerConfig, BossConfig, ExpeditionConfig),
 		Mastery = { Objectives = Mastery.View(data.Mastery, MasteryConfig), Titles = Mastery.Titles(data.Mastery, MasteryConfig), Title = data.Mastery.Title },
 		Critical = seam and seam.Critical or 0,
@@ -486,7 +495,7 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 	seamCounter += 1
 	local stratum = run and Expedition.FloorStratum(run.Floor, data.Progress.StrataUnlocked, ExpeditionConfig) or WorldConfig.Sites[siteId].Stratum
 	local fx = Events.Combine(activeEvents())
-	local chance = Tuning.MutationChance * (Purchases.Owns(player, "PrismaticLuck") and 2 or 1) * fx.MutationMult * Grants.BoostMult(data.Boosts, "Luck", os.time()) * (run and Expedition.Modifiers(run, ExpeditionConfig).MutationChanceMult or 1)
+	local chance = Tuning.MutationChance * (Purchases.Owns(player, "PrismaticLuck") and 2 or 1) * fx.MutationMult * (1 + upgradeLevel(data, "Lens") * Upgrades.Defs.Lens.PerLevel) * Grants.BoostMult(data.Boosts, "Luck", os.time()) * (run and Expedition.Modifiers(run, ExpeditionConfig).MutationChanceMult or 1)
 	local grid
 	if puzzle then
 		stratum = PuzzleConfig.Stratum
@@ -509,7 +518,7 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 		Valuable = Seam.CountValuable(grid, Crystals),
 		InFlight = false,
 	}
-	seam.HeartsMax = LurkerConfig.Hearts + (run and Expedition.HeartsBonus(run, ExpeditionConfig) or 0)
+	seam.HeartsMax = LurkerConfig.Hearts + upgradeLevel(data, "Plating") * Upgrades.Defs.Plating.PerLevel + (run and Expedition.HeartsBonus(run, ExpeditionConfig) or 0)
 	if run then
 		run.Hearts = run.Hearts or seam.HeartsMax
 		seam.Hearts = run.Hearts
@@ -592,9 +601,9 @@ local function contextFor(data: any, run: Expedition.Run?)
 	local mods = run and Expedition.Modifiers(run, ExpeditionConfig) or nil
 	return {
 		Crystals = Config.Context.Crystals,
-		Charges = Config.Context.Charges,
+		Charges = chargesFor(data),
 		Tuning = Tuning,
-		RadiusBonus = upgradeLevel(data, "BlastRadius") * Upgrades.Defs.BlastRadius.PerLevel,
+		RadiusBonus = 0, -- already inside chargesFor
 		MomentumPops = math.max(3, Tuning.MomentumPops - upgradeLevel(data, "Momentum") * Upgrades.Defs.Momentum.PerLevel + (mods and mods.MomentumPopsDelta or 0)),
 		Modifiers = mods,
 	}
@@ -751,7 +760,7 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 	if not data or (not seam.Hidden and not seam.Monster) then
 		return
 	end
-	local mctx = { Crystals = Config.Context.Crystals, Charges = Config.Context.Charges, BlastCells = ChainSim.BlastCells, Size = seam.Grid.Size }
+	local mctx = { Crystals = Config.Context.Crystals, Charges = chargesFor(data), BlastCells = ChainSim.BlastCells, Size = seam.Grid.Size }
 	local turn = { UserId = player.UserId, Eaten = {}, Hearts = seam.Hearts }
 
 	if seam.Hidden and Lurker.Revealed(seam.Hidden, result.Events) then
@@ -856,7 +865,7 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 	if not data or not boss then
 		return
 	end
-	local mctx = { Crystals = Config.Context.Crystals, Charges = Config.Context.Charges, BlastCells = ChainSim.BlastCells, Size = seam.Grid.Size }
+	local mctx = { Crystals = Config.Context.Crystals, Charges = chargesFor(data), BlastCells = ChainSim.BlastCells, Size = seam.Grid.Size }
 	local turn = { UserId = player.UserId, Eaten = {}, Hearts = seam.Hearts }
 	local out = Boss.Apply(boss, volley, result, mctx, BossConfig, power, seam.Grid, runRng)
 	local stats = seam.BossStats or { Volleys = 0, HeartsLost = 0 }
@@ -1064,6 +1073,7 @@ local function onDetonate(player: Player, payload: any)
 	local power, powerName = Power.Multiplier(result.Pops, seam.Critical, PowerConfig), select(2, Power.Tier(result.Pops, PowerConfig))
 	local relicMods = seam.Run and Expedition.Modifiers(seam.Run, ExpeditionConfig) or nil
 	power *= Events.Combine(activeEvents()).DamageMult -- live events (Crystal Storm, Explosive Sunday)
+	power *= 1 + upgradeLevel(data, "Scope") * Upgrades.Defs.Scope.PerLevel
 	if relicMods then
 		power *= relicMods.DamageMult
 		if seam.Hearts == 1 then
@@ -1073,7 +1083,7 @@ local function onDetonate(player: Player, payload: any)
 	if seam.Critical > 0 then
 		multiplier *= PowerConfig.CriticalPayout
 	end
-	local criticalLeft, criticalStarted = Power.Advance(seam.Critical, result.Pops, PowerConfig, relicMods and relicMods.CriticalPopsDelta or 0)
+	local criticalLeft, criticalStarted = Power.Advance(seam.Critical, result.Pops, PowerConfig, (relicMods and relicMods.CriticalPopsDelta or 0) - upgradeLevel(data, "Capacitor") * Upgrades.Defs.Capacitor.PerLevel)
 	if criticalStarted and relicMods and relicMods.HeartOnCritical > 0 then
 		seam.Hearts = math.min(seam.HeartsMax, seam.Hearts + relicMods.HeartOnCritical)
 	end
@@ -1427,6 +1437,40 @@ local function onContractClaim(player: Player)
 	end
 	Grants.Apply(data, ContractsConfig.Rewards[tier], os.time(), data.Progress.StrataUnlocked)
 	notify(player, "Contract complete! Reward collected.", "Reward")
+	announceGoals(player)
+	sync(player)
+end
+
+-- The trait tree: buy a node, or respec (clear) one charge's branch. Every argument is validated by Shared/Loadout.luau.
+local function onTraitAction(player: Player, action: any, id: any)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	if action == "buy" then
+		local ok, reason = Loadout.CanBuy(data.Traits, id, TraitsConfig, data.UnlockedCharges, data.Shards)
+		if not ok then
+			return notify(player, reason, "Error")
+		end
+		local cost = Loadout.Buy(data.Traits, id, TraitsConfig, data.UnlockedCharges, data.Shards)
+		if cost then
+			data.Shards -= cost
+			notify(player, TraitsConfig.Nodes[id].Name .. " unlocked!", "Reward")
+		end
+	elseif action == "respec" then
+		if type(id) ~= "string" or table.find(TraitsConfig.BranchOrder, id) == nil then
+			return
+		end
+		if data.Shards < TraitsConfig.Respec then
+			return notify(player, ("Respec costs %d shards."):format(TraitsConfig.Respec), "Error")
+		end
+		if Loadout.Respec(data.Traits, id, TraitsConfig) > 0 then
+			data.Shards -= TraitsConfig.Respec
+			notify(player, "Branch reset. Choose again.", "Info")
+		end
+	else
+		return
+	end
 	announceGoals(player)
 	sync(player)
 end
@@ -1797,6 +1841,7 @@ function Game.Init()
 	Remotes.UseCharge.OnServerEvent:Connect(guarded("UseCharge", 3, 5, onUseCharge))
 	Remotes.EquipFinisher.OnServerEvent:Connect(guarded("EquipFinisher", 3, 5, onEquipFinisher))
 	Remotes.ContractAccept.OnServerEvent:Connect(guarded("ContractAccept", 4, 6, onContractAccept))
+	Remotes.TraitAction.OnServerEvent:Connect(guarded("TraitAction", 5, 8, onTraitAction))
 	Remotes.AssayClaim.OnServerEvent:Connect(guarded("AssayClaim", 5, 8, onAssayClaim))
 	Remotes.ContractClaim.OnServerEvent:Connect(guarded("ContractClaim", 3, 5, onContractClaim))
 	Remotes.ClubClaim.OnServerEvent:Connect(guarded("ClubClaim", 1, 2, onClubClaim))

@@ -160,15 +160,11 @@ end
 
 -- The exact cells a charge of this kind would blast from (x, z).
 local function areaCells(view, x, z, kind)
-	local def = Config.Charges.Defs[kind]
+	local def = State.Charges(State.Data and State.Data.Puzzle and State.Data.Puzzle.Active)[kind]
 	if not def then
 		return {}
 	end
-	local radius = (def.Radius or 0)
-	if def.Shape == "Radius" then
-		radius += State.UpgradeLevel("BlastRadius") * Config.Upgrades.Defs.BlastRadius.PerLevel
-	end
-	return ChainSim.BlastCells(def.Shape, x, z, radius, def.Range or 0, view.Size)
+	return ChainSim.BlastCells(def.Shape, x, z, def.Radius or 0, def.Range or 0, view.Size, def)
 end
 
 -- One-line description of the crystal at the hovered (or last planted) cell.
@@ -213,9 +209,12 @@ end
 local function combatLines(res, full)
 	local data = State.Data
 	local lines = {}
-	local mctx = { Crystals = Config.Context.Crystals, Charges = Config.Context.Charges, BlastCells = ChainSim.BlastCells, Size = Config.Tuning.GridSize }
+	local mctx = { Crystals = Config.Context.Crystals, Charges = State.Charges(data.Puzzle and data.Puzzle.Active), BlastCells = ChainSim.BlastCells, Size = Config.Tuning.GridSize }
 	local mods = State.Run and State.Run.Modifiers
 	local power = Power.Multiplier(res.Pops, data.Critical or 0, Config.Bosses.Power)
+	if not (data.Puzzle and data.Puzzle.Active) then
+		power *= 1 + State.UpgradeLevel("Scope") * Config.Upgrades.Defs.Scope.PerLevel
+	end
 	if mods then
 		power *= mods.DamageMult
 		if (data.Hearts or 0) == 1 then
@@ -331,9 +330,9 @@ local function refresh()
 	local puzzle = State.Data.Puzzle and State.Data.Puzzle.Active -- the puzzle ignores upgrades
 	local ctx = {
 		Crystals = Config.Context.Crystals,
-		Charges = Config.Context.Charges,
+		Charges = State.Charges(puzzle),
 		Tuning = Config.Tuning,
-		RadiusBonus = puzzle and 0 or State.UpgradeLevel("BlastRadius") * upgrades.BlastRadius.PerLevel,
+		RadiusBonus = 0, -- Fat Fuse is already inside State.Charges
 		MomentumPops = puzzle and Config.Tuning.MomentumPops or math.max(3, Config.Tuning.MomentumPops - State.UpgradeLevel("Momentum") * upgrades.Momentum.PerLevel + (State.Run and State.Run.Modifiers.MomentumPopsDelta or 0)),
 		Modifiers = State.Run and State.Run.Modifiers or nil, -- relics change the real rules, so the preview must too
 	}

@@ -5,6 +5,10 @@
 export type Cell = { Kind: string, Mutated: boolean? }
 export type Grid = { Size: number, Cells: { [number]: Cell } }
 export type Charge = { X: number, Z: number, Kind: string }
+-- Optional shape extras (they come from a charge's definition, see Config/Charges.luau and Shared/Loadout.luau):
+-- Width = extra lanes each side of a Column/Row/Cross arm, Diagonal = a Cross also fires along the diagonals,
+-- Inner = a Ring skips everything at or inside this distance.
+export type ShapeOpts = { Width: number?, Diagonal: boolean?, Inner: number? }
 export type Event = {
 	T: number,
 	X: number,
@@ -39,7 +43,7 @@ export type Result = {
 	Momentum: boolean,
 }
 
-type QueueItem = { T: number, Seq: number, X: number, Z: number, Cause: string, SX: number, SZ: number, Lit: number? }
+type QueueItem = { T: number, Seq: number, X: number, Z: number, Cause: string, SX: number, SZ: number, Lit: number?, VM: number? }
 
 local ChainSim = {}
 
@@ -48,37 +52,57 @@ function ChainSim.Key(size: number, x: number, z: number): number
 end
 
 -- The cells a blast covers, clipped to the grid, with each cell's distance in cells from the origin (used for timing).
--- Shapes: Radius (round), Column (up and down the z axis), Row (along the x axis), Cross (row and column together). Shared by the sim and the preview.
-function ChainSim.BlastCells(shape: string, ox: number, oz: number, radius: number, range: number, size: number): { { X: number, Z: number, D: number } }
+-- Shapes: Radius (round), Ring (round but not the middle), Column (up and down the z axis), Row (along the x axis), Cross (row
+-- and column together). `opts` (optional, may be a whole charge definition) widens lines and adds diagonals or a hole.
+-- Shared by the sim, the combat code and the preview.
+function ChainSim.BlastCells(shape: string, ox: number, oz: number, radius: number, range: number, size: number, opts: ShapeOpts?): { { X: number, Z: number, D: number } }
 	local cells = {}
+	local seen: { [number]: boolean } = {}
 	local function add(x: number, z: number, d: number)
 		if x >= 1 and x <= size and z >= 1 and z <= size then
-			table.insert(cells, { X = x, Z = z, D = d })
+			local key = (z - 1) * size + x
+			if not seen[key] then
+				seen[key] = true
+				table.insert(cells, { X = x, Z = z, D = d })
+			end
 		end
 	end
-	if shape == "Radius" then
+	local width = math.max(0, math.floor(opts and opts.Width or 0))
+	if shape == "Radius" or shape == "Ring" then
+		local inner = shape == "Ring" and (opts and opts.Inner or 0) or -1
+		if inner <= 0 then
+			inner = -1 -- no hole: a full disc, middle included
+		end
 		local reach = math.ceil(radius)
 		for dz = -reach, reach do
 			for dx = -reach, reach do
 				local d = math.sqrt(dx * dx + dz * dz)
-				if d <= radius then
+				if d <= radius and d > inner then
 					add(ox + dx, oz + dz, d)
 				end
 			end
 		end
 	elseif shape == "Column" then
 		for dz = -range, range do
-			add(ox, oz + dz, math.abs(dz))
+			for w = -width, width do
+				add(ox + w, oz + dz, math.abs(dz) + math.abs(w) * 0.5)
+			end
 		end
 	elseif shape == "Row" then
 		for dx = -range, range do
-			add(ox + dx, oz, math.abs(dx))
+			for w = -width, width do
+				add(ox + dx, oz + w, math.abs(dx) + math.abs(w) * 0.5)
+			end
 		end
 	elseif shape == "Cross" then
 		for d = -range, range do
-			add(ox + d, oz, math.abs(d))
-			if d ~= 0 then
-				add(ox, oz + d, math.abs(d)) -- the center is already covered by the row arm
+			for w = -width, width do
+				add(ox + d, oz + w, math.abs(d) + math.abs(w) * 0.5)
+				add(ox + w, oz + d, math.abs(d) + math.abs(w) * 0.5)
+			end
+			if opts and opts.Diagonal and d ~= 0 then
+				add(ox + d, oz + d, math.abs(d) * 1.2)
+				add(ox + d, oz - d, math.abs(d) * 1.2)
 			end
 		end
 	end
@@ -94,7 +118,7 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 	local seq = 0
 
 	-- Schedule a cell to pop at time t; keeps only the earliest pending time per cell.
-	local function schedule(x: number, z: number, t: number, cause: string, sx: number, sz: number)
+	local function schedule(x: number, z: number, t: number, cause: string, sx: number, sz: number, vm: number?)
 		if x < 1 or x > size or z < 1 or z > size then
 			return
 		end
@@ -126,13 +150,13 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 				hi = mid
 			end
 		end
-		table.insert(queue, lo, { T = t, Seq = seq, X = x, Z = z, Cause = cause, SX = sx, SZ = sz, Lit = lit })
+		table.insert(queue, lo, { T = t, Seq = seq, X = x, Z = z, Cause = cause, SX = sx, SZ = sz, Lit = lit, VM = vm })
 	end
 
-	local function blast(ox: number, oz: number, t0: number, shape: string, radius: number, range: number, cause: string)
+	local function blast(ox: number, oz: number, t0: number, shape: string, radius: number, range: number, cause: string, opts: ShapeOpts?, vm: number?)
 		local step = tuning.StepPerCell
-		for _, c in ChainSim.BlastCells(shape, ox, oz, radius, range, size) do
-			schedule(c.X, c.Z, t0 + c.D * step, cause, ox, oz)
+		for _, c in ChainSim.BlastCells(shape, ox, oz, radius, range, size, opts) do
+			schedule(c.X, c.Z, t0 + c.D * step, cause, ox, oz, vm)
 		end
 	end
 
@@ -140,7 +164,7 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 		local def = ctx.Charges[c.Kind]
 		if def ~= nil then
 			local radius = (def.Radius or 0) + (def.Shape == "Radius" and (ctx.RadiusBonus or 0) or 0)
-			blast(c.X, c.Z, 0, def.Shape, radius, def.Range or 0, "Charge")
+			blast(c.X, c.Z, 0, def.Shape, radius, def.Range or 0, "Charge", def, def.DirectMult)
 		end
 	end
 
@@ -175,6 +199,9 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 				value *= mods.RelayValueMult or 1
 			end
 			value *= mods.ValueMult or 1
+			if item.Cause == "Charge" then
+				value *= item.VM or 1 -- a charge's own bonus for the crystals it hits directly (Loadout traits)
+			end
 			peak = math.max(peak, mult)
 
 			if behavior == "Volatile" then

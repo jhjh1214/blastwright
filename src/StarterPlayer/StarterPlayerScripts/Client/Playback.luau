@@ -86,7 +86,7 @@ local function popEvent(run, ev)
 				VFX.Ring(view.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(255, 205, 90), view.Extent * (1 + tier.Bonus * 0.5), 0.6)
 			end
 		end
-		local delta = State.Run and State.Run.Modifiers and State.Run.Modifiers.CriticalPopsDelta or 0
+		local delta = (State.Run and State.Run.Modifiers and State.Run.Modifiers.CriticalPopsDelta or 0) - State.UpgradeLevel("Capacitor") * Config.Upgrades.Defs.Capacitor.PerLevel
 		if run.Count == math.max(1, Config.Bosses.Power.CriticalPops + delta) then
 			run.ShownCritical = true
 			UI.ShowTier("Critical Mass")

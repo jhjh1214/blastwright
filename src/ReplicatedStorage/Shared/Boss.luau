@@ -138,7 +138,7 @@ local function coreDamage(state: State, volley: { any }, result: any, ctx: any, 
 		local cdef = ctx.Charges[charge.Kind]
 		local direct = def.Direct[charge.Kind]
 		if cdef and direct then
-			for _, c in ctx.BlastCells(cdef.Shape, charge.X, charge.Z, cdef.Radius or 0, cdef.Range or 0, ctx.Size) do
+			for _, c in ctx.BlastCells(cdef.Shape, charge.X, charge.Z, cdef.Radius or 0, cdef.Range or 0, ctx.Size, cdef) do
 				if inCore(def, c.X, c.Z, 1) then
 					total += direct
 					break

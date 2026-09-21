@@ -17,7 +17,7 @@ return {
 	Hearts = 3, -- rig hearts per seam (an Expedition carries them between floors)
 	Spawn = { BaseChance = 0.10, PerStratum = 0.05, PerFloor = 0.04, Cap = 0.6, FirstFightChance = 0.6 }, -- chance a seam hides a Lurker (FirstFightChance: before the first kill)
 	Damage = {
-		Direct = { Basic = 2, Shaft = 3, Cross = 3 }, -- per charge whose blast covers the Lurker's cell
+		Direct = { Basic = 2, Shaft = 3, Cross = 3, Shock = 3 }, -- per charge whose blast covers the Lurker's cell
 		Splash = 1, -- per crystal popped next to it ...
 		SplashCap = 3, -- ... up to this many per volley
 	},

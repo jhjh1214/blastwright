@@ -76,7 +76,7 @@ function Lurker.Damage(m: Monster, volley: { any }, result: any, ctx: any, cfg: 
 		local cdef = ctx.Charges[charge.Kind]
 		local direct = cfg.Damage.Direct[charge.Kind]
 		if cdef and direct then
-			for _, c in ctx.BlastCells(cdef.Shape, charge.X, charge.Z, cdef.Radius or 0, cdef.Range or 0, size) do
+			for _, c in ctx.BlastCells(cdef.Shape, charge.X, charge.Z, cdef.Radius or 0, cdef.Range or 0, size, cdef) do
 				if c.X == m.X and c.Z == m.Z then
 					local dmg = math.max(1, direct - (def.Armor or 0))
 					if def.Weak == charge.Kind then

@@ -23,6 +23,7 @@ Fx.Room = {
 	Boss = Color3.fromRGB(200, 40, 60),
 }
 Fx.Tab = {
+	Loadout = Color3.fromRGB(255, 96, 76),
 	Forge = Color3.fromRGB(255, 140, 60),
 	Daily = Color3.fromRGB(110, 230, 150),
 	Farm = Color3.fromRGB(170, 235, 80),

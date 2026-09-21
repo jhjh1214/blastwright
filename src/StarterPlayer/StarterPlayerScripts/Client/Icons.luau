@@ -164,6 +164,8 @@ DRAW.Clock = function(p)
 	box(p, 24, 24, 6, 6, Color3.fromRGB(238, 62, 78), 99, 0, 4, true)
 end
 
+DRAW.Loadout = DRAW.Bomb
+
 -- Draw the icon `name` filling `parent`. Returns the canvas (a square, centred).
 function Icons.Draw(name, parent, tint, fill)
 	local canvas = Instance.new("Frame")
@@ -197,6 +199,6 @@ function Icons.Draw(name, parent, tint, fill)
 	return canvas
 end
 
-Icons.Names = { "Forge", "Shop", "Daily", "Goals", "Codex", "Farm", "Gem", "Bomb", "Bolt", "Close", "Heart", "Lock", "Skull", "Star", "Clock" }
+Icons.Names = { "Forge", "Shop", "Daily", "Goals", "Codex", "Farm", "Gem", "Bomb", "Bolt", "Close", "Heart", "Lock", "Skull", "Star", "Clock", "Loadout" }
 
 return Icons

@@ -1,7 +1,7 @@
 --!nonstrict
 -- The world HUD's main navigation, in the chunky style:
 --   * a big red SHOP action button (icon + huge label), the primary thing to press;
---   * a vertical stack of square icon buttons above it: Forge, Daily, Goals, Codex, Farm, each its own colour with a big
+--   * a vertical stack of square icon buttons above it: Forge, Loadout, Daily, Goals, Codex, Farm, each its own colour with a big
 --     outlined icon and a caption.
 -- The whole stack scales down to fit short screens (phone landscape) so the world stays visible. Same API as before:
 -- SetBadge, SetHighlight, PulseHighlight, SetSelected.
@@ -10,9 +10,10 @@ local Theme = require(script.Parent.Theme)
 
 local Dock = {}
 
-local SIDE = { "Forge", "Daily", "Goals", "Codex", "Farm" }
+local SIDE = { "Forge", "Loadout", "Daily", "Goals", "Codex", "Farm" }
 local COLORS = {
 	Forge = Theme.Colors.Forge,
+	Loadout = Color3.fromRGB(255, 96, 76),
 	Shop = Theme.Colors.Shop,
 	Daily = Theme.Colors.Daily,
 	Goals = Theme.Colors.Goals,

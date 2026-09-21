@@ -27,6 +27,7 @@ return {
 	WorldBoss = require(script.WorldBoss),
 	Plus = require(script.Plus),
 	Assay = require(script.Assay),
+	Traits = require(script.Traits),
 	Lurkers = require(script.Lurkers),
 	Bosses = require(script.Bosses),
 	Mastery = require(script.Mastery),

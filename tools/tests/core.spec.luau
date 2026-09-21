@@ -1499,7 +1499,8 @@ test("cross charge: the simulation uses it, sources point at the charge cell, an
 	eq(findEvent(r, 2, 5).SX, 5, "source x is the charge cell")
 	eq(findEvent(r, 5, 8).SZ, 5, "source z is the charge cell")
 	eq(Charges.Defs.Cross.UnlockCost > Charges.Defs.Shaft.UnlockCost, true, "priced above the shaft charge")
-	eq(Charges.Order[#Charges.Order], "Cross", "listed last so the selector grows in unlock order")
+	eq(Charges.Order[#Charges.Order], "Shock", "listed last so the selector grows in unlock order")
+	eq(Charges.Defs.Shock.UnlockCost > Charges.Defs.Cross.UnlockCost, true, "the shockwave is the priciest unlock")
 	eq(#Charges.Order, (function() local n = 0 for _ in Charges.Defs do n += 1 end return n end)(), "Order lists every charge")
 end)
 
@@ -3764,6 +3765,178 @@ test("assay: the save migrates to v16 with an empty record and the title is a va
 	eq(next(d.Assay.Pops), nil, "empty")
 	eq(Schema.CURRENT_VERSION >= 16, true, "v16 exists")
 	eq(require("../../src/ReplicatedStorage/Shared/Grants").Valid({ Kind = "Title", Title = AssayCfg.Title }), true, "title valid")
+end)
+
+-- Trait tree and shape extras ----------------------------------------------------------------------------------------
+local Loadout = require("../../src/ReplicatedStorage/Shared/Loadout")
+local TraitsCfg = require("../../src/ReplicatedStorage/Shared/Config/Traits")
+local function shapeSet(cells)
+	local set, n = {}, 0
+	for _, c in cells do set[c.X .. "," .. c.Z] = c; n += 1 end
+	return set, n
+end
+
+test("shapes: a Ring skips its middle, Width thickens lines, Diagonal adds the star, nothing is counted twice", function()
+	local ring, rn = shapeSet(ChainSim.BlastCells("Ring", 5, 5, 2.5, 0, 9, { Inner = 1 }))
+	eq(ring["5,5"], nil, "the centre is skipped")
+	eq(ring["6,5"], nil, "the touching neighbour is skipped (distance 1 is not beyond the hole)")
+	eq(ring["6,6"] ~= nil and ring["7,5"] ~= nil and ring["7,6"] ~= nil, true, "the ring itself")
+	eq(ring["8,5"], nil, "beyond the outer radius")
+	eq(rn, 16, "sixteen cells in a 1 to 2.5 ring")
+	local _, filled = shapeSet(ChainSim.BlastCells("Ring", 5, 5, 2.5, 0, 9, { Inner = 0 }))
+	eq(filled, 21, "no hole: the whole disc of radius 2.5, middle included")
+	local _, plain = shapeSet(ChainSim.BlastCells("Column", 5, 5, 0, 4, 9))
+	eq(plain, 9, "a plain column is one lane")
+	local wide, wn = shapeSet(ChainSim.BlastCells("Column", 5, 5, 0, 4, 9, { Width = 1 }))
+	eq(wn, 27, "width 1 = three lanes")
+	eq(wide["4,1"] ~= nil and wide["6,9"] ~= nil, true, "the outer lanes reach the ends")
+	local _, wider = shapeSet(ChainSim.BlastCells("Column", 5, 5, 0, 4, 9, { Width = 2 }))
+	eq(wider, 45, "width 2 = five lanes")
+	local _, edge = shapeSet(ChainSim.BlastCells("Column", 1, 5, 0, 4, 9, { Width = 1 }))
+	eq(edge, 18, "lanes are clipped at the grid edge")
+	local _, cross = shapeSet(ChainSim.BlastCells("Cross", 5, 5, 0, 4, 9))
+	eq(cross, 17, "a plain cross of range 4")
+	local star, sn = shapeSet(ChainSim.BlastCells("Cross", 5, 5, 0, 4, 9, { Diagonal = true }))
+	eq(sn, 33, "a star adds 16 diagonal cells (4 per diagonal arm)")
+	eq(star["6,6"] ~= nil and star["9,1"] ~= nil and star["1,9"] ~= nil, true, "diagonals reach the corners")
+	local _, thick = shapeSet(ChainSim.BlastCells("Cross", 5, 5, 0, 4, 9, { Width = 1 }))
+	eq(thick, 45, "thick arms: two 3x9 bars overlapping in a 3x3, counted once")
+end)
+
+test("shapes: a charge's DirectMult pays only the crystals it hits directly, not the ones the chain reaches", function()
+	local function ctxWith(mult)
+		local charges = { Basic = { Name = "b", Shape = "Radius", Radius = 1.5, DirectMult = mult } }
+		return { Crystals = Crystals.Defs, Charges = charges, Tuning = Tuning }
+	end
+	local g = { Size = 9, Cells = {} }
+	g.Cells[ChainSim.Key(9, 5, 5)] = { Kind = "Glimmerstone" }
+	g.Cells[ChainSim.Key(9, 5, 6)] = { Kind = "Kindlequartz" } -- volatile: sets off its neighbours as a chain
+	g.Cells[ChainSim.Key(9, 5, 8)] = { Kind = "Glimmerstone" } -- reached only by the chain, not by the charge
+	local base = ChainSim.Run(g, { { X = 5, Z = 5, Kind = "Basic" } }, ctxWith(nil))
+	local boosted = ChainSim.Run(g, { { X = 5, Z = 5, Kind = "Basic" } }, ctxWith(2))
+	eq(base.Pops, boosted.Pops, "the mult never changes what pops")
+	local function valueAt(result, x, z)
+		for _, ev in result.Events do if ev.X == x and ev.Z == z then return ev.Value, ev.Cause end end
+		return nil
+	end
+	local v1, c1 = valueAt(base, 5, 5)
+	local v2 = valueAt(boosted, 5, 5)
+	eq(c1, "Charge", "the cell under the charge is a direct hit")
+	eq(v2, v1 * 2, "direct hits pay double")
+	local far1, farCause = valueAt(base, 5, 8)
+	local far2 = valueAt(boosted, 5, 8)
+	if far1 ~= nil then
+		eq(farCause ~= "Charge", true, "the far crystal was set off by the chain")
+		eq(far2, far1, "chain-reached crystals are not boosted")
+	end
+end)
+
+test("traits: config is coherent (every node listed once, requirements and groups make sense, costs rise by tier)", function()
+	local seen = {}
+	for _, id in TraitsCfg.Order do
+		eq(TraitsCfg.Nodes[id] ~= nil, true, id .. " is defined")
+		eq(seen[id], nil, id .. " listed once")
+		seen[id] = true
+	end
+	for id, node in TraitsCfg.Nodes do
+		eq(seen[id], true, id .. " is in Order")
+		eq(Charges.Defs[node.Branch] ~= nil, true, id .. " belongs to a real charge")
+		eq(node.Cost > 0, true, id .. " costs something")
+		if node.Requires then
+			local req = TraitsCfg.Nodes[node.Requires]
+			eq(req ~= nil and req.Branch == node.Branch and req.Tier == node.Tier - 1, true, id .. " requires the previous tier of its own branch")
+		else
+			eq(node.Tier, 1, id .. " with no requirement is tier 1")
+		end
+		if node.Group then
+			local rivals = 0
+			for _, other in TraitsCfg.Nodes do if other.Group == node.Group then rivals += 1 end end
+			eq(rivals, 2, id .. " is one of exactly two in its fork")
+		end
+	end
+	for _, branch in TraitsCfg.BranchOrder do
+		local tiers = { 0, 0, 0 }
+		for _, node in TraitsCfg.Nodes do if node.Branch == branch then tiers[node.Tier] += 1 end end
+		eq(tiers[1] == 1 and tiers[2] == 2 and tiers[3] == 2, true, branch .. " has 1 + 2 + 2 nodes")
+	end
+	eq(#TraitsCfg.BranchOrder, #Charges.Order, "every charge has a branch")
+end)
+
+test("traits: buying needs the charge, the previous tier, shards and respects the fork", function()
+	local st = Loadout.Default()
+	local basicOnly = { Basic = true }
+	eq(select(1, Loadout.CanBuy(st, "BoreBroad", TraitsCfg, basicOnly, 1e9)), false, "the charge is not unlocked")
+	eq(select(1, Loadout.CanBuy(st, "CapShaped", TraitsCfg, basicOnly, 1e9)), false, "tier 2 needs tier 1")
+	eq(select(1, Loadout.CanBuy(st, "CapPacked", TraitsCfg, basicOnly, TraitsCfg.Nodes.CapPacked.Cost - 1)), false, "one shard short")
+	eq(Loadout.Buy(st, "CapPacked", TraitsCfg, basicOnly, TraitsCfg.Nodes.CapPacked.Cost), TraitsCfg.Nodes.CapPacked.Cost, "bought exactly at the price")
+	eq(Loadout.Buy(st, "CapPacked", TraitsCfg, basicOnly, 1e9), nil, "cannot be bought twice")
+	eq(Loadout.Buy(st, "CapShaped", TraitsCfg, basicOnly, 1e9) ~= nil, true, "the fork: take one")
+	eq(select(1, Loadout.CanBuy(st, "CapWide", TraitsCfg, basicOnly, 1e9)), false, "the rival is locked out")
+	eq(select(1, Loadout.CanBuy(st, "CapMega", TraitsCfg, basicOnly, 1e9)), false, "the rival's capstone needs the rival")
+	eq(select(1, Loadout.CanBuy(st, "CapDemolition", TraitsCfg, basicOnly, 1e9)), true, "the chosen path continues")
+	for _, junk in { 5, true, {}, "Nope", "", "__index" } do
+		eq(select(1, Loadout.CanBuy(st, junk, TraitsCfg, basicOnly, 1e9)), false, "junk id")
+		eq(Loadout.Buy(st, junk, TraitsCfg, basicOnly, 1e9), nil, "junk id cannot be bought")
+	end
+end)
+
+test("traits: respec clears only that branch and takes the fork back", function()
+	local st = Loadout.Default()
+	local all = { Basic = true, Shaft = true }
+	Loadout.Buy(st, "CapPacked", TraitsCfg, all, 1e9)
+	Loadout.Buy(st, "CapShaped", TraitsCfg, all, 1e9)
+	Loadout.Buy(st, "BoreBroad", TraitsCfg, all, 1e9)
+	eq(Loadout.Respec(st, 5 :: any, TraitsCfg), 0, "junk branch")
+	eq(Loadout.Respec(st, "Cross", TraitsCfg), 0, "an empty branch removes nothing")
+	eq(Loadout.Respec(st, "Basic", TraitsCfg), 2, "two removed")
+	eq(st.Owned.BoreBroad, true, "another branch is untouched")
+	eq(Loadout.Buy(st, "CapPacked", TraitsCfg, all, 1e9) ~= nil, true, "start again")
+	eq(Loadout.Buy(st, "CapWide", TraitsCfg, all, 1e9) ~= nil, true, "and take the other fork")
+end)
+
+test("traits: effective charges apply owned effects only, never mutate the base, and match what ChainSim covers", function()
+	local base = Charges.Defs
+	local before = base.Shaft.Width
+	local st = Loadout.Default()
+	local all = { Basic = true, Shaft = true, Cross = true, Shock = true }
+	local plain = Loadout.Charges(base, st, TraitsCfg, 0)
+	eq(plain.Basic.Radius, base.Basic.Radius, "no traits: unchanged")
+	for _, id in { "CapPacked", "CapWide", "CapMega", "BoreBroad", "BoreTrench", "CrossHeavy", "CrossStar", "ShockTuned", "ShockCore" } do
+		st.Owned[id] = true
+	end
+	local eff = Loadout.Charges(base, st, TraitsCfg, 0.5)
+	eq(eff.Basic.Radius, base.Basic.Radius + 0.5 + 0.5 + 0.75 + 0.5, "cap: packed + wide + mega + the Fat Fuse bonus")
+	eq(eff.Shaft.Width, 2, "bore: two width upgrades")
+	eq(eff.Cross.Diagonal, true, "cross: star")
+	eq(eff.Cross.DirectMult, 1.25, "cross: heavy arms")
+	eq(eff.Shock.Radius, base.Shock.Radius + 0.5, "shock: tuned coil")
+	eq(eff.Shock.Inner, 0, "shock core fills the hole (never below zero)")
+	eq(eff.Shaft.Radius or 0, 0, "the fat-fuse bonus is only for round blasts")
+	eq(base.Shaft.Width, before, "the base definitions are untouched")
+	local _, cells = shapeSet(ChainSim.BlastCells(eff.Shaft.Shape, 5, 5, eff.Shaft.Radius or 0, eff.Shaft.Range or 0, 9, eff.Shaft))
+	eq(cells, 45, "the sim covers five lanes for a Trench bore")
+end)
+
+test("charges: every charge type has a role line, a priced unlock except the first, and a Direct damage entry for combat", function()
+	local LurkerCfg2 = require("../../src/ReplicatedStorage/Shared/Config/Lurkers")
+	local BossCfg2 = require("../../src/ReplicatedStorage/Shared/Config/Bosses")
+	for id, def in Charges.Defs do
+		eq(type(def.Role) == "string" and def.Role ~= "", true, id .. " has a role")
+		eq(id == "Basic" or (def.UnlockCost or 0) > 0, true, id .. " is a priced unlock")
+		eq(LurkerCfg2.Damage.Direct[id] ~= nil, true, id .. " has Lurker damage")
+		for kind, boss in BossCfg2.Defs do eq(boss.Direct[id] ~= nil, true, kind .. " boss has damage for " .. id) end
+	end
+end)
+
+test("upgrades: every rig upgrade has ascending prices; unlock prices rise across areas and charges", function()
+	local U = require("../../src/ReplicatedStorage/Shared/Config/Upgrades")
+	local Strata2 = require("../../src/ReplicatedStorage/Shared/Config/Strata")
+	for _, id in U.Order do
+		local d = U.Defs[id]
+		eq(d ~= nil and #d.Costs >= 1 and d.PerLevel > 0, true, id .. " is defined")
+		for i = 2, #d.Costs do eq(d.Costs[i] > d.Costs[i - 1], true, id .. " price rises") end
+	end
+	for i = 2, #Strata2 do eq(Strata2[i].Cost > Strata2[i - 1].Cost, true, "area price rises") end
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

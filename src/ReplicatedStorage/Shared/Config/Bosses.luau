@@ -28,7 +28,7 @@ return {
 			Core = { X = 5, Z = 5 },
 			Nodes = 5,
 			ArmorBreakDamage = 6,
-			Direct = { Basic = 4, Shaft = 5, Cross = 5 },
+			Direct = { Basic = 4, Shaft = 5, Cross = 5, Shock = 5 },
 			Splash = 1,
 			SplashCap = 6,
 			PopsPerBonus = 4,
@@ -67,7 +67,7 @@ return {
 			Core = { X = 5, Z = 5 }, -- the 3x3 body in the middle of the grid; charges must reach it
 			Nodes = 4, -- armor nodes (crystals) that must be popped in phase 1
 			ArmorBreakDamage = 6,
-			Direct = { Basic = 4, Shaft = 5, Cross = 5 }, -- per charge whose blast reaches the core
+			Direct = { Basic = 4, Shaft = 5, Cross = 5, Shock = 5 }, -- per charge whose blast reaches the core
 			Splash = 1, -- per crystal popped near the core ...
 			SplashCap = 6, -- ... up to this many
 			PopsPerBonus = 4, -- +1 damage per this many pops in the chain

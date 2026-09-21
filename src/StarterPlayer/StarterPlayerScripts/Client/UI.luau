@@ -23,6 +23,8 @@ local Calm = require(script.Parent.Calm)
 local Feed = require(script.Parent.Feed)
 local BossHud = require(script.Parent.BossHud)
 local Theme = require(script.Parent.Theme)
+local Loadout = require(Shared.Loadout)
+local ChainSim = require(Shared.ChainSim)
 local Kit = require(script.Parent.Kit)
 local Icons = require(script.Parent.Icons)
 
@@ -350,8 +352,8 @@ function UI.Init()
 	-- (the dock along the bottom is the navigation now; this in-panel tab bar stays hidden but keeps the tab buttons wired)
 	local tabBar = mk("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 42), ZIndex = 11, Visible = false }, kitPanel.Body)
 	mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, tabBar)
-	for i, name in { "Forge", "Daily", "Farm", "Goals", "Shop", "Codex" } do
-		local tab = button(tabBar, name, THEME.Row, { Size = UDim2.new(1 / 6, -5, 1, 0), TextSize = 14, LayoutOrder = i, ZIndex = 12 })
+	for i, name in { "Forge", "Loadout", "Daily", "Farm", "Goals", "Shop", "Codex" } do
+		local tab = button(tabBar, name, THEME.Row, { Size = UDim2.new(1 / 7, -5, 1, 0), TextSize = 14, LayoutOrder = i, ZIndex = 12 })
 		tab.TextColor3 = Fx.Tab[name]
 		mk("UIStroke", { Color = Fx.Tab[name], Thickness = 1.5, Transparency = 0.5 }, tab)
 		tabButtons[name] = tab
@@ -667,7 +669,7 @@ function UI.Toast(text, kind)
 	AudioManager.Play(kind == "Error" and "Error" or "Reward")
 end
 
-local TAB_GLYPH = { Forge = "▲", Daily = "★", Farm = "●", Goals = "★", Shop = "◆", Codex = "◆" }
+local TAB_GLYPH = { Loadout = "◆", Forge = "▲", Daily = "★", Farm = "●", Goals = "★", Shop = "◆", Codex = "◆" }
 
 -- One list row: a glowing icon tile (or a spinning gem), title and description, an optional progress bar, and a button.
 -- opts = { Icon = glyph, IconColor = Color3, Gem = Color3 (spinning crystal), Dim = greyed out, Progress = 0..1, Accent = Color3 }
@@ -769,7 +771,7 @@ local function rebuildPanel()
 				local owned = d.UnlockedCharges[id]
 				row(order, def.Name, def.Description, owned and "Owned" or ("Unlock  ◆ " .. commas(def.UnlockCost)), not owned and d.Shards >= def.UnlockCost, function()
 					if not owned then Remotes.Buy:FireServer("Charge", id) end
-				end, nil, { Icon = ({ Basic = "o", Shaft = "|", Cross = "+" })[id] or "*", Accent = ({ Basic = Color3.fromRGB(255, 160, 60), Shaft = Color3.fromRGB(90, 200, 255), Cross = Color3.fromRGB(255, 100, 220) })[id], Dim = false })
+				end, nil, { Icon = ({ Basic = "o", Shaft = "|", Cross = "+", Shock = "~" })[id] or "*", Accent = ({ Basic = Color3.fromRGB(255, 160, 60), Shaft = Color3.fromRGB(90, 200, 255), Cross = Color3.fromRGB(255, 100, 220), Shock = Color3.fromRGB(120, 230, 190) })[id], Dim = false })
 			end
 		end
 		order += 1
@@ -781,6 +783,54 @@ local function rebuildPanel()
 			row(order, ("%d. %s"):format(n, s.Name), s.Description, unlocked and "Open" or ("Unlock  ◆ " .. commas(s.Cost)), can, function()
 				if not unlocked then Remotes.Buy:FireServer("Stratum", tostring(n)) end
 			end, nil, { Icon = tostring(n), Accent = ({ Color3.fromRGB(90, 200, 255), Color3.fromRGB(190, 120, 255), Color3.fromRGB(255, 120, 60), Color3.fromRGB(110, 230, 190) })[n], Dim = not unlocked and not can })
+		end
+	elseif activeTab == "Loadout" then
+		titleLabel.Text = "Loadout"
+		local order = 0
+		header(order, "Each charge has its own upgrade path: pick ONE fork per branch")
+		local state = { Owned = d.Traits or {} }
+		local charges = State.Charges()
+		for _, branch in Config.Traits.BranchOrder do
+			local def = Config.Charges.Defs[branch]
+			local unlocked = d.UnlockedCharges[branch] == true
+			local eff = charges[branch]
+			local cells = #ChainSim.BlastCells(eff.Shape, 5, 5, eff.Radius or 0, eff.Range or 0, 9, eff)
+			local direct = eff.DirectMult and eff.DirectMult > 1 and ("   direct hits x%.2f"):format(eff.DirectMult) or ""
+			order += 1
+			header(order, ("%s   %d cells%s"):format(def.Name, cells, direct))
+			local anyOwned = false
+			for _ in pairs(state.Owned) do anyOwned = true break end
+			local ownedHere = false
+			for id, node in Config.Traits.Nodes do
+				if node.Branch == branch and state.Owned[id] then ownedHere = true end
+			end
+			order += 1
+			local resetText = ownedHere and ("Reset  ◆ " .. commas(Config.Traits.Respec)) or nil
+			row(order, unlocked and def.Role or "Locked: unlock this charge in the Forge", def.Description, resetText, ownedHere and d.Shards >= Config.Traits.Respec, function()
+				Remotes.TraitAction:FireServer("respec", branch)
+			end, nil, { Icon = ({ Basic = "o", Shaft = "|", Cross = "+", Shock = "~" })[branch] or "*", Accent = ({ Basic = Color3.fromRGB(255, 160, 60), Shaft = Color3.fromRGB(90, 200, 255), Cross = Color3.fromRGB(255, 100, 220), Shock = Color3.fromRGB(120, 230, 190) })[branch], Dim = not unlocked })
+			for _, node in Loadout.BranchView(state, branch, Config.Traits, d.UnlockedCharges, d.Shards) do
+				order += 1
+				local cfgNode = Config.Traits.Nodes[node.Id]
+				local btn
+				if node.Owned then
+					btn = "Owned"
+				elseif node.CanBuy then
+					btn = "Buy  ◆ " .. commas(node.Cost)
+				elseif node.Reason == "Not enough shards." then
+					btn = "◆ " .. commas(node.Cost)
+				else
+					btn = "Locked"
+				end
+				local tierText = cfgNode.Group and ("Tier %d, fork"):format(node.Tier) or ("Tier %d"):format(node.Tier)
+				local desc = node.Description
+				if not node.Owned and not node.CanBuy and node.Reason ~= "Not enough shards." then
+					desc = desc .. "  (" .. node.Reason .. ")"
+				end
+				row(order, ("%s  [%s]"):format(node.Name, tierText), desc, btn, node.CanBuy, function()
+					Remotes.TraitAction:FireServer("buy", node.Id)
+				end, node.Owned and THEME.Gold or nil, { Icon = tostring(node.Tier), Accent = ({ Basic = Color3.fromRGB(255, 160, 60), Shaft = Color3.fromRGB(90, 200, 255), Cross = Color3.fromRGB(255, 100, 220), Shock = Color3.fromRGB(120, 230, 190) })[branch], Dim = not node.Owned and not node.CanBuy })
+			end
 		end
 	elseif activeTab == "Daily" then
 		titleLabel.Text = "Daily objectives"
@@ -1149,8 +1199,8 @@ local function rebuildCharges()
 		if State.Data.UnlockedCharges[id] then
 			local def = Config.Charges.Defs[id]
 			local selected = State.SelectedCharge == id
-			local kindColor = ({ Basic = Color3.fromRGB(255, 160, 60), Shaft = Color3.fromRGB(90, 200, 255), Cross = Color3.fromRGB(255, 100, 220) })[id] or THEME.Accent
-			local kindGlyph = ({ Basic = "o", Shaft = "|", Cross = "+" })[id] or "*"
+			local kindColor = ({ Basic = Color3.fromRGB(255, 160, 60), Shaft = Color3.fromRGB(90, 200, 255), Cross = Color3.fromRGB(255, 100, 220), Shock = Color3.fromRGB(120, 230, 190) })[id] or THEME.Accent
+			local kindGlyph = ({ Basic = "o", Shaft = "|", Cross = "+", Shock = "~" })[id] or "*"
 			local b = button(chargeColumn, ("[%s] %s"):format(kindGlyph, def.Name), selected and kindColor or THEME.Panel, { Size = UDim2.fromOffset(150, 42), TextSize = 15, LayoutOrder = i, TextColor3 = selected and THEME.Text or Fx.Lighten(kindColor, 0.35) })
 			mk("UIStroke", { Color = kindColor, Thickness = selected and 3 or 1.5, Transparency = selected and 0.05 or 0.5 }, b)
 			b.Activated:Connect(function()
