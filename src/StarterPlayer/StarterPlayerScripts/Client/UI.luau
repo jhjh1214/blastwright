@@ -83,7 +83,7 @@ local function commas(n)
 	return (out:gsub("^,", ""))
 end
 
-local eventLabel
+local eventLabel, communityLabel
 local gui, shardLabel, locationLabel, cacheLabel, objectiveCard, objectiveText, blastHint, seamLabel, chainLabel, previewFrame, previewLabel, infoLabel
 local welcomeFrame, menuDot, detonateStroke
 local detonatePulse = false
@@ -134,6 +134,7 @@ function UI.Init()
 	roamGroup = fullGroup("Roam")
 	locationLabel = label(roamGroup, "", 20, THEME.Text, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(320, 28) })
 	eventLabel = label(roamGroup, "", 13, THEME.Gold, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 52), Size = UDim2.fromOffset(200, 34), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Right, TextYAlignment = Enum.TextYAlignment.Top, Visible = false })
+	communityLabel = label(roamGroup, "", 13, THEME.Accent, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 92), Size = UDim2.fromOffset(200, 34), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Right, TextYAlignment = Enum.TextYAlignment.Top, Visible = false })
 	cacheLabel = label(roamGroup, "", 16, THEME.Dim, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.fromOffset(170, 22), TextXAlignment = Enum.TextXAlignment.Left })
 	objectiveCard = mk("Frame", { BackgroundColor3 = THEME.Bg, BackgroundTransparency = 0.2, Position = UDim2.new(0, 12, 0, 80), Size = UDim2.fromOffset(250, 0), AutomaticSize = Enum.AutomaticSize.Y, Visible = false }, roamGroup)
 	corner(objectiveCard, 12)
@@ -370,6 +371,26 @@ function UI.SetInfo(text)
 		infoLabel.Text = text
 		infoLabel.Visible = text ~= nil and text ~= ""
 	end
+end
+
+-- Shared Server Goal line (roaming HUD). view = { Round, Progress, Target, Done, FrenzyLeft } or nil.
+function UI.SetCommunity(view, receivedAt)
+	if not communityLabel then return end
+	if not view then
+		communityLabel.Visible = false
+		return
+	end
+	local frenzy = math.max(0, view.FrenzyLeft - (os.clock() - (receivedAt or os.clock())))
+	local text
+	if frenzy > 0 then
+		text = ("Server frenzy! Payouts boosted for %d:%02d"):format(frenzy // 60, frenzy % 60)
+	elseif view.Done then
+		text = "Server goal reached! Next one starting..."
+	else
+		text = ("Server goal: %s / %s pops together"):format(commas(view.Progress), commas(view.Target))
+	end
+	communityLabel.Text = text
+	communityLabel.Visible = true
 end
 
 function UI.SetChain(pops, mult)

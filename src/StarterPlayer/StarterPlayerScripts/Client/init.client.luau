@@ -63,6 +63,11 @@ Remotes.SeamStart.OnClientEvent:Connect(function(payload)
 	end
 end)
 
+Remotes.Community.OnClientEvent:Connect(function(view)
+	State.Community, State.CommunityAt = view, os.clock()
+	UI.SetCommunity(view, State.CommunityAt)
+end)
+
 Remotes.SeamRemove.OnClientEvent:Connect(function(userId)
 	CavernView.Remove(userId)
 	if userId == localPlayer.UserId then

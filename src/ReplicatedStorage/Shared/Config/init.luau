@@ -19,6 +19,7 @@ return {
 	Achievements = require(script.Achievements),
 	Cosmetics = require(script.Cosmetics),
 	Events = require(script.Events),
+	Community = require(script.Community),
 	Tuning = Tuning,
 	Context = {
 		Crystals = Crystals.Defs,

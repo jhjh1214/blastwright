@@ -11,6 +11,9 @@ The game is a walkable mine, not a single screen. Layout data and tests: `Config
 ## Daily objectives
 Menu > Daily shows three objectives that rotate each UTC day (same for everyone, deterministic from the day number). Targets and rewards rise by slot. Progress is recorded by the server as you blast. Claiming pays shards once. Unclaimed rewards are lost at reset, but a missed day costs nothing else (no streaks). A dot on the Menu button and a pulsing objective tell you when one is ready.
 
+## Server Goal (co-op)
+Everyone on a server pools their pops toward one shared target (`Config/Community.luau`): 250 with one player, plus 150 for each extra player online when the round starts, capped at 2,500. The progress is shown under the event banner. When it is reached, **everyone who contributed** gets 1,500 shards and the whole server gets a 3-minute **Frenzy** (payouts x1.25, stacking with events and passes); a new round starts 20 seconds later, retargeted for the players then online. It gives a lone player and a full server the same feeling of "we did it together" with no matchmaking. The rules (target scaling, one completion per round, contributor tracking, frenzy timing) are pure, tested code; the broadcasting is server code that has not been run.
+
 ## Live events
 A calendar (UTC, `Config/Events.luau`) switches rules on for everyone with no update or restart: **Prismatic Weekend** (Saturday and Sunday: 3x Prismatic chance), **Overcharge Wednesday** (+1 charge every seam), and **Happy Hour** (18:00 to 19:00 every day: payouts x1.5). A gold banner under the Menu button names the active event and its time left. Seams generated during an event use its rules; payouts use the rate in force when you detonate. Adding an event is one table in the config (a test checks weekdays, hours, effect names and that no shard bonus exceeds 3x). Event rates multiply with the 2x Shards and Prismatic Luck passes.
 

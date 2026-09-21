@@ -11,6 +11,7 @@ local Geometry = require(Shared.Geometry)
 local Remotes = require(Shared.Remotes)
 
 local Achievements = require(Shared.Achievements)
+local Community = require(Shared.Community)
 local Cosmetics = require(Shared.Cosmetics)
 local Dailies = require(Shared.Dailies)
 local Events = require(Shared.Events)
@@ -33,6 +34,7 @@ local WeekliesConfig = Config.Weeklies
 local AchievementsConfig = Config.Achievements
 local CosmeticsConfig = Config.Cosmetics
 local EventsConfig = Config.Events
+local CommunityConfig = Config.Community
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -64,6 +66,8 @@ local lastAction: { [Player]: { Buy: number, Detonate: number } } = {}
 local seenGoals: { [Player]: { [string]: boolean } } = {}
 local seamCounter = 0
 local limiter = RateLimiter.new()
+local goal = Community.New(1, 1, CommunityConfig) -- the shared Server Goal for this server
+local goalDirty = true
 
 -- Every remote and prompt handler goes through here: a per-player, per-remote token bucket drops floods (an exploiter
 -- spamming a remote) before any work is done. Legitimate play stays far below these limits.
@@ -199,6 +203,32 @@ local function seamPayload(player: Player, seam: SeamState): { [string]: any }
 	}
 end
 
+-- Server Goal: reward everyone who contributed, start the frenzy, and open the next round a little later.
+local function finishGoal()
+	for _, userId in Community.Rewardees(goal) do
+		local player = Players:GetPlayerByUserId(userId)
+		local data = player and Data.Get(player)
+		if player and data then
+			data.Shards += CommunityConfig.RewardShards
+			data.Stats.TotalShards += CommunityConfig.RewardShards
+			notify(player, ("Server goal reached! +%d shards, and a server-wide frenzy!"):format(CommunityConfig.RewardShards), "Reward")
+			sync(player)
+		end
+	end
+	Community.StartFrenzy(goal, os.clock(), CommunityConfig)
+	goalDirty = true
+	local finished = goal
+	task.delay(CommunityConfig.NewRoundDelay, function()
+		if goal ~= finished then
+			return
+		end
+		local nextGoal = Community.New(finished.Round + 1, #Players:GetPlayers(), CommunityConfig)
+		nextGoal.FrenzyUntil = finished.FrenzyUntil -- the frenzy outlives the round that earned it
+		goal = nextGoal
+		goalDirty = true
+	end)
+end
+
 local function startSeam(player: Player)
 	local data = Data.Get(player)
 	local siteId = playerSite[player]
@@ -315,7 +345,7 @@ local function onDetonate(player: Player, payload: any)
 			data.Codex.Mutated[ev.Kind] = true
 		end
 	end
-	local multiplier = (Purchases.Owns(player, "DoubleShards") and 2 or 1) * Events.Combine(activeEvents()).ShardMult
+	local multiplier = (Purchases.Owns(player, "DoubleShards") and 2 or 1) * Events.Combine(activeEvents()).ShardMult * Community.Mult(goal, os.clock(), CommunityConfig)
 	local payout = math.floor(result.Total * multiplier + 0.5)
 	seam.Popped += valuablePops
 	seam.Earned += payout
@@ -331,6 +361,10 @@ local function onDetonate(player: Player, payload: any)
 	end
 	data.Stats.BestChain = math.max(data.Stats.BestChain, result.Pops)
 	Leaderboard.Submit(player.UserId, data.Stats.BestChain)
+	if Community.Contribute(goal, player.UserId, result.Pops) then
+		finishGoal()
+	end
+	goalDirty = true
 	if result.Momentum then
 		seam.Charges = math.min(seam.Charges + 1, seam.ChargesMax)
 	end
@@ -610,6 +644,7 @@ local function onPlayerAdded(player: Player)
 	Purchases.LoadPasses(player)
 	player:LoadCharacter()
 	sync(player)
+	Remotes.Community:FireClient(player, Community.View(goal, os.clock(), CommunityConfig))
 
 	-- Show caverns that are already active.
 	for other, seam in seams do
@@ -689,6 +724,18 @@ function Game.Init()
 		task.spawn(onPlayerAdded, player)
 	end
 	task.spawn(idleLoop)
+	-- Broadcast the shared goal when it changed (at most every 2 seconds), and at least every 10 so timers stay honest.
+	task.spawn(function()
+		local ticks = 0
+		while true do
+			task.wait(2)
+			ticks += 1
+			if goalDirty or ticks % 5 == 0 then
+				goalDirty = false
+				Remotes.Community:FireAllClients(Community.View(goal, os.clock(), CommunityConfig))
+			end
+		end
+	end)
 end
 
 return Game
