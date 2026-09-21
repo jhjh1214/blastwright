@@ -64,7 +64,9 @@ local function label(parent, text, size, color, props)
 		TextStrokeTransparency = 1,
 	}
 	for k, v in props or {} do
-		p[k] = v
+		if k ~= "NoOutline" then
+			p[k] = v
+		end
 	end
 	local l = mk("TextLabel", p, parent)
 	if size >= 16 and not (props and props.NoOutline) then
