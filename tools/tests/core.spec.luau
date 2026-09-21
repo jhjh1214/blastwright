@@ -2161,5 +2161,323 @@ test("schema: v9 saves migrate to v10 with a slain counter and keep every other 
 	eq(Schema.Default().Stats.LurkersSlain, 0, "new profiles start at 0")
 end)
 
+local Power = require("../../src/ReplicatedStorage/Shared/Power")
+local Boss = require("../../src/ReplicatedStorage/Shared/Boss")
+local BossCfg = require("../../src/ReplicatedStorage/Shared/Config/Bosses")
+local PowerCfg = BossCfg.Power
+local TitanDef = BossCfg.Defs.Titan
+local bctx = { Crystals = Crystals.Defs, Charges = Charges.Defs, Tuning = Tuning, BlastCells = ChainSim.BlastCells, Size = N }
+local function lcg(seed) local s = seed return function() s = (s * 48271) % 2147483647 return s / 2147483647 end end
+local function fullGrid() return grid(function() return "Glimmerstone" end) end
+local function fakeResult(pops, events) return { Pops = pops, Events = events or {} } end
+
+test("power: tiers pick the highest reached and give 1 below the first", function()
+	eq((Power.Tier(PowerCfg.Tiers[1].Pops - 1, PowerCfg)), 1, "too small")
+	for _, t in PowerCfg.Tiers do
+		local mult, name = Power.Tier(t.Pops, PowerCfg)
+		eq(mult, t.Damage, t.Name .. " multiplier at its threshold")
+		eq(name, t.Name, t.Name .. " name")
+	end
+	eq((Power.Tier(9999, PowerCfg)), PowerCfg.Tiers[#PowerCfg.Tiers].Damage, "no higher than the top tier")
+end)
+
+test("power: tiers ascend in both size and damage, and Critical Mass starts at the config chain length", function()
+	for i = 2, #PowerCfg.Tiers do
+		eq(PowerCfg.Tiers[i].Pops > PowerCfg.Tiers[i - 1].Pops and PowerCfg.Tiers[i].Damage > PowerCfg.Tiers[i - 1].Damage, true, "ascending at " .. i)
+	end
+	eq(Power.StartsCritical(PowerCfg.CriticalPops, PowerCfg), true, "at the threshold")
+	eq(Power.StartsCritical(PowerCfg.CriticalPops - 1, PowerCfg), false, "just under")
+end)
+
+test("power: Critical Mass boosts the next volleys, counts down, and a new huge chain refreshes it", function()
+	local left, started = Power.Advance(0, PowerCfg.CriticalPops, PowerCfg)
+	eq(left, PowerCfg.CriticalVolleys, "starts")
+	eq(started, true, "reported as just started")
+	eq(Power.Multiplier(3, left, PowerCfg), PowerCfg.CriticalDamage, "boosts a small chain while active")
+	eq(Power.Multiplier(3, 0, PowerCfg), 1, "no boost when not active")
+	local l1 = Power.Advance(left, 3, PowerCfg)
+	eq(l1, PowerCfg.CriticalVolleys - 1, "counts down")
+	local l0 = Power.Advance(1, 3, PowerCfg)
+	eq(l0, 0, "runs out")
+	eq(Power.Advance(0, 3, PowerCfg), 0, "never negative")
+	local again, restarted = Power.Advance(1, PowerCfg.CriticalPops, PowerCfg)
+	eq(again, PowerCfg.CriticalVolleys, "refreshed")
+	eq(restarted, false, "but not announced as new")
+	eq(Power.Multiplier(PowerCfg.CriticalPops, 1, PowerCfg), PowerCfg.Tiers[#PowerCfg.Tiers].Damage * PowerCfg.CriticalDamage, "tier and Critical multiply")
+end)
+
+test("boss: a new fight clears the 3x3 core and picks armor nodes on valuable crystals outside it", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(7))
+	for dz = -1, 1 do for dx = -1, 1 do eq(g.Cells[ChainSim.Key(N, 5 + dx, 5 + dz)], nil, "core cell empty") end end
+	eq(#b.Nodes, TitanDef.Nodes, "node count")
+	eq(b.Phase, "Armor", "starts in armor")
+	eq(b.HP, TitanDef.MaxHP, "full health")
+	for _, n in b.Nodes do
+		eq(g.Cells[ChainSim.Key(N, n.X, n.Z)] ~= nil, true, "node sits on a crystal")
+	end
+end)
+
+test("boss: armor takes no damage; popping the last node breaks it, hurts a little and refunds a charge", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	local first = b.Nodes[1]
+	local o = Boss.Apply(b, {}, fakeResult(20, { { X = first.X, Z = first.Z } }), bctx, BossCfg, 1, g, lcg(1))
+	eq(o.NodesBroken, 1, "one node")
+	eq(b.HP, TitanDef.MaxHP, "armor: no damage")
+	eq(b.Phase, "Armor", "still armored")
+	local events = {}
+	for _, n in b.Nodes do table.insert(events, { X = n.X, Z = n.Z }) end
+	local o2 = Boss.Apply(b, {}, fakeResult(3, events), bctx, BossCfg, 1, g, lcg(1))
+	eq(b.Phase, "Attack", "armor broken")
+	eq(b.HP, TitanDef.MaxHP - TitanDef.ArmorBreakDamage, "armor-break damage")
+	eq(o2.PhaseChanged, true, "phase change reported")
+	eq(o2.Refund, TitanDef.PhaseRefund, "refund")
+end)
+
+test("boss: in the attack phase a charge on the core, nearby pops and a long chain all add up, scaled by power", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes = "Attack", {}
+	local events = { { X = 5, Z = 3 }, { X = 3, Z = 5 } } -- within 2 of the core
+	local dmg = Boss.Apply(b, { cap(5, 5) }, fakeResult(8, events), bctx, BossCfg, 1, g, lcg(1)).Damage
+	eq(dmg, TitanDef.Direct.Basic + 2 * TitanDef.Splash + 8 // TitanDef.PopsPerBonus, "direct + splash + chain bonus")
+	local b2 = Boss.New("Titan", fullGrid(), bctx, BossCfg, lcg(3))
+	b2.Phase, b2.Nodes = "Attack", {}
+	local doubled = Boss.Apply(b2, { cap(5, 5) }, fakeResult(8, events), bctx, BossCfg, 2, g, lcg(1)).Damage
+	eq(doubled, dmg * 2, "power doubles it")
+	local b3 = Boss.New("Titan", fullGrid(), bctx, BossCfg, lcg(3))
+	b3.Phase, b3.Nodes = "Attack", {}
+	eq(Boss.Apply(b3, { cap(1, 1) }, fakeResult(0, {}), bctx, BossCfg, 1, g, lcg(1)).Damage, 0, "a miss does nothing")
+end)
+
+test("boss: splash is capped and a Cross charge reaches the core from a distance", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes = "Attack", {}
+	local many = {}
+	for i = 1, 20 do many[i] = { X = 4 + i % 3, Z = 4 } end
+	eq(Boss.Apply(b, {}, fakeResult(0, many), bctx, BossCfg, 1, g, lcg(1)).Damage, TitanDef.SplashCap * TitanDef.Splash, "capped")
+	local b2 = Boss.New("Titan", fullGrid(), bctx, BossCfg, lcg(3))
+	b2.Phase, b2.Nodes = "Attack", {}
+	eq(Boss.Apply(b2, { { X = 5, Z = 9, Kind = "Cross" } }, fakeResult(0, {}), bctx, BossCfg, 1, g, lcg(1)).Damage, TitanDef.Direct.Cross, "cross reaches the core column")
+end)
+
+test("boss: HP thresholds move it through weak, enrage and finisher, refunding a charge each time", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes = "Attack", {}
+	b.HP = b.MaxHP
+	local function setHP(fraction) b.HP = math.ceil(b.MaxHP * fraction) + 1 end
+	setHP(TitanDef.AttackEnd)
+	local o = Boss.Apply(b, { cap(5, 5) }, fakeResult(4, {}), bctx, BossCfg, 1, g, lcg(1))
+	eq(b.Phase, "Weak", "into the weak-point phase")
+	eq(o.Refund, TitanDef.PhaseRefund, "refund")
+	eq(#b.Weak, TitanDef.Weak.Count, "weak points chosen")
+	b.Phase = "Weak"
+	b.Weak = { { X = 1, Z = 1 }, { X = 9, Z = 9 } }
+	setHP(TitanDef.WeakEnd)
+	Boss.Apply(b, {}, fakeResult(1, { { X = 1, Z = 1 } }), bctx, BossCfg, 1, g, lcg(1)) -- one weak point hit
+	eq(b.Phase, "Enrage", "into enrage")
+	eq(#b.Weak, 0, "weak points gone outside their phase")
+	b.Phase = "Enrage"
+	setHP(TitanDef.FinisherAt)
+	Boss.Apply(b, { cap(5, 5) }, fakeResult(4, {}), bctx, BossCfg, 1, g, lcg(1))
+	eq(b.Phase, "Finisher", "into the finisher")
+end)
+
+test("boss: in the weak-point phase hitting both points beats one, which beats none", function()
+	local function fight(events, pops)
+		local g = fullGrid()
+		local b = Boss.New("Titan", g, bctx, BossCfg, lcg(11))
+		b.Phase, b.Nodes = "Weak", {}
+		b.Weak = { { X = 1, Z = 1 }, { X = 9, Z = 9 } }
+		local o = Boss.Apply(b, {}, fakeResult(pops, events), bctx, BossCfg, 1, g, lcg(2))
+		return o.Damage, o.WeakHit
+	end
+	local none, n0 = fight({}, 6)
+	local one, n1 = fight({ { X = 1, Z = 1 } }, 6)
+	local both, n2 = fight({ { X = 1, Z = 1 }, { X = 9, Z = 9 } }, 6)
+	eq(n0 == 0 and n1 == 1 and n2 == 2, true, "weak hits counted")
+	eq(none, 6 // TitanDef.Weak.PopsPerMiss, "a miss only gets chain damage")
+	eq(one, TitanDef.Weak.One, "one point")
+	eq(both, TitanDef.Weak.Both, "both points")
+	eq(both > one and one > none, true, "ordering")
+end)
+
+test("boss: weak points are spread out, on crystals, and never inside the core", function()
+	for seed = 1, 12 do
+		local g = fullGrid()
+		local b = Boss.New("Titan", g, bctx, BossCfg, lcg(seed))
+		b.Phase, b.Nodes = "Attack", {}
+		b.HP = math.floor(b.MaxHP * TitanDef.AttackEnd) + 1
+		Boss.Apply(b, { cap(5, 5) }, fakeResult(4, {}), bctx, BossCfg, 1, g, lcg(seed + 50))
+		eq(#b.Weak, 2, "two points")
+		local a, c = b.Weak[1], b.Weak[2]
+		eq(math.max(math.abs(a.X - c.X), math.abs(a.Z - c.Z)) >= TitanDef.Weak.MinDist, true, "spread apart")
+		for _, w in b.Weak do
+			eq(g.Cells[ChainSim.Key(N, w.X, w.Z)] ~= nil, true, "on a crystal")
+			eq(math.abs(w.X - 5) <= 1 and math.abs(w.Z - 5) <= 1, false, "outside the core")
+		end
+	end
+end)
+
+test("boss: the finisher needs one big chain or Critical power; failing heals it and it stays a finisher", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes, b.HP = "Finisher", {}, 5
+	local o = Boss.Apply(b, {}, fakeResult(TitanDef.Finisher.Pops - 1, {}), bctx, BossCfg, 1, g, lcg(1))
+	eq(o.Killed, false, "too small")
+	eq(b.Phase, "Finisher", "still a finisher")
+	eq(b.HP, 5 + TitanDef.Finisher.HealOnFail, "healed a little")
+	eq(b.FinisherTries, 1, "try counted")
+	local o2 = Boss.Apply(b, {}, fakeResult(TitanDef.Finisher.Pops, {}), bctx, BossCfg, 1, g, lcg(1))
+	eq(o2.Killed, true, "a big chain ends it")
+	eq(b.Phase, "Dead", "dead")
+	local b2 = Boss.New("Titan", fullGrid(), bctx, BossCfg, lcg(3))
+	b2.Phase, b2.Nodes, b2.HP = "Finisher", {}, 5
+	eq(Boss.Apply(b2, {}, fakeResult(2, {}), bctx, BossCfg, 2, fullGrid(), lcg(1)).Killed, true, "Critical Mass power also finishes it")
+end)
+
+test("boss: an attack is telegraphed a turn ahead, then lands: it wrecks crystals on the line and costs a heart", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes = "Attack", {}
+	local first = Boss.Act(b, g, bctx, BossCfg, false, lcg(21))
+	eq(first.HeartsLost, 0, "nothing lands on the first turn")
+	eq(#b.Telegraph, N, "one full line is marked")
+	local marked = {}
+	for _, c in b.Telegraph do marked[#marked + 1] = { X = c.X, Z = c.Z } end
+	local second = Boss.Act(b, g, bctx, BossCfg, false, lcg(22))
+	eq(second.HeartsLost, 1, "the marked line hits")
+	eq(#second.Hit, N, "the whole line")
+	for _, c in marked do eq(g.Cells[ChainSim.Key(N, c.X, c.Z)], nil, "line crystals destroyed") end
+end)
+
+test("boss: a dodge cancels the heart loss, still wrecks the line, and goes on cooldown", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes = "Attack", {}
+	Boss.Act(b, g, bctx, BossCfg, false, lcg(21))
+	eq(Boss.CanDodge(b), true, "ready while an attack is marked")
+	local o = Boss.Act(b, g, bctx, BossCfg, true, lcg(22))
+	eq(o.Dodged, true, "dodged")
+	eq(o.HeartsLost, 0, "no heart lost")
+	eq(b.DodgeCooldown, TitanDef.Dodge.Cooldown, "cooldown starts")
+	eq(Boss.CanDodge(b), false, "not ready")
+	Boss.Act(b, g, bctx, BossCfg, false, lcg(23))
+	Boss.Act(b, g, bctx, BossCfg, false, lcg(24))
+	eq(b.DodgeCooldown, 0, "cooldown runs down")
+end)
+
+test("boss: armor phase does not attack; enrage marks two lines", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	Boss.Act(b, g, bctx, BossCfg, false, lcg(5))
+	eq(#b.Telegraph, 0, "armor: quiet")
+	b.Phase = "Enrage"
+	local found = false
+	for seed = 1, 20 do
+		Boss.Act(b, g, bctx, BossCfg, false, lcg(seed))
+		if #b.Telegraph == N * 2 then found = true end
+		if #b.Telegraph ~= N * 2 and #b.Telegraph ~= N then error("unexpected telegraph size " .. #b.Telegraph) end
+	end
+	eq(found, true, "two distinct lines appear")
+end)
+
+test("boss: the client view carries what the HUD needs and nothing mutable is shared badly", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	local v = Boss.View(b, BossCfg)
+	eq(v.Name, TitanDef.Name, "name")
+	eq(v.HP, TitanDef.MaxHP, "hp")
+	eq(v.Phase, "Armor", "phase")
+	eq(#v.Nodes, TitanDef.Nodes, "nodes shown")
+	eq(v.Core.X, 5, "core")
+end)
+
+test("boss: config sanity (phase thresholds descend, floors name real bosses)", function()
+	eq(TitanDef.AttackEnd > TitanDef.WeakEnd and TitanDef.WeakEnd > TitanDef.FinisherAt and TitanDef.FinisherAt > 0, true, "thresholds descend")
+	for floor, kind in BossCfg.BossFloors do eq(BossCfg.Defs[kind] ~= nil and floor >= 1, true, "boss floor " .. floor) end
+	eq(BossCfg.BossFloors[4], "Titan", "the first boss arrives on floor 4")
+end)
+
+test("boss: phase boundaries are inclusive (exactly on the threshold counts as crossing it)", function()
+	local function land(fromPhase, startHP, hitCell)
+		local g = fullGrid()
+		local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+		b.Phase, b.Nodes, b.HP = fromPhase, {}, startHP
+		if fromPhase == "Weak" then b.Weak = { { X = 1, Z = 1 }, { X = 9, Z = 9 } } end
+		-- Attack/Enrage: a charge on the core with 4 pops does Direct.Basic + 4 // PopsPerBonus damage
+		Boss.Apply(b, { cap(5, 5) }, fakeResult(4, hitCell and { { X = 1, Z = 1 } } or {}), bctx, BossCfg, 1, g, lcg(1))
+		return b
+	end
+	local hit = TitanDef.Direct.Basic + 4 // TitanDef.PopsPerBonus
+	eq(land("Attack", math.floor(TitanDef.MaxHP * TitanDef.AttackEnd) + hit, false).Phase, "Weak", "exactly at the attack threshold")
+	eq(land("Attack", math.floor(TitanDef.MaxHP * TitanDef.AttackEnd) + hit + 1, false).Phase, "Attack", "one HP above stays")
+	eq(land("Enrage", math.floor(TitanDef.MaxHP * TitanDef.FinisherAt) + hit, false).Phase, "Finisher", "exactly at the finisher threshold")
+	eq(land("Weak", math.floor(TitanDef.MaxHP * TitanDef.WeakEnd) + TitanDef.Weak.One, true).Phase, "Enrage", "exactly at the weak threshold")
+end)
+
+test("boss: breaking armor never kills, even with enormous power", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	local events = {}
+	for _, n in b.Nodes do table.insert(events, { X = n.X, Z = n.Z }) end
+	local o = Boss.Apply(b, {}, fakeResult(3, events), bctx, BossCfg, 1000, g, lcg(1))
+	eq(o.Killed, false, "not killed by the armor break")
+	eq(b.HP >= 1, true, "at least 1 HP")
+	eq(b.Phase, "Attack", "phase")
+end)
+
+test("boss: a failed finisher stays a finisher even when the heal lifts it above the threshold", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes = "Finisher", {}
+	b.HP = math.floor(TitanDef.MaxHP * TitanDef.FinisherAt) -- right at the edge
+	Boss.Apply(b, {}, fakeResult(1, {}), bctx, BossCfg, 1, g, lcg(1))
+	eq(b.HP > TitanDef.MaxHP * TitanDef.FinisherAt, true, "healed above the finisher line")
+	eq(b.Phase, "Finisher", "still the finisher")
+end)
+
+test("boss: the weak-point phase only attacks on even turns", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes = "Weak", {}
+	Boss.Act(b, g, bctx, BossCfg, false, lcg(4))
+	eq(#b.Telegraph, 0, "turn 1: quiet")
+	Boss.Act(b, g, bctx, BossCfg, false, lcg(5))
+	eq(#b.Telegraph, N, "turn 2: a line is marked")
+end)
+
+test("boss: enrage never marks the same line twice, and dodge is only offered while an attack is marked", function()
+	local g = fullGrid()
+	local b = Boss.New("Titan", g, bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes = "Enrage", {}
+	Boss.Act(b, g, bctx, BossCfg, false, function() return 0.3 end) -- both rolls pick the same line
+	eq(#b.Telegraph, N, "one line, not two copies of it")
+	local q = Boss.New("Titan", fullGrid(), bctx, BossCfg, lcg(3))
+	Boss.Act(q, fullGrid(), bctx, BossCfg, false, lcg(1))
+	eq(Boss.CanDodge(q), false, "nothing marked, nothing to dodge")
+end)
+
+test("boss: weak points avoid a crystal-filled core and still appear when crystals are few and close together", function()
+	local g = fullGrid() -- core NOT cleared here
+	local b = Boss.New("Titan", fullGrid(), bctx, BossCfg, lcg(3))
+	b.Phase, b.Nodes = "Attack", {}
+	b.HP = math.floor(b.MaxHP * TitanDef.AttackEnd) + 1
+	for seed = 1, 40 do
+		b.Phase, b.HP = "Attack", math.floor(b.MaxHP * TitanDef.AttackEnd) + 1
+		Boss.Apply(b, { cap(5, 5) }, fakeResult(4, {}), bctx, BossCfg, 1, g, lcg(seed))
+		for _, w in b.Weak do eq(math.abs(w.X - 5) <= 1 and math.abs(w.Z - 5) <= 1, false, "never in the core") end
+	end
+	local sparse = grid(function(x, z) if z == 1 and (x == 1 or x == 2) then return "Glimmerstone" end end)
+	local b2 = Boss.New("Titan", sparse, bctx, BossCfg, lcg(3))
+	b2.Phase, b2.Nodes = "Attack", {}
+	b2.HP = math.floor(b2.MaxHP * TitanDef.AttackEnd) + 1
+	Boss.Apply(b2, { cap(5, 5) }, fakeResult(4, {}), bctx, BossCfg, 1, sparse, lcg(9))
+	eq(#b2.Weak, 2, "both points found even though they are adjacent")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end
