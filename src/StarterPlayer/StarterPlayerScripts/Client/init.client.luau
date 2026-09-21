@@ -68,70 +68,80 @@ Remotes.SeamStart.OnClientEvent:Connect(function(payload)
 end)
 
 Remotes.RunState.OnClientEvent:Connect(function(view)
-	State.Run = view.Active and view or nil
-	UI.SetRun(State.Run)
-	State.Changed:Fire("Placed") -- refreshes the preview with the run's modifiers
+	local ok, err = pcall(function()
+		State.Run = view.Active and view or nil
+		UI.SetRun(State.Run)
+		State.Changed:Fire("Placed") -- refreshes the preview with the run's modifiers
+	end)
+	if not ok then
+		warn("[Client] RunState failed: " .. tostring(err))
+	end
 end)
 
 Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
-	local view = CavernView.Get(localPlayer.UserId)
-	if not view then
-		return
-	end
-	for _, e in turn.Eaten do
-		CavernView.Eat(view, e.X, e.Z)
-	end
-	-- hit numbers and bursts on whatever was hit (positions are read before the creature moves on)
-	local hitPos = (turn.BossDamage and turn.BossDamage > 0 and CavernView.BossPosition(view)) or (turn.Damage and turn.Damage > 0 and CavernView.MonsterPosition(view)) or nil
-	local hitAmount = (turn.BossDamage and turn.BossDamage > 0 and turn.BossDamage) or (turn.Damage and turn.Damage > 0 and turn.Damage) or nil
-	if hitPos and hitAmount then
-		FloatingNumbers.Show(hitPos + Vector3.new(0, 8, 0), "-" .. hitAmount, Color3.fromRGB(255, 90, 90), math.min(1.1 + hitAmount * 0.03, 2))
-		VFX.Burst(hitPos + Vector3.new(0, 3, 0), Color3.fromRGB(255, 90, 90), 16, 26)
-	end
-	if turn.Slain then
-		local at = Geometry.CellPosition(view.Origin, turn.Slain.X, turn.Slain.Z) + Vector3.new(0, 3, 0)
-		VFX.Burst(at, Color3.fromRGB(255, 220, 90), 40, 34)
-		VFX.Ring(at, Color3.fromRGB(255, 220, 90), 22, 0.6)
-		FloatingNumbers.Show(at + Vector3.new(0, 4, 0), "+" .. turn.Slain.Bounty, Color3.fromRGB(255, 215, 90), 1.6)
-	end
-	if turn.HeartsLost or turn.Stolen then
-		UI.Flash(Color3.fromRGB(255, 40, 40), 0.45) -- the rig took a hit
-	end
-	for _, c in turn.Corrupted or {} do
-		CavernView.Corrupt(view, c.X, c.Z)
-	end
-	if turn.Cut then
-		local at = CavernView.BossPosition(view)
-		if at then
-			FloatingNumbers.Show(at + Vector3.new(0, 10, 0), "CUT!", Color3.fromRGB(120, 255, 170), 1.5)
+	local ok, err = pcall(function()
+		local view = CavernView.Get(localPlayer.UserId)
+		if not view then
+			return
 		end
-	elseif turn.Dodged then
-		local at = CavernView.BossPosition(view)
-		if at then
-			FloatingNumbers.Show(at + Vector3.new(0, 10, 0), "BLOCKED", Color3.fromRGB(120, 200, 255), 1.5)
+		for _, e in turn.Eaten do
+			CavernView.Eat(view, e.X, e.Z)
 		end
-	end
-	CavernView.SetMonster(view, turn.Monster)
-	CavernView.SetBoss(view, turn.Boss)
-	if turn.BossSlain then
-		-- FINAL BLAST: the arena erupts.
-		local core = Geometry.CellPosition(view.Origin, 5, 5) + Vector3.new(0, 4, 0)
-		local fin = State.Data and State.Data.Finishers and State.Data.Finishers.Color or { 255, 205, 90 } -- the equipped finisher colours the FINAL BLAST
-		for i = 1, 6 do
-			task.delay(i * 0.12, function()
-				VFX.Burst(core + Vector3.new(math.random(-8, 8), math.random(0, 6), math.random(-8, 8)), Color3.fromRGB(math.max(0, fin[1] - i * 8), math.max(0, fin[2] - i * 12), math.max(0, fin[3] - i * 6)), 30, 40)
-				VFX.Ring(view.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(fin[1], fin[2], fin[3]), view.Extent * (0.6 + i * 0.25), 0.9)
-			end)
+		-- hit numbers and bursts on whatever was hit (positions are read before the creature moves on)
+		local hitPos = (turn.BossDamage and turn.BossDamage > 0 and CavernView.BossPosition(view)) or (turn.Damage and turn.Damage > 0 and CavernView.MonsterPosition(view)) or nil
+		local hitAmount = (turn.BossDamage and turn.BossDamage > 0 and turn.BossDamage) or (turn.Damage and turn.Damage > 0 and turn.Damage) or nil
+		if hitPos and hitAmount then
+			FloatingNumbers.Show(hitPos + Vector3.new(0, 8, 0), "-" .. hitAmount, Color3.fromRGB(255, 90, 90), math.min(1.1 + hitAmount * 0.03, 2))
+			VFX.Burst(hitPos + Vector3.new(0, 3, 0), Color3.fromRGB(255, 90, 90), 16, 26)
 		end
-		UI.ShowTier("Boss defeated")
-		CameraFeedback.Shake(2)
-		CameraFeedback.Punch(10)
-	elseif turn.PhaseChanged then
-		UI.ShowTier(turn.PhaseChanged .. " phase")
-		CameraFeedback.Punch(5)
-	end
-	if turn.Emerged or turn.Slain or turn.HeartsLost or #turn.Eaten > 0 then
-		CameraFeedback.Shake(turn.HeartsLost and 1.4 or 0.8)
+		if turn.Slain then
+			local at = Geometry.CellPosition(view.Origin, turn.Slain.X, turn.Slain.Z) + Vector3.new(0, 3, 0)
+			VFX.Burst(at, Color3.fromRGB(255, 220, 90), 40, 34)
+			VFX.Ring(at, Color3.fromRGB(255, 220, 90), 22, 0.6)
+			FloatingNumbers.Show(at + Vector3.new(0, 4, 0), "+" .. turn.Slain.Bounty, Color3.fromRGB(255, 215, 90), 1.6)
+		end
+		if turn.HeartsLost or turn.Stolen then
+			UI.Flash(Color3.fromRGB(255, 40, 40), 0.45) -- the rig took a hit
+		end
+		for _, c in turn.Corrupted or {} do
+			CavernView.Corrupt(view, c.X, c.Z)
+		end
+		if turn.Cut then
+			local at = CavernView.BossPosition(view)
+			if at then
+				FloatingNumbers.Show(at + Vector3.new(0, 10, 0), "CUT!", Color3.fromRGB(120, 255, 170), 1.5)
+			end
+		elseif turn.Dodged then
+			local at = CavernView.BossPosition(view)
+			if at then
+				FloatingNumbers.Show(at + Vector3.new(0, 10, 0), "BLOCKED", Color3.fromRGB(120, 200, 255), 1.5)
+			end
+		end
+		CavernView.SetMonster(view, turn.Monster)
+		CavernView.SetBoss(view, turn.Boss)
+		if turn.BossSlain then
+			-- FINAL BLAST: the arena erupts.
+			local core = Geometry.CellPosition(view.Origin, 5, 5) + Vector3.new(0, 4, 0)
+			local fin = State.Data and State.Data.Finishers and State.Data.Finishers.Color or { 255, 205, 90 } -- the equipped finisher colours the FINAL BLAST
+			for i = 1, 6 do
+				task.delay(i * 0.12, function()
+					VFX.Burst(core + Vector3.new(math.random(-8, 8), math.random(0, 6), math.random(-8, 8)), Color3.fromRGB(math.max(0, fin[1] - i * 8), math.max(0, fin[2] - i * 12), math.max(0, fin[3] - i * 6)), 30, 40)
+					VFX.Ring(view.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(fin[1], fin[2], fin[3]), view.Extent * (0.6 + i * 0.25), 0.9)
+				end)
+			end
+			UI.ShowTier("Boss defeated")
+			CameraFeedback.Shake(2)
+			CameraFeedback.Punch(10)
+		elseif turn.PhaseChanged then
+			UI.ShowTier(turn.PhaseChanged .. " phase")
+			CameraFeedback.Punch(5)
+		end
+		if turn.Emerged or turn.Slain or turn.HeartsLost or #turn.Eaten > 0 then
+			CameraFeedback.Shake(turn.HeartsLost and 1.4 or 0.8)
+		end
+	end)
+	if not ok then
+		warn("[Client] MonsterTurn failed: " .. tostring(err))
 	end
 end)
 
