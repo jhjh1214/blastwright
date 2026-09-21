@@ -1,0 +1,180 @@
+--!nonstrict
+-- Bottom-right status tiles for things that are running right now: one tile per live event (its own icon and colour) and one
+-- for the shared Server Goal (progress bar, or the frenzy countdown). Each tile shows a timer or progress and can be tapped
+-- to read what it does. Pure display: the server decides what is live; a 1-second loop only updates the countdown text.
+local Kit = require(script.Parent.Kit)
+local Icons = require(script.Parent.Icons)
+local Theme = require(script.Parent.Theme)
+
+local StatusDock = {}
+
+-- event id -> icon and colour (unknown ids fall back to a star)
+local LOOK = {
+	PrismaticWeekend = { Icon = "Gem", Color = Color3.fromRGB(58, 150, 255) },
+	OverchargeWednesday = { Icon = "Bolt", Color = Color3.fromRGB(255, 186, 40) },
+	HappyHour = { Icon = "Clock", Color = Color3.fromRGB(70, 198, 96) },
+	LurkerSwarmFriday = { Icon = "Skull", Color = Color3.fromRGB(238, 62, 78) },
+	CrystalStorm = { Icon = "Star", Color = Color3.fromRGB(170, 90, 255) },
+	ExplosiveSunday = { Icon = "Bomb", Color = Color3.fromRGB(255, 120, 40) },
+}
+local FALLBACK = { Icon = "Star", Color = Theme.Colors.Boost }
+local GOAL_COLOR = Theme.Colors.Codex
+local MAX_EVENT_TILES = 3
+local WIDTH = 236
+
+local function make(class, props, parent)
+	local inst = Instance.new(class)
+	for k, v in props do
+		inst[k] = v
+	end
+	inst.Parent = parent
+	return inst
+end
+
+local function commas(n)
+	local s = tostring(math.floor(n + 0.5))
+	return (s:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", ""))
+end
+
+function StatusDock.FormatTime(seconds)
+	seconds = math.max(0, math.floor(seconds))
+	if seconds >= 3600 then
+		return ("%dh %02dm"):format(seconds // 3600, (seconds % 3600) // 60)
+	end
+	return ("%d:%02d"):format(seconds // 60, seconds % 60)
+end
+
+-- One tile: icon disc, name, big value line, optional bar, and a description shown on tap.
+local function buildTile(parent, order, look, name, description)
+	local root = make("Frame", { BackgroundColor3 = Theme.Shade(look.Color, 0.4), Size = UDim2.fromOffset(WIDTH, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = order, BorderSizePixel = 0, ZIndex = Theme.Z.Hud }, parent)
+	make("UICorner", { CornerRadius = UDim.new(0, 14) }, root)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = Theme.Stroke.Small, LineJoinMode = Enum.LineJoinMode.Round }, root)
+	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(look.Color, 0.1), Theme.Shade(look.Color, 0.35)), Rotation = 90 }, root)
+	make("UIPadding", { PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 7), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 10) }, root)
+	make("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, root)
+
+	local row = make("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 42), LayoutOrder = 1, ZIndex = Theme.Z.Hud + 1 }, root)
+	local disc = make("Frame", { BackgroundColor3 = look.Color, Size = UDim2.fromOffset(42, 42), ZIndex = Theme.Z.Hud + 1 }, row)
+	make("UICorner", { CornerRadius = UDim.new(1, 0) }, disc)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = Theme.Stroke.Small }, disc)
+	Icons.Draw(look.Icon, disc, nil, 0.86)
+	local title = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(50, 1), Size = UDim2.new(1, -50, 0, 16), Font = Theme.Font.Body, Text = name, TextSize = 14, TextColor3 = Theme.Tint(look.Color, 0.75), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = Theme.Z.Hud + 2 }, row)
+	Kit.Outline(title, 2)
+	local value = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(50, 17), Size = UDim2.new(1, -50, 0, 24), Font = Theme.Font.Display, Text = "", TextSize = 21, TextColor3 = Theme.Colors.Ink, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = Theme.Z.Hud + 2 }, row)
+	Kit.Outline(value, 2.5)
+
+	local tile = { Root = root, Value = value, Title = title, Color = look.Color }
+
+	local desc = make("TextLabel", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Font = Theme.Font.Body, Text = description or "", TextSize = 14, TextColor3 = Color3.fromRGB(240, 244, 255), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, Visible = false, LayoutOrder = 3, ZIndex = Theme.Z.Hud + 2 }, root)
+	tile.Description = desc
+	local tap = make("TextButton", { BackgroundTransparency = 1, Text = "", Size = UDim2.fromScale(1, 1), ZIndex = Theme.Z.Hud + 3 }, root)
+	tap.Activated:Connect(function()
+		if desc.Text ~= "" then
+			desc.Visible = not desc.Visible
+		end
+	end)
+	return tile
+end
+
+local function addBar(tile)
+	local track = make("Frame", { BackgroundColor3 = Theme.Colors.Outline, Size = UDim2.new(1, 0, 0, 12), LayoutOrder = 2, BorderSizePixel = 0, ZIndex = Theme.Z.Hud + 1 }, tile.Root)
+	make("UICorner", { CornerRadius = UDim.new(1, 0) }, track)
+	local fill = make("Frame", { BackgroundColor3 = Theme.Tint(tile.Color, 0.25), Size = UDim2.fromScale(0, 1), BorderSizePixel = 0, ZIndex = Theme.Z.Hud + 2 }, track)
+	make("UICorner", { CornerRadius = UDim.new(1, 0) }, fill)
+	tile.Track, tile.Fill = track, fill
+end
+
+function StatusDock.Build(parent)
+	local holder = make("Frame", { Name = "StatusDock", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -12), Size = UDim2.fromOffset(WIDTH, 0), AutomaticSize = Enum.AutomaticSize.Y, ZIndex = Theme.Z.Hud }, parent)
+	make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Bottom, HorizontalAlignment = Enum.HorizontalAlignment.Right }, holder)
+
+	local dock = {}
+	local eventTiles = {} -- { { Tile, EndsAt } } in display order
+	local goalTile, goalView, goalAt = nil, nil, 0
+	local eventSignature = ""
+
+	local function refresh()
+		local now = os.clock()
+		for _, e in eventTiles do
+			e.Tile.Value.Text = "ends in " .. StatusDock.FormatTime(e.EndsAt - now)
+		end
+		if goalTile and goalView then
+			local v = goalView
+			local frenzy = math.max(0, v.FrenzyLeft - (now - goalAt))
+			if frenzy > 0 then
+				goalTile.Title.Text = "SERVER FRENZY"
+				goalTile.Value.Text = "boost " .. StatusDock.FormatTime(frenzy)
+				goalTile.Fill.Size = UDim2.fromScale(1, 1)
+			elseif v.Done then
+				goalTile.Title.Text = "SERVER GOAL"
+				goalTile.Value.Text = "Reached!"
+				goalTile.Fill.Size = UDim2.fromScale(1, 1)
+			else
+				goalTile.Title.Text = "SERVER GOAL"
+				goalTile.Value.Text = ("%s / %s"):format(commas(v.Progress), commas(v.Target))
+				goalTile.Fill.Size = UDim2.fromScale(math.clamp(v.Progress / math.max(1, v.Target), 0, 1), 1)
+			end
+		end
+	end
+
+	-- list: the snapshot's Events ({ Id, Name, Description, EndsIn }), receivedAt: os.clock() when it arrived
+	function dock.SetEvents(list, receivedAt)
+		list = list or {}
+		-- snapshots arrive after every volley: same events -> only refresh the end times (keeps tiles and open descriptions)
+		local ids = {}
+		for i, ev in list do
+			if i <= MAX_EVENT_TILES then
+				table.insert(ids, tostring(ev.Id or ev.Name))
+			end
+		end
+		local signature = table.concat(ids, "|")
+		if signature == eventSignature then
+			for i, e in eventTiles do
+				e.EndsAt = (receivedAt or os.clock()) + list[i].EndsIn
+			end
+			refresh()
+			return
+		end
+		eventSignature = signature
+		for _, e in eventTiles do
+			e.Tile.Root:Destroy()
+		end
+		table.clear(eventTiles)
+		for i, ev in list or {} do
+			if i > MAX_EVENT_TILES then
+				break
+			end
+			local look = LOOK[ev.Id] or FALLBACK
+			local tile = buildTile(holder, i, look, ev.Name, ev.Description)
+			table.insert(eventTiles, { Tile = tile, EndsAt = (receivedAt or os.clock()) + ev.EndsIn })
+		end
+		refresh()
+	end
+
+	-- view: Community.View or nil
+	function dock.SetGoal(view, receivedAt)
+		goalView, goalAt = view, receivedAt or os.clock()
+		if not view then
+			if goalTile then
+				goalTile.Root:Destroy()
+				goalTile = nil
+			end
+			return
+		end
+		if not goalTile then
+			goalTile = buildTile(holder, 100, { Icon = "Goals", Color = GOAL_COLOR }, "SERVER GOAL", "Everyone's pops and Lurker kills fill this bar together. Reach it for a server-wide payout frenzy.")
+			addBar(goalTile)
+		end
+		refresh()
+	end
+
+	task.spawn(function()
+		while holder.Parent do
+			task.wait(1)
+			refresh()
+		end
+	end)
+	return dock
+end
+
+return StatusDock

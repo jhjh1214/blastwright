@@ -18,6 +18,7 @@ local State = require(script.Parent.State)
 local Fx = require(script.Parent.Fx)
 local ShopArt = require(script.Parent.ShopArt)
 local Dock = require(script.Parent.Dock)
+local StatusDock = require(script.Parent.StatusDock)
 local Feed = require(script.Parent.Feed)
 local BossHud = require(script.Parent.BossHud)
 local Theme = require(script.Parent.Theme)
@@ -120,14 +121,14 @@ local function commas(n)
 	return (out:gsub("^,", ""))
 end
 
-local eventLabel, communityLabel
+local statusDock
 local shardCur
 local gui, shardLabel, locationLabel, cacheLabel, objectiveCard, objectiveText, blastHint, seamLabel, chainLabel, previewFrame, previewLabel, infoLabel
 local welcomeFrame, detonateStroke
 local detonatePulse = false
 local settingButtons = {}
 local tabButtons = {}
-local chargeColumn, panel, panelScroll, detonateButton, dock, topCenter, bossHud, leftCol, readPanel, panelRule
+local chargeColumn, panel, panelScroll, detonateButton, dock, bossHud, leftCol, readPanel, panelRule
 local roamGroup, blastGroup
 local runLabel, runModal, runCards, runTitle, runBank, rigLabel
 local bossFrame, bossName, bossFill, bossHint, dodgeButton, criticalLabel
@@ -159,17 +160,10 @@ function UI.Init()
 	----------------------------------------------------------- roaming HUD
 	roamGroup = fullGroup("Roam")
 	locationLabel = label(roamGroup, "", 20, THEME.Text, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(320, 28) })
-	-- Event and server-goal chips sit under the location, in the middle, so the right edge stays free for messages.
-	topCenter = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 40), Size = UDim2.fromOffset(420, 0), AutomaticSize = Enum.AutomaticSize.Y }, roamGroup)
-	mk("UIListLayout", { Padding = UDim.new(0, 4), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, topCenter)
-	local function chipProxy(order, color)
-		local c = Kit.Chip(topCenter, { Color = color, Visible = false, LayoutOrder = order, Height = 34 })
-		return setmetatable({}, { __newindex = function(_, k, v)
-			if k == "Text" then c.Label.Text = v elseif k == "Visible" then c.Root.Visible = v end
-		end })
-	end
-	eventLabel = chipProxy(1, Theme.Colors.Boost)
-	communityLabel = chipProxy(2, Theme.Colors.Codex)
+	-- The area name is a passing banner (fades in on entering an area, then away). Live events and the Server Goal are small
+	-- tiles with their own icons and timers in the bottom-right corner (StatusDock), so the middle of the screen stays clear.
+	locationLabel.TextTransparency = 1
+	statusDock = StatusDock.Build(roamGroup)
 	cacheLabel = label(roamGroup, "", 16, THEME.Text, { Position = UDim2.new(0, 16, 0, 66), Size = UDim2.fromOffset(200, 22), TextXAlignment = Enum.TextXAlignment.Left })
 	objectiveCard = Kit.Card(roamGroup, { Name = "Objective", Color = Theme.Colors.Panel, Position = UDim2.new(0, 12, 0, 96), Size = UDim2.fromOffset(250, 0) })
 	objectiveCard.AutomaticSize = Enum.AutomaticSize.Y
@@ -420,7 +414,7 @@ function UI.Init()
 		end)
 	end
 
-	local go = button(welcomeFrame, "Let's go", THEME.Accent, { Size = UDim2.fromOffset(180, 48), TextSize = 20, TextColor3 = THEME.Bg, LayoutOrder = 20, ZIndex = 21 })
+	local go = button(welcomeFrame, "Let's go", THEME.Accent, { Size = UDim2.fromOffset(180, 48), TextSize = 20, TextColor3 = THEME.Text, LayoutOrder = 20, ZIndex = 21 })
 	go.Activated:Connect(function()
 		AudioManager.Play("Click")
 		UI.ShowWelcome(false)
@@ -526,7 +520,7 @@ function UI.RefreshSettings()
 		local on = not settings or settings[key] ~= false
 		entry.Button.Text = ("%s: %s"):format(entry.Title, on and "On" or "Off")
 		entry.Button.BackgroundColor3 = on and THEME.Accent or THEME.Row
-		entry.Button.TextColor3 = on and THEME.Bg or THEME.Text
+		entry.Button.TextColor3 = on and THEME.Text or THEME.Text
 	end
 end
 
@@ -536,10 +530,29 @@ function UI.ShowWelcome(show)
 	end
 end
 
+local shownArea = nil
+local areaFade = 0
+-- Shows the area name only when it changes (entering a new area): fades in, holds, fades away.
 function UI.SetLocation(text)
-	if locationLabel then
-		locationLabel.Text = text
+	if not locationLabel or text == shownArea then
+		return
 	end
+	shownArea = text
+	areaFade += 1
+	local mine = areaFade
+	locationLabel.Text = text
+	local stroke = locationLabel:FindFirstChildOfClass("UIStroke")
+	locationLabel.TextTransparency = 1
+	if stroke then stroke.Transparency = 1 end
+	Kit.Tween(locationLabel, 0.35, { TextTransparency = 0 })
+	if stroke then Kit.Tween(stroke, 0.35, { Transparency = 0 }) end
+	task.delay(3, function()
+		if mine ~= areaFade then
+			return
+		end
+		Kit.Tween(locationLabel, 0.9, { TextTransparency = 1 })
+		if stroke then Kit.Tween(stroke, 0.9, { Transparency = 1 }) end
+	end)
 end
 
 function UI.SetPreview(text)
@@ -564,24 +577,11 @@ function UI.SetInfo(text)
 	end
 end
 
--- Shared Server Goal line (roaming HUD). view = { Round, Progress, Target, Done, FrenzyLeft } or nil.
+-- Shared Server Goal tile (bottom-right status dock). view = { Round, Progress, Target, Done, FrenzyLeft } or nil.
 function UI.SetCommunity(view, receivedAt)
-	if not communityLabel then return end
-	if not view then
-		communityLabel.Visible = false
-		return
+	if statusDock then
+		statusDock.SetGoal(view, receivedAt)
 	end
-	local frenzy = math.max(0, view.FrenzyLeft - (os.clock() - (receivedAt or os.clock())))
-	local text
-	if frenzy > 0 then
-		text = ("Server frenzy! Payouts boosted for %d:%02d"):format(frenzy // 60, frenzy % 60)
-	elseif view.Done then
-		text = "Server goal reached! Next one starting..."
-	else
-		text = ("Server goal: %s / %s pops together"):format(commas(view.Progress), commas(view.Target))
-	end
-	communityLabel.Text = text
-	communityLabel.Visible = true
 end
 
 function UI.SetChain(pops, mult)
@@ -697,7 +697,7 @@ local function row(order, titleText, desc, buttonText, enabled, onClick, titleCo
 	end
 	if buttonText then
 		local ready = enabled and string.sub(buttonText, 1, 5) == "Claim"
-		local b = button(f, buttonText, enabled and Fx.Lighten(accent, 0.1) or THEME.Panel, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(120, 52), TextSize = 16, ZIndex = 12, TextColor3 = enabled and THEME.Bg or THEME.Dim })
+		local b = button(f, buttonText, enabled and Fx.Lighten(accent, 0.1) or THEME.Panel, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(120, 52), TextSize = 16, ZIndex = 12, TextColor3 = enabled and THEME.Text or THEME.Dim })
 		if ready then
 			Fx.Shimmer(b, 1.6, 0.7)
 			Fx.Glow(b, Fx.Lighten(accent, 0.5), 2.5, 0.9)
@@ -732,7 +732,7 @@ local function rebuildPanel()
 	for name, tab in tabButtons do
 		local selected = name == activeTab
 		tab.BackgroundColor3 = selected and Fx.Tab[name] or THEME.Row
-		tab.TextColor3 = selected and THEME.Bg or Fx.Tab[name]
+		tab.TextColor3 = selected and THEME.Text or Fx.Tab[name]
 	end
 
 	if activeTab == "Forge" then
@@ -1077,7 +1077,7 @@ local function rebuildCharges()
 			local selected = State.SelectedCharge == id
 			local kindColor = ({ Basic = Color3.fromRGB(255, 160, 60), Shaft = Color3.fromRGB(90, 200, 255), Cross = Color3.fromRGB(255, 100, 220) })[id] or THEME.Accent
 			local kindGlyph = ({ Basic = "o", Shaft = "|", Cross = "+" })[id] or "*"
-			local b = button(chargeColumn, ("[%s] %s"):format(kindGlyph, def.Name), selected and kindColor or THEME.Panel, { Size = UDim2.fromOffset(150, 42), TextSize = 15, LayoutOrder = i, TextColor3 = selected and THEME.Bg or Fx.Lighten(kindColor, 0.35) })
+			local b = button(chargeColumn, ("[%s] %s"):format(kindGlyph, def.Name), selected and kindColor or THEME.Panel, { Size = UDim2.fromOffset(150, 42), TextSize = 15, LayoutOrder = i, TextColor3 = selected and THEME.Text or Fx.Lighten(kindColor, 0.35) })
 			mk("UIStroke", { Color = kindColor, Thickness = selected and 3 or 1.5, Transparency = selected and 0.05 or 0.5 }, b)
 			b.Activated:Connect(function()
 				AudioManager.Play("Click")
@@ -1180,16 +1180,9 @@ function UI.Refresh()
 		dock.SetBadge("Farm", d.Farm ~= nil and d.Farm.Pending >= math.max(1, d.Farm.PerHour) ) -- an hour of production is waiting
 	end
 
-	-- Live event banner (first active event; "+N" if there are more).
-	local events = d.Events or {}
-	if #events > 0 then
-		local first = events[1]
-		local left = math.max(0, first.EndsIn - (os.clock() - (State.EventsAt or os.clock())))
-		local when = left >= 3600 and ("%dh %02dm"):format(left // 3600, (left % 3600) // 60) or ("%dm"):format(math.ceil(left / 60))
-		eventLabel.Text = ("★ %s: %s (ends in %s)%s"):format(first.Name, first.Description, when, #events > 1 and (" +" .. (#events - 1) .. " more") or "")
-		eventLabel.Visible = true
-	else
-		eventLabel.Visible = false
+	-- Live events: one status tile each (icon, name, time left) in the bottom-right corner.
+	if statusDock then
+		statusDock.SetEvents(d.Events or {}, State.EventsAt)
 	end
 	UI.RefreshSettings()
 

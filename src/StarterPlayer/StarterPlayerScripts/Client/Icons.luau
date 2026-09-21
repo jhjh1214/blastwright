@@ -1,7 +1,7 @@
 --!nonstrict
 -- Icons drawn in code (there are no verified icon assets in the project, and none are invented): chunky, multi-coloured shapes
 -- with a dark outline, meant to sit big on a coloured button. Each is built from rounded rectangles on a 48 x 48 canvas and
--- scales to any size. Names: Forge, Shop, Daily, Goals, Codex, Farm, Gem, Bomb, Bolt, Close, Heart, Lock.
+-- scales to any size. Names: Forge, Shop, Daily, Goals, Codex, Farm, Gem, Bomb, Bolt, Close, Heart, Lock, Skull, Star, Clock.
 local Theme = require(script.Parent.Theme)
 
 local Icons = {}
@@ -139,6 +139,31 @@ DRAW.Lock = function(p)
 	box(p, 24, 30, 5, 9, OUT, 2, 0, 3, true)
 end
 
+DRAW.Skull = function(p)
+	local bone = Color3.fromRGB(238, 238, 248)
+	box(p, 24, 21, 32, 28, bone, 99, 0, 1)
+	box(p, 24, 35, 18, 12, bone, 4, 0, 1)
+	box(p, 24, 31, 24, 10, bone, 0, 0, 2, true)
+	box(p, 16, 22, 8, 9, OUT, 99, 0, 3, true)
+	box(p, 32, 22, 8, 9, OUT, 99, 0, 3, true)
+	box(p, 24, 30, 4, 5, OUT, 2, 0, 3, true)
+end
+
+DRAW.Star = function(p)
+	local gold = Color3.fromRGB(255, 214, 64)
+	box(p, 24, 24, 28, 28, gold, 5, 0, 1)
+	box(p, 24, 24, 28, 28, gold, 5, 45, 1)
+	box(p, 24, 24, 20, 20, Color3.fromRGB(255, 236, 130), 99, 0, 2, true)
+	box(p, 18, 17, 5, 5, WHITE, 99, 0, 3, true)
+end
+
+DRAW.Clock = function(p)
+	box(p, 24, 24, 36, 36, Color3.fromRGB(240, 244, 255), 99, 0, 1)
+	box(p, 24, 16, 4, 14, OUT, 2, 0, 3, true)
+	box(p, 29, 25, 13, 4, OUT, 2, 0, 3, true)
+	box(p, 24, 24, 6, 6, Color3.fromRGB(238, 62, 78), 99, 0, 4, true)
+end
+
 -- Draw the icon `name` filling `parent`. Returns the canvas (a square, centred).
 function Icons.Draw(name, parent, tint, fill)
 	local canvas = Instance.new("Frame")
@@ -172,6 +197,6 @@ function Icons.Draw(name, parent, tint, fill)
 	return canvas
 end
 
-Icons.Names = { "Forge", "Shop", "Daily", "Goals", "Codex", "Farm", "Gem", "Bomb", "Bolt", "Close", "Heart", "Lock" }
+Icons.Names = { "Forge", "Shop", "Daily", "Goals", "Codex", "Farm", "Gem", "Bomb", "Bolt", "Close", "Heart", "Lock", "Skull", "Star", "Clock" }
 
 return Icons

@@ -229,7 +229,7 @@ local function snapshot(player: Player): { [string]: any }?
 		Events = (function()
 			local list = {}
 			for _, e in activeEvents() do
-				table.insert(list, { Name = e.Name, Description = e.Description, EndsIn = e.EndsIn })
+				table.insert(list, { Id = e.Id, Name = e.Name, Description = e.Description, EndsIn = e.EndsIn })
 			end
 			return list
 		end)(),
@@ -1640,13 +1640,13 @@ function Game.Init()
 		task.spawn(onPlayerAdded, player)
 	end
 	task.spawn(idleLoop)
-	-- Broadcast the shared goal when it changed (at most every 2 seconds), and at least every 10 so timers stay honest.
+	-- Broadcast the shared goal when it changed (at most every 2 seconds), and at least every 30 (clients count the frenzy down themselves) so timers stay honest.
 	task.spawn(function()
 		local ticks = 0
 		while true do
 			task.wait(2)
 			ticks += 1
-			if goalDirty or ticks % 5 == 0 then
+			if goalDirty or ticks % 15 == 0 then
 				goalDirty = false
 				Remotes.Community:FireAllClients(Community.View(goal, os.clock(), CommunityConfig))
 			end

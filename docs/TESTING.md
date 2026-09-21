@@ -180,3 +180,8 @@ Everything below was written without being run in Studio (the automated tests co
 ## E18. Trophy hall and combat dailies (unseen in Studio)
 - West of the hub plaza: two gold pedestals (Crystal Titan, Prism Warden). Before your first kill each shows a black silhouette and "???"; after a kill the model gets its colours back and the sign reads "<name> Slain xN". Expect: updates right after leaving an Expedition boss fight; no Output errors from `[trophy hall]`; model is not floating or clipping into the pedestal (tune `MODEL_SCALE` / height in `Client/Trophies.luau`).
 - Daily/Weekly (Daily and Goals buttons): new objectives "Slay N Lurkers" and "Trigger Critical Mass N times" appear in the rotation and progress as you kill Lurkers / start Critical Mass.
+
+## E19. Status tiles, area banner, text colour (unseen in Studio)
+- Walk between areas: the area name fades in at the top-centre when you ENTER a new area, holds about 3 seconds, and fades away. It must not stay on screen.
+- Bottom-right corner: one tile per live event (Prismatic Weekend = gem, Overcharge = bolt, Happy Hour = clock, Lurker Swarm = skull, Crystal Storm = star, Explosive Sunday = bomb) showing "ends in ..." and a Server Goal tile with a progress bar (turns into "SERVER FRENZY" with a countdown). Tap a tile to read its description. Nothing event-related should sit in the middle of the screen any more. To force an event for testing, change an event's Weekdays/StartHour/EndHour in `Config/Events.luau`.
+- Text that used to be dark navy on coloured buttons (Let's go, selected tabs and charge buttons, disabled-vs-enabled buy buttons) is now white with the dark outline. Report any label that still looks dark.
