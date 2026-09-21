@@ -33,8 +33,9 @@ return {
 	Gamepasses = {
 		DoubleShards = { Id = nil, Name = "2x Shards", Description = "Permanently doubles the shards you earn from blasting." },
 		PrismaticLuck = { Id = nil, Name = "Prismatic Luck", Description = "Doubles the chance that crystals spawn Prismatic (worth 3x)." },
+		BlastwrightPlus = { Id = nil, Name = "Blastwright Plus", Description = "The Blastwright Plus title and a free supply drop every day (3 emergency charges and a revive token). Supports the game; no power, nothing locked." },
 	} :: { [string]: Gamepass },
-	GamepassOrder = { "DoubleShards", "PrismaticLuck" },
+	GamepassOrder = { "DoubleShards", "PrismaticLuck", "BlastwrightPlus" },
 
 	-- The product ladder. Small consumables first, then cosmetics and bundles; nothing here gates core play.
 	-- Tiers: Tiny (5-25 Robux), Small (49-99), Medium (149-299), Large (399-799), Premium (999+).

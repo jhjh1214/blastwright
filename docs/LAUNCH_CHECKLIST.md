@@ -25,7 +25,7 @@ Ordered. Items marked **(you)** need your Roblox account; the rest are things to
 - [ ] Output shows no `[Data]` warnings about failed loads or saves.
 
 ## 3. Monetization **(you)** (see `docs/MANUAL_ACTIONS.md`)
-- [ ] Create the 18 Developer Products (4 shard packs, 4 blast colors, 10 offers) and 2 Gamepasses (optionally the Club subscription); paste ids into `Config/Products.luau` (table in `docs/PUBLISH_GUIDE.md`).
+- [ ] Create the 18 Developer Products (4 shard packs, 4 blast colors, 10 offers) and 3 Gamepasses (optionally the Club subscription); paste ids into `Config/Products.luau` (table in `docs/PUBLISH_GUIDE.md`).
 - [ ] Test each purchase once in a private server: grants once, persists, and the Shop tab updates.
 - [ ] Confirm 2x Shards and Prismatic Luck behave as described; boosts, revive and finishers grant once and persist.
 - [ ] Check prices (suggestions in `docs/MONETIZATION.md`).

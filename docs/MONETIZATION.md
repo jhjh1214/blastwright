@@ -53,4 +53,7 @@ Grants live in pure `Shared/Grants.luau` (tested, mutation-checked: boosts stack
 - **Not tested:** `ProcessReceipt` end to end, `UserOwnsGamePassAsync`, the purchase prompts, and the effect of 2x Shards in a live session. These need real product IDs in a published place.
 
 ## To turn it on
-See `docs/MANUAL_ACTIONS.md`. In short: publish the place, create 5 Developer Products and 2 Gamepasses in the Creator Dashboard, paste their IDs into `Config/Products.luau` (or send them to Claude to paste), test in a private server.
+See `docs/MANUAL_ACTIONS.md`. In short: publish the place, create the 18 Developer Products and 3 Gamepasses in the Creator Dashboard, paste their IDs into `Config/Products.luau` (or send them to Claude to paste), test in a private server.
+
+## Blastwright Plus (gamepass, built)
+`Gamepasses.BlastwrightPlus` (id nil until you create it). Comfort and recognition only: the "Blastwright Plus" title (equip it in the Forge) and a free supply drop once per UTC day (3 emergency charges + 1 revive token), paid on join or at once after buying. Logic in `Shared/Plus.luau` (tested, once per day), numbers in `Config/Plus.luau`. Suggested price 399 Robux.

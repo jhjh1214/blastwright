@@ -3676,5 +3676,95 @@ test("worldboss: every reward is a valid grant and the view hides a settled boss
 	eq(WorldBoss.View(st, 1800 * 5 + 10, WBCfg).Active, false, "settled")
 end)
 
+-- Blastwright Plus ---------------------------------------------------------------------------------------------------
+local PlusMod = require("../../src/ReplicatedStorage/Shared/Plus")
+local PlusCfg = require("../../src/ReplicatedStorage/Shared/Config/Plus")
+
+test("plus: the daily gift is paid once per UTC day and never for junk or a clock that went backwards", function()
+	local st = PlusMod.Default()
+	eq(PlusMod.ClaimDaily(st, 20000), true, "first claim")
+	eq(PlusMod.ClaimDaily(st, 20000), false, "same day")
+	eq(PlusMod.ClaimDaily(st, 19999), false, "an earlier day")
+	eq(PlusMod.ClaimDaily(st, 0 / 0), false, "NaN")
+	eq(PlusMod.ClaimDaily(st, "x" :: any), false, "junk")
+	eq(PlusMod.ClaimDaily(st, 20001), true, "next day")
+end)
+
+test("plus: config points at a real pass, a valid title and valid gift grants; the save migrates to v15", function()
+	local G = require("../../src/ReplicatedStorage/Shared/Grants")
+	eq(Products.Gamepasses[PlusCfg.Pass] ~= nil, true, "pass exists")
+	eq(G.Valid({ Kind = "Title", Title = PlusCfg.Title }), true, "title valid")
+	for _, g in PlusCfg.DailyGift do eq(G.Valid(g), true, "gift grant valid") end
+	local d = Schema.Migrate({ SchemaVersion = 14, Shards = 3 })
+	eq(d.Plus.LastDay, 0, "plus record")
+	eq(Schema.CURRENT_VERSION >= 15, true, "v15 exists")
+	local d2 = freshSave()
+	G.Apply(d2, { { Kind = "Title", Title = PlusCfg.Title } }, 0, 1)
+	G.Apply(d2, { { Kind = "Title", Title = PlusCfg.Title } }, 0, 1)
+	eq(d2.Mastery.Extra[PlusCfg.Title], true, "title granted (twice is harmless)")
+end)
+
+-- Assay Office -------------------------------------------------------------------------------------------------------
+local Assay = require("../../src/ReplicatedStorage/Shared/Assay")
+local AssayCfg = require("../../src/ReplicatedStorage/Shared/Config/Assay")
+local AssayKinds = { "Glimmerstone", "Kindlequartz" }
+
+test("assay: tiers rise, and pops are counted per kind ignoring junk", function()
+	for i = 2, #AssayCfg.Tiers do
+		eq(AssayCfg.Tiers[i].Pops > AssayCfg.Tiers[i - 1].Pops and AssayCfg.Tiers[i].Reward > AssayCfg.Tiers[i - 1].Reward, true, "tier " .. i .. " rises")
+	end
+	local st = Assay.Default()
+	Assay.Record(st, "Glimmerstone", 30)
+	Assay.Record(st, "Glimmerstone", 0)
+	Assay.Record(st, "Glimmerstone", -4)
+	Assay.Record(st, "Glimmerstone", 0 / 0)
+	Assay.Record(st, 5 :: any, 10)
+	eq(st.Pops.Glimmerstone, 30, "only the good record counted")
+	eq(st.Pops.Kindlequartz, nil, "other kinds untouched")
+end)
+
+test("assay: a tier is claimable exactly at its threshold, once, only for real kinds and real tiers", function()
+	local st = Assay.Default()
+	Assay.Record(st, "Glimmerstone", AssayCfg.Tiers[1].Pops - 1)
+	eq(Assay.Claim(st, "Glimmerstone", 1, AssayKinds, AssayCfg), nil, "one short")
+	Assay.Record(st, "Glimmerstone", 1)
+	for _, junk in { 0, 9, -1, 1.5, "1", true, {} } do
+		eq(Assay.Claim(st, "Glimmerstone", junk, AssayKinds, AssayCfg), nil, "junk tier")
+	end
+	for _, junk in { 5, true, {}, "Nope", "" } do
+		eq(Assay.Claim(st, junk, 1, AssayKinds, AssayCfg), nil, "junk kind")
+	end
+	eq(Assay.Claim(st, "Glimmerstone", 1, AssayKinds, AssayCfg), AssayCfg.Tiers[1].Reward, "exactly at the threshold")
+	eq(Assay.Claim(st, "Glimmerstone", 1, AssayKinds, AssayCfg), nil, "only once")
+	eq(Assay.Claim(st, "Glimmerstone", 2, AssayKinds, AssayCfg), nil, "the next tier is not reached")
+	eq(Assay.Claim(st, "Kindlequartz", 1, AssayKinds, AssayCfg), nil, "another kind has no pops")
+	Assay.Record(st, "Ghost", 5000)
+	eq(Assay.Claim(st, "Ghost", 1, AssayKinds, AssayCfg), nil, "a kind that is not a crystal cannot be claimed even with pops recorded")
+end)
+
+test("assay: the title needs every kind at the title tier, and the view lists what can be claimed", function()
+	local st = Assay.Default()
+	local need = AssayCfg.Tiers[AssayCfg.TitleTier].Pops
+	Assay.Record(st, "Glimmerstone", need)
+	eq(Assay.TitleEarned(st, AssayKinds, AssayCfg), false, "one kind is not enough")
+	Assay.Record(st, "Kindlequartz", need - 1)
+	eq(Assay.TitleEarned(st, AssayKinds, AssayCfg), false, "one pop short")
+	Assay.Record(st, "Kindlequartz", 1)
+	eq(Assay.TitleEarned(st, AssayKinds, AssayCfg), true, "all kinds at Master")
+	eq(Assay.TitleEarned(st, {}, AssayCfg), false, "no kinds, no title")
+	local v = Assay.View(st, AssayKinds, AssayCfg)
+	eq(#v[1].Claimable, AssayCfg.TitleTier, "tiers up to Master are claimable")
+	eq(v[1].Next.Index, AssayCfg.TitleTier + 1, "the next goal is the tier after")
+	Assay.Claim(st, "Glimmerstone", 1, AssayKinds, AssayCfg)
+	eq(#Assay.View(st, AssayKinds, AssayCfg)[1].Claimable, AssayCfg.TitleTier - 1, "a claimed tier leaves the list")
+end)
+
+test("assay: the save migrates to v16 with an empty record and the title is a valid grant", function()
+	local d = Schema.Migrate({ SchemaVersion = 15, Shards = 2 })
+	eq(next(d.Assay.Pops), nil, "empty")
+	eq(Schema.CURRENT_VERSION >= 16, true, "v16 exists")
+	eq(require("../../src/ReplicatedStorage/Shared/Grants").Valid({ Kind = "Title", Title = AssayCfg.Title }), true, "title valid")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

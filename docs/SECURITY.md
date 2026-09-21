@@ -42,3 +42,5 @@ All handlers go through a per-player, per-remote token bucket (`Server/RateLimit
 1. Re-run this table against the code (new remotes must be added here and go through `guarded`).
 2. Test a save/rejoin cycle and a server shutdown in a published place.
 3. Make one purchase per product in a private server and confirm it grants once and persists.
+
+Later additions: `AssayClaim` (5 / 8): kind must be a real crystal id and tier an integer for an existing tier, reached and unclaimed (`Assay.Claim`, hostile ids tested). The world boss and Plus have no client input: they run from the server clock and `Purchases.Owns`.

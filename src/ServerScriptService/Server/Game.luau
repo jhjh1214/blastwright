@@ -19,6 +19,8 @@ local Expedition = require(Shared.Expedition)
 local Puzzle = require(Shared.Puzzle)
 local Contracts = require(Shared.Contracts)
 local WorldBoss = require(Shared.WorldBoss)
+local Plus = require(Shared.Plus)
+local Assay = require(Shared.Assay)
 local Farm = require(Shared.Farm)
 local Lurker = require(Shared.Lurker)
 local Power = require(Shared.Power)
@@ -50,6 +52,8 @@ local ExpeditionConfig = Config.Expedition
 local PuzzleConfig = Config.Puzzle
 local ContractsConfig = Config.Contracts
 local WorldBossConfig = Config.WorldBoss
+local PlusConfig = Config.Plus
+local AssayConfig = Config.Assay
 local FarmConfig = Config.Farm
 local LurkerConfig = Config.Lurkers
 local BossConfig = Config.Bosses
@@ -294,6 +298,7 @@ local function snapshot(player: Player): { [string]: any }?
 			}
 		end)(),
 		AwaitRevive = seam ~= nil and seam.AwaitRevive == true,
+		Assay = Assay.View(data.Assay, Crystals.Order, AssayConfig),
 		Collection = Mastery.CollectionView(data.Collection, LurkerConfig, BossConfig, ExpeditionConfig),
 		Mastery = { Objectives = Mastery.View(data.Mastery, MasteryConfig), Titles = Mastery.Titles(data.Mastery, MasteryConfig), Title = data.Mastery.Title },
 		Critical = seam and seam.Critical or 0,
@@ -1036,6 +1041,7 @@ local function onDetonate(player: Player, payload: any)
 			valuablePops += 1
 		end
 		data.Codex.Discovered[ev.Kind] = true
+		Assay.Record(data.Assay, ev.Kind, 1)
 		if ev.Mutated then
 			data.Codex.Mutated[ev.Kind] = true
 		end
@@ -1416,6 +1422,26 @@ local function onContractClaim(player: Player)
 	sync(player)
 end
 
+local function onAssayClaim(player: Player, kind: any, tier: any)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	local reward = Assay.Claim(data.Assay, kind, tier, Crystals.Order, AssayConfig)
+	if not reward then
+		return
+	end
+	local scaled = reward * math.max(1, data.Progress.StrataUnlocked)
+	award(data, scaled)
+	notify(player, ("Assay milestone reached! +%d shards"):format(scaled), "Reward")
+	if Assay.TitleEarned(data.Assay, Crystals.Order, AssayConfig) and not data.Mastery.Extra[AssayConfig.Title] then
+		Grants.Apply(data, { { Kind = "Title", Title = AssayConfig.Title } }, os.time(), data.Progress.StrataUnlocked)
+		notify(player, ("Title earned: %s! Equip it in the Forge."):format(AssayConfig.Title), "Reward")
+	end
+	announceGoals(player)
+	sync(player)
+end
+
 local function onClaim(player: Player, slot: any)
 	local data = Data.Get(player)
 	if not data then
@@ -1625,6 +1651,20 @@ local function respawn(player: Player)
 	end
 end
 
+-- Blastwright Plus perks: the title (always, while owned) and one supply drop per UTC day. Safe to call repeatedly.
+local function applyPlus(player: Player)
+	local data = Data.Get(player)
+	if not data or not Purchases.Owns(player, PlusConfig.Pass) then
+		return
+	end
+	Grants.Apply(data, { { Kind = "Title", Title = PlusConfig.Title } }, os.time(), data.Progress.StrataUnlocked)
+	if Plus.ClaimDaily(data.Plus, Dailies.DayNumber(os.time())) then
+		Grants.Apply(data, PlusConfig.DailyGift, os.time(), data.Progress.StrataUnlocked)
+		notify(player, "Blastwright Plus supply drop: 3 emergency charges and a revive token.", "Reward")
+	end
+	sync(player)
+end
+
 local function onPlayerAdded(player: Player)
 	player.CharacterAdded:Connect(function(character)
 		task.spawn(function()
@@ -1659,6 +1699,7 @@ local function onPlayerAdded(player: Player)
 	Leaderboard.Submit("Bosses", player.UserId, session.Data.Stats.BossesSlain)
 	Achievements.NewlyComplete(session.Data, AchievementsConfig, seenGoals[player]) -- silent: old completions are not announced
 	Purchases.LoadPasses(player)
+	applyPlus(player)
 	task.spawn(Purchases.RefreshClub, player)
 	player:LoadCharacter()
 	sync(player)
@@ -1737,6 +1778,7 @@ function Game.Init()
 	Remotes.UseCharge.OnServerEvent:Connect(guarded("UseCharge", 3, 5, onUseCharge))
 	Remotes.EquipFinisher.OnServerEvent:Connect(guarded("EquipFinisher", 3, 5, onEquipFinisher))
 	Remotes.ContractAccept.OnServerEvent:Connect(guarded("ContractAccept", 4, 6, onContractAccept))
+	Remotes.AssayClaim.OnServerEvent:Connect(guarded("AssayClaim", 5, 8, onAssayClaim))
 	Remotes.ContractClaim.OnServerEvent:Connect(guarded("ContractClaim", 3, 5, onContractClaim))
 	Remotes.ClubClaim.OnServerEvent:Connect(guarded("ClubClaim", 1, 2, onClubClaim))
 	Remotes.EquipTitle.OnServerEvent:Connect(guarded("EquipTitle", 3, 5, onEquipTitle))
@@ -1744,7 +1786,10 @@ function Game.Init()
 	Remotes.FarmAction.OnServerEvent:Connect(guarded("FarmAction", 3, 5, onFarmAction))
 	Remotes.PuzzleStart.OnServerEvent:Connect(guarded("PuzzleStart", 2, 3, onPuzzleStart))
 	optional("Purchases", function()
-		Purchases.Init({ Notify = notify, OnChanged = sync })
+		Purchases.Init({ Notify = notify, OnChanged = function(player)
+			applyPlus(player) -- a Plus purchase pays out at once
+			sync(player)
+		end })
 	end)
 	optional("Leaderboard", function()
 		Leaderboard.Init(World.Registry.Boards)

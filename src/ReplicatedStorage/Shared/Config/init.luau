@@ -25,6 +25,8 @@ return {
 	Farm = require(script.Farm),
 	Contracts = require(script.Contracts),
 	WorldBoss = require(script.WorldBoss),
+	Plus = require(script.Plus),
+	Assay = require(script.Assay),
 	Lurkers = require(script.Lurkers),
 	Bosses = require(script.Bosses),
 	Mastery = require(script.Mastery),

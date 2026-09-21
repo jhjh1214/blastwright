@@ -976,8 +976,8 @@ local function rebuildPanel()
 		-- Permanent perks
 		local perks = section("Permanent perks")
 		local perkArt = { DoubleShards = ShopArt.Boost(2, "forever", Color3.fromRGB(255, 205, 90)), PrismaticLuck = ShopArt.Orb(Color3.fromRGB(255, 110, 230)) }
-		local perkTier = { DoubleShards = "Large", PrismaticLuck = "Medium" }
-		local perkHint = { DoubleShards = 499, PrismaticLuck = 299 }
+		local perkTier = { DoubleShards = "Large", PrismaticLuck = "Medium", BlastwrightPlus = "Premium" }
+		local perkHint = { DoubleShards = 499, PrismaticLuck = 299, BlastwrightPlus = 399 }
 		for i, key in Products.GamepassOrder do
 			local def = Products.Gamepasses[key]
 			local owned = d.Passes and d.Passes[key]
@@ -1039,6 +1039,29 @@ local function rebuildPanel()
 		end
 		-- Blast colors: owned styles can be equipped; locked ones say how to get them.
 		local order = #Config.Crystals.Order + 1
+		-- Assay Office: pop each crystal kind to reach milestones; claim the rewards here.
+		if d.Assay and #d.Assay > 0 then
+			header(order, "Assay Office: every crystal kind has its own pop milestones")
+			for _, a in d.Assay do
+				order += 1
+				local def = Config.Crystals.Defs[a.Kind]
+				local first = a.Claimable[1]
+				local btn, can, onClick
+				if first then
+					local tier = Config.Assay.Tiers[first]
+					btn, can = "Claim  ◆ " .. commas(tier.Reward * math.max(1, d.Progress and d.Progress.StrataUnlocked or 1)), true
+					onClick = function() Remotes.AssayClaim:FireServer(a.Kind, first) end
+				elseif a.Next then
+					btn, can = ("%s / %s"):format(commas(a.Pops), commas(a.Next.Pops)), false
+				else
+					btn, can = "Grandmaster", false
+				end
+				local c = def and Color3.fromRGB(def.Color[1], def.Color[2], def.Color[3]) or THEME.Accent
+				local goal = a.Next and ("Next: %s at %s pops"):format(a.Next.Id, commas(a.Next.Pops)) or "Every milestone reached"
+				row(order, (def and def.Name or a.Kind) .. ("  (%s popped)"):format(commas(a.Pops)), goal, btn, can, onClick or function() end, nil, { Gem = c, Accent = c, Progress = a.Next and a.Pops / math.max(1, a.Next.Pops) or 1 })
+			end
+			order += 1
+		end
 		header(order, "Blast colors")
 		for _, style in d.Styles or {} do
 			order += 1

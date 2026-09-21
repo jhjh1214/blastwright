@@ -32,7 +32,7 @@ Return to Claude and say "Done: playtest" and paste any Output errors or notes o
 MANUAL ACTION REQUIRED (when you want to sell things)
 ========================================
 ACTION:
-Publish the experience, then create the Developer Products (18 in total, you can start with a few) and 2 Gamepasses (optionally 1 subscription).
+Publish the experience, then create the Developer Products (18 in total, you can start with a few) and 3 Gamepasses (optionally 1 subscription).
 
 WHY:
 Only your Roblox account can create products. Until then the Shop shows "Not for sale yet" and everything else works.
