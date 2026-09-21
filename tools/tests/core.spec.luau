@@ -1975,5 +1975,182 @@ test("farm: schema v9 gives old saves a level-1 farm that starts now-ish", funct
 	eq(Schema.CURRENT_VERSION, 9, "version")
 end)
 
+local Lurker = require("../../src/ReplicatedStorage/Shared/Lurker")
+local LurkerCfg = require("../../src/ReplicatedStorage/Shared/Config/Lurkers")
+local lctx = { Crystals = Crystals.Defs, Charges = Charges.Defs, Tuning = Tuning, BlastCells = ChainSim.BlastCells }
+local function seqRng(...) local v, i = { ... }, 0 return function() i += 1 return v[(i - 1) % #v + 1] end end
+
+test("lurker: spawn chance rises with area and expedition floor and is capped", function()
+	local a = Lurker.SpawnChance(1, 0, LurkerCfg)
+	eq(Lurker.SpawnChance(3, 0, LurkerCfg) > a, true, "deeper area")
+	eq(Lurker.SpawnChance(1, 4, LurkerCfg) > a, true, "deeper floor")
+	eq(Lurker.SpawnChance(4, 50, LurkerCfg), LurkerCfg.Spawn.Cap, "capped")
+end)
+
+test("lurker: a kind is only picked from monsters allowed in that area", function()
+	for i = 1, 20 do
+		local kind = Lurker.PickKind(1, i / 21, LurkerCfg)
+		eq(LurkerCfg.Defs[kind].Stratum <= 1, true, "area-1 kinds only")
+	end
+	local seen = {}
+	for i = 1, 30 do seen[Lurker.PickKind(4, i / 31, LurkerCfg)] = true end
+	local n = 0 for _ in seen do n += 1 end
+	eq(n, 3, "all three appear deep down")
+end)
+
+test("lurker: it hides under a valuable crystal, never under an empty cell or a hazard", function()
+	local g = grid(function(x, z) if x == 3 and z == 4 then return "Glimmerstone" end if x == 6 and z == 6 then return "Dreadgeode" end end)
+	for i = 1, 10 do
+		local h = Lurker.Hide(g, lctx, "Gnasher", i / 11)
+		eq(h.X == 3 and h.Z == 4, true, "the only valuable crystal")
+	end
+	eq(Lurker.Hide(grid(function() return nil end), lctx, "Gnasher", 0.5), nil, "nowhere to hide")
+end)
+
+test("lurker: it emerges exactly when its cell is popped", function()
+	local h = { Kind = "Gnasher", X = 5, Z = 5 }
+	local r = ChainSim.Run(grid(function(x, z) if x == 5 and z == 5 then return "Glimmerstone" end end), { cap(5, 5) }, ctx)
+	eq(Lurker.Revealed(h, r.Events), true, "popped")
+	local miss = ChainSim.Run(grid(function(x, z) if x == 2 and z == 2 then return "Glimmerstone" end end), { cap(2, 2) }, ctx)
+	eq(Lurker.Revealed(h, miss.Events), false, "elsewhere")
+	local m = Lurker.New("Gnasher", 5, 5, LurkerCfg)
+	eq(m.HP, LurkerCfg.Defs.Gnasher.HP, "full health")
+end)
+
+test("lurker: a direct charge hit does the charge's damage; a miss does none", function()
+	local m = Lurker.New("Gnasher", 5, 5, LurkerCfg)
+	local none = { Events = {} }
+	eq(Lurker.Damage(m, { cap(5, 5) }, none, lctx, LurkerCfg), LurkerCfg.Damage.Direct.Basic, "direct")
+	eq(Lurker.Damage(m, { cap(9, 9) }, none, lctx, LurkerCfg), 0, "miss")
+	eq(Lurker.Damage(m, { { X = 5, Z = 9, Kind = "Shaft" } }, none, lctx, LurkerCfg), LurkerCfg.Damage.Direct.Shaft, "a shaft reaches down the column")
+end)
+
+test("lurker: each charge counts separately and splash from adjacent pops is capped", function()
+	local m = Lurker.New("Gnasher", 5, 5, LurkerCfg)
+	local two = Lurker.Damage(m, { cap(5, 5), cap(5, 6) }, { Events = {} }, lctx, LurkerCfg)
+	eq(two, LurkerCfg.Damage.Direct.Basic * 2, "two charges both cover it")
+	local events = {}
+	for i = 1, 8 do events[i] = { X = 4 + (i % 3), Z = 4 + (i % 2) } end -- all within 1 of (5,5) except none
+	local splash = Lurker.Damage(m, {}, { Events = events }, lctx, LurkerCfg)
+	eq(splash, LurkerCfg.Damage.Splash * LurkerCfg.Damage.SplashCap, "capped")
+	eq(Lurker.Damage(m, {}, { Events = { { X = 9, Z = 9 } } }, lctx, LurkerCfg), 0, "far pops do nothing")
+end)
+
+test("lurker: armor cuts each direct hit (never below 1) and a weakness doubles it", function()
+	local brute = Lurker.New("Brute", 5, 5, LurkerCfg)
+	local def = LurkerCfg.Defs.Brute
+	local basic = Lurker.Damage(brute, { cap(5, 5) }, { Events = {} }, lctx, LurkerCfg)
+	eq(basic, math.max(1, LurkerCfg.Damage.Direct.Basic - def.Armor), "armor reduces")
+	local cross = Lurker.Damage(brute, { { X = 5, Z = 5, Kind = "Cross" } }, { Events = {} }, lctx, LurkerCfg)
+	eq(cross, math.max(1, LurkerCfg.Damage.Direct.Cross - def.Armor) * 2, "weak to Cross")
+end)
+
+test("lurker: Hit lowers health, reports death at zero, and never goes negative", function()
+	local m = Lurker.New("Gnasher", 5, 5, LurkerCfg)
+	eq(Lurker.Hit(m, 1), true, "alive")
+	eq(m.HP, LurkerCfg.Defs.Gnasher.HP - 1, "hp")
+	eq(Lurker.Hit(m, 999), false, "dead")
+	eq(m.HP, 0, "floored")
+end)
+
+test("lurker: a Gnasher eats adjacent valuable crystals and only those", function()
+	local g = grid(function(x, z)
+		if x == 4 and z == 5 then return "Glimmerstone" end
+		if x == 6 and z == 5 then return "Glimmerstone" end
+		if x == 5 and z == 6 then return "Dreadgeode" end
+		if x == 9 and z == 9 then return "Glimmerstone" end
+	end)
+	local m = Lurker.New("Gnasher", 5, 5, LurkerCfg)
+	local act = Lurker.Act(m, g, lctx, LurkerCfg)
+	eq(#act.Eaten, math.min(2, LurkerCfg.Defs.Gnasher.Params.PerTurn), "eats up to its appetite")
+	eq(g.Cells[ChainSim.Key(N, 5, 6)] ~= nil, true, "hazards are left alone")
+	eq(g.Cells[ChainSim.Key(N, 9, 9)] ~= nil, true, "far crystals untouched")
+end)
+
+test("lurker: with nothing adjacent a Gnasher steps toward the nearest crystal onto an empty cell", function()
+	local g = grid(function(x, z) if x == 9 and z == 5 then return "Glimmerstone" end end)
+	local m = Lurker.New("Gnasher", 5, 5, LurkerCfg)
+	local act = Lurker.Act(m, g, lctx, LurkerCfg)
+	eq(#act.Eaten, 0, "nothing to eat")
+	eq(m.X, 6, "moved one step east")
+	eq(m.Z, 5, "same row")
+end)
+
+test("lurker: a Sapper drains charges every turn; a Brute smashes the rig on its schedule and telegraphs it", function()
+	local g = grid(function() return nil end)
+	local sap = Lurker.New("Sapper", 5, 5, LurkerCfg)
+	eq(Lurker.Act(sap, g, lctx, LurkerCfg).ChargesDrained, LurkerCfg.Defs.Sapper.Params.Amount, "drain")
+	local brute = Lurker.New("Brute", 5, 5, LurkerCfg)
+	local every = LurkerCfg.Defs.Brute.Params.EveryTurns
+	local hits, warned = 0, false
+	for turn = 1, every * 2 do
+		if Lurker.Telegraph(brute, LurkerCfg) then warned = true end
+		hits += Lurker.Act(brute, g, lctx, LurkerCfg).HeartsLost
+	end
+	eq(hits, 2, "one smash per cycle")
+	eq(warned, true, "the smash is announced a turn ahead")
+end)
+
+test("lurker: the bounty is paid per monster kind and repairs cost a fraction of the seam's earnings", function()
+	eq(Lurker.Bounty("Brute", LurkerCfg), LurkerCfg.Defs.Brute.Bounty, "bounty")
+	eq(Lurker.RepairFee(1000, LurkerCfg), math.floor(1000 * LurkerCfg.Defeat.RepairFraction), "repair fee")
+	eq(Lurker.RepairFee(0, LurkerCfg), 0, "nothing earned, nothing owed")
+end)
+
+test("lurker: config sanity (monsters get tougher, values positive)", function()
+	eq(LurkerCfg.Hearts >= 2, true, "at least two hearts")
+	for id, def in LurkerCfg.Defs do
+		eq(def.HP > 0 and def.Bounty > 0, true, id .. " has health and a bounty")
+		eq(LurkerCfg.Damage.Direct[def.Weak or "Basic"] ~= nil, true, id .. " weakness is a real charge")
+	end
+end)
+
+test("lurker: splash only counts pops within one cell on BOTH axes", function()
+	local m = Lurker.New("Gnasher", 5, 5, LurkerCfg)
+	eq(Lurker.Damage(m, {}, { Events = { { X = 5, Z = 7 } } }, lctx, LurkerCfg), 0, "two cells away in z")
+	eq(Lurker.Damage(m, {}, { Events = { { X = 7, Z = 5 } } }, lctx, LurkerCfg), 0, "two cells away in x")
+	eq(Lurker.Damage(m, {}, { Events = { { X = 6, Z = 6 } } }, lctx, LurkerCfg), LurkerCfg.Damage.Splash, "diagonal neighbour")
+end)
+
+test("lurker: the smash warning shows exactly one turn before it lands", function()
+	local brute = Lurker.New("Brute", 5, 5, LurkerCfg)
+	local g = grid(function() return nil end)
+	local every = LurkerCfg.Defs.Brute.Params.EveryTurns
+	for turn = 1, every * 2 do
+		local warned = Lurker.Telegraph(brute, LurkerCfg)
+		local hit = Lurker.Act(brute, g, lctx, LurkerCfg).HeartsLost
+		eq(warned, hit == 1, "warning matches the hit on turn " .. turn)
+	end
+end)
+
+test("lurker: a Gnasher never eats more than its appetite, never eats hazards, never steps onto a crystal", function()
+	local g = grid(function(x, z)
+		if x == 5 and z == 4 then return "Dreadgeode" end -- scanned first
+		if (x == 4 and z == 5) or (x == 6 and z == 5) or (x == 5 and z == 6) then return "Glimmerstone" end
+	end)
+	local m = Lurker.New("Gnasher", 5, 5, LurkerCfg)
+	local act = Lurker.Act(m, g, lctx, LurkerCfg)
+	eq(#act.Eaten, LurkerCfg.Defs.Gnasher.Params.PerTurn, "appetite respected")
+	eq(g.Cells[ChainSim.Key(N, 5, 4)] ~= nil, true, "hazard survives")
+	local blocked = grid(function(x, z)
+		if x == 9 and z == 5 then return "Glimmerstone" end
+		if x == 6 and z == 5 then return "Dreadgeode" end
+	end)
+	local m2 = Lurker.New("Gnasher", 5, 5, LurkerCfg)
+	Lurker.Act(m2, blocked, lctx, LurkerCfg)
+	eq(blocked.Cells[ChainSim.Key(N, m2.X, m2.Z)], nil, "it stands on an empty cell")
+end)
+
+test("lurker: a Gnasher heads for the NEAREST crystal, not the first one it finds", function()
+	local g = grid(function(x, z)
+		if x == 7 and z == 5 then return "Glimmerstone" end
+		if x == 5 and z == 9 then return "Glimmerstone" end
+	end)
+	local m = Lurker.New("Gnasher", 5, 5, LurkerCfg)
+	Lurker.Act(m, g, lctx, LurkerCfg)
+	eq(m.X, 6, "east toward the near one")
+	eq(m.Z, 5, "same row")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

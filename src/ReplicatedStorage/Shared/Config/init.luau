@@ -23,6 +23,7 @@ return {
 	Expedition = require(script.Expedition),
 	Puzzle = require(script.Puzzle),
 	Farm = require(script.Farm),
+	Lurkers = require(script.Lurkers),
 	Tuning = Tuning,
 	Context = {
 		Crystals = Crystals.Defs,
