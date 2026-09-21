@@ -1,5 +1,7 @@
 # Launch checklist
 
+Every manual step in one place: `docs/PUBLISH_GUIDE.md`. This is the verification list.
+
 Ordered. Items marked **(you)** need your Roblox account; the rest are things to verify. Nothing here has been done yet unless ticked.
 
 ## 0. Before publishing
@@ -23,13 +25,13 @@ Ordered. Items marked **(you)** need your Roblox account; the rest are things to
 - [ ] Output shows no `[Data]` warnings about failed loads or saves.
 
 ## 3. Monetization **(you)** (see `docs/MANUAL_ACTIONS.md`)
-- [ ] Create 5 Developer Products (4 shard packs + Neon Pink Blasts) and 2 Gamepasses; paste ids into `Config/Products.luau`.
+- [ ] Create the 18 Developer Products (4 shard packs, 4 blast colors, 10 offers) and 2 Gamepasses (optionally the Club subscription); paste ids into `Config/Products.luau` (table in `docs/PUBLISH_GUIDE.md`).
 - [ ] Test each purchase once in a private server: grants once, persists, and the Shop tab updates.
-- [ ] Confirm 2x Shards and Prismatic Luck behave as described.
+- [ ] Confirm 2x Shards and Prismatic Luck behave as described; boosts, revive and finishers grant once and persist.
 - [ ] Check prices (suggestions in `docs/MONETIZATION.md`).
 
 ## 4. Devices
-- [ ] Phone (or the Device emulator at 390x844 and 844x390): top bar, Menu tabs, grid framing and taps.
+- [ ] Phone (or the Device emulator at 390x844 and 844x390): top bar, dock buttons (Shop, Forge, Daily, Goals, Codex, Farm), grid framing and taps.
 - [ ] Low-end phone frame rate in a full server; if poor, see the levers in `docs/TECHNICAL_ARCHITECTURE.md` (fewer decor lights, StreamingEnabled).
 - [ ] Gamepad/keyboard: Space to detonate, X to leave, Backspace to clear.
 

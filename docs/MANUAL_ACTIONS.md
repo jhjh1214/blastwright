@@ -1,5 +1,7 @@
 # Manual Actions
 
+See `docs/PUBLISH_GUIDE.md` for the single ordered list. The blocks below are the detailed versions.
+
 ```
 ========================================
 MANUAL ACTION REQUIRED
@@ -18,7 +20,7 @@ EXACT STEPS:
 4. Follow the checklist in docs/TESTING.md.
 
 WHAT YOU SHOULD SEE:
-A dark crystal mine: hub plaza, roads, four biomes, blast pads. Using a pad station opens the top-down grid; tapping plants charges; Detonate triggers a cascade; shards count up. Geode caches are hidden off the roads.
+A dark crystal mine: hub plaza, roads, four biomes, blast pads. Walking to a pad and pressing E opens the top-down grid; tapping plants charges; Detonate triggers a cascade; shards count up. Geode caches are hidden off the roads.
 
 THEN:
 Return to Claude and say "Done: playtest" and paste any Output errors or notes on how it felt.
@@ -46,7 +48,7 @@ EXACT STEPS:
 7. Test in a published Private Server (Studio test purchases cannot prove the live flow).
 
 WHAT YOU SHOULD SEE:
-The Shop tab shows "Buy" instead of "Not for sale yet". After buying a shard pack the shard total rises and it stays after rejoining.
+The Shop shows "Buy" instead of "Not for sale yet". After buying a shard pack the shard total rises and it stays after rejoining.
 
 THEN:
 Return to Claude and say "Done: products created" with the IDs.

@@ -4,7 +4,7 @@
 **Blastwright** is a PvE Roblox game: plant charges in crystal caverns, detonate, and plan chain reactions for shards. Concept approved 2026-09-21. Design: `docs/GAME_DESIGN.md`. Architecture: `docs/TECHNICAL_ARCHITECTURE.md`.
 
 ## Status (update this section as work lands)
-- Done and unit-tested (254 tests, three charge types): `ChainSim`, `Seam`, `Schema`, `Validate`.
+- Done and unit-tested (255 tests, three charge types): `ChainSim`, `Seam`, `Schema`, `Validate`.
 - Runs in Studio (developer-confirmed) but has no automated tests and only a first smoke run: `Game`, `Data`, `World`, all Client modules.
 - Developer confirmed on 2026-09-21 that the game runs in Studio and shows the cavern and UI (after the lazy-DataStore fix). Developer reported it "feels very good" (2026-09-21); audio playback not explicitly confirmed.
 - Audio: 7 SFX cues wired from Creator Store results (`tools/asset-search`); **unheard, playback unconfirmed** until Output shows `[Audio] ... OK`.
@@ -17,7 +17,7 @@
 - Not started: mobile testing.
 - Stratum 3 (Slowburn delayed-fuse crystal) added and unit-tested; its visuals, fuse flash and Codex entry are **not yet seen in Studio**.
 - Playtest 2026-09-21: world build died on an invalid `SurfaceGui` property (fixed; API checker added). Lighting/crystal glow retuned after "too dark / too bright" feedback; guide system (objective card, marker, trail, edge arrow, welcome panel) added. **Both unseen in Studio.**
-- Next: developer checks the Daily button and the Shop tab; creates products when ready (docs/MANUAL_ACTIONS.md); then asset pass and mobile.
+- Next: developer runs the first full playtest (docs/TESTING.md), then follows docs/PUBLISH_GUIDE.md (the single ordered list of every manual step: balance, publish, products, assets, presentation).
 
 ## Environment (Windows, PowerShell)
 Rojo 7.7.0 (`C:\Tools\Rojo`), Git, Node, Python. Asset search: `python tools/asset-search/audio_search.py <cue> <max_secs> <keywords...>`. Luau CLI/analyzer/compiler are in `tools/bin` (git-ignored; re-download from the luau-lang GitHub release if missing). Roblox Studio is installed but cannot be driven by Claude.
