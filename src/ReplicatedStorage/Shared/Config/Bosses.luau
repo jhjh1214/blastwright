@@ -41,6 +41,25 @@ return {
 			CutPops = 3, -- popping this many crystals on the marked cells cuts the attack (no damage, no dodge used)
 			EnrageLines = 2, -- telegraphed attack lines in the enrage phase
 			PhaseRefund = 1, -- charges refunded when a phase is broken
+
+			-- Real-time attacks (Shared/BossRT.luau): the boss winds up attacks on a clock, telegraphs them on the grid, and each
+			-- is answered by the crystal system (see docs/MONSTERS.md).
+			RT = {
+				FirstAttackDelay = 3,
+				Interval = { Attack = 6.5, Weak = 5.5, Enrage = 4, Finisher = 5 }, -- seconds between attack wind-ups
+				MaxThreats = { Attack = 1, Weak = 1, Enrage = 2, Finisher = 1 }, -- attacks in the air at once
+				Attacks = {
+					Attack = { "Slam" },
+					Weak = { "Slam", "Meteor" },
+					Enrage = { "Slam", "Meteor", "Corruption" },
+					Finisher = { "Slam", "Corruption" },
+				},
+				Slam = { Delay = 2.6 },
+				Meteor = { Delay = 3.2, Zones = 3 },
+				Corruption = { Delay = 4.5, Marks = 4 },
+				ShieldSeconds = 1.2, -- Dodge: how long the shield lasts
+				DodgeCooldown = 7, -- seconds until Dodge is ready again
+			},
 		},
 	},
 }

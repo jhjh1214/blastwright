@@ -3115,5 +3115,210 @@ test("events: Lurker Swarm Friday is all Friday only, Explosive Sunday all Sunda
 	eq(has(MONDAY + 20 * HOUR - 1, "CrystalStorm") or has(MONDAY + 21 * HOUR, "CrystalStorm"), false, "outside it")
 end)
 
+local BossRT = require("../../src/ReplicatedStorage/Shared/BossRT")
+local RT = TitanDef.RT
+local function firstThen(first, seed)
+	local rest, called = lcg(seed), false
+	return function() if not called then called = true return first end return rest() end
+end
+local function armedState(now) local st = BossRT.New(now or 0, "Titan", BossCfg) st.NextAt = 0 return st end
+
+test("bossrt: a new fight waits before its first attack and has no threats or shield", function()
+	local st = BossRT.New(100, "Titan", BossCfg)
+	eq(st.NextAt, 100 + RT.FirstAttackDelay, "first attack delay")
+	eq(#st.Threats, 0, "no threats")
+	eq(BossRT.IsShielded(st, 100), false, "no shield")
+	eq(BossRT.Spawn(st, "Attack", "Titan", fullGrid(), bctx, 100 + RT.FirstAttackDelay - 0.01, lcg(1), BossCfg), nil, "too early")
+end)
+
+test("bossrt: attacks start only when due, only in phases that attack, and never beyond the phase's limit", function()
+	local st = armedState()
+	eq(BossRT.Spawn(st, "Armor", "Titan", fullGrid(), bctx, 5, lcg(1), BossCfg), nil, "the armor phase does not attack")
+	local t1 = BossRT.Spawn(st, "Attack", "Titan", fullGrid(), bctx, 5, lcg(1), BossCfg)
+	eq(t1 ~= nil, true, "spawned")
+	eq(st.NextAt, 5 + RT.Interval.Attack, "the next wind-up is an interval later")
+	eq(BossRT.Spawn(st, "Attack", "Titan", fullGrid(), bctx, 5 + RT.Interval.Attack, lcg(2), BossCfg), nil, "attack phase allows one threat at a time")
+	local st2 = armedState()
+	eq(BossRT.Spawn(st2, "Enrage", "Titan", fullGrid(), bctx, 1, lcg(1), BossCfg) ~= nil, true, "first enrage attack")
+	eq(BossRT.Spawn(st2, "Enrage", "Titan", fullGrid(), bctx, 1 + RT.Interval.Enrage, lcg(2), BossCfg) ~= nil, true, "a second at once in enrage")
+	eq(BossRT.Spawn(st2, "Enrage", "Titan", fullGrid(), bctx, 1 + 2 * RT.Interval.Enrage, lcg(3), BossCfg), nil, "but no third")
+	eq(t1.LandsAt, 5 + RT[t1.Type].Delay, "lands after its telegraph delay")
+end)
+
+test("bossrt: a slam marks a full row or column, and both orientations occur", function()
+	local seenH, seenV = false, false
+	for seed = 1, 30 do
+		local t = BossRT.Spawn(armedState(), "Attack", "Titan", fullGrid(), bctx, 1, lcg(seed), BossCfg)
+		eq(t.Type, "Slam", "the attack phase only slams")
+		eq(#t.Cells, N, "a full line")
+		local sameX, sameZ = true, true
+		for _, c in t.Cells do
+			if c.X ~= t.Cells[1].X then sameX = false end
+			if c.Z ~= t.Cells[1].Z then sameZ = false end
+		end
+		eq(sameX ~= sameZ, true, "one axis fixed")
+		if sameX then seenV = true else seenH = true end
+	end
+	eq(seenH and seenV, true, "rows and columns")
+end)
+
+test("bossrt: meteors aim at crystals outside the core, spaced apart, and do not spawn with nothing to hit", function()
+	for seed = 1, 20 do
+		local t = BossRT.Spawn(armedState(), "Weak", "Titan", fullGrid(), bctx, 1, firstThen(0.9, seed), BossCfg)
+		eq(t.Type, "Meteor", "the rng picked a meteor")
+		eq(#t.Zones >= 1 and #t.Zones <= RT.Meteor.Zones, true, "up to the configured number of zones")
+		for i, z in t.Zones do
+			eq(math.abs(z.X - 5) <= 1 and math.abs(z.Z - 5) <= 1, false, "outside the core")
+			for j = i + 1, #t.Zones do
+				eq(math.max(math.abs(z.X - t.Zones[j].X), math.abs(z.Z - t.Zones[j].Z)) >= 3, true, "zones do not overlap")
+			end
+		end
+	end
+	eq(BossRT.Spawn(armedState(), "Weak", "Titan", grid(function() return nil end), bctx, 1, firstThen(0.9, 1), BossCfg), nil, "an empty grid has nothing to aim at")
+end)
+
+test("bossrt: corruption marks crystals outside the core, and does not spawn on an empty grid", function()
+	local t = BossRT.Spawn(armedState(), "Enrage", "Titan", fullGrid(), bctx, 1, firstThen(0.99, 4), BossCfg)
+	eq(t.Type, "Corruption", "picked")
+	eq(#t.Marks, RT.Corruption.Marks, "the configured number of marks")
+	for _, m in t.Marks do eq(math.abs(m.X - 5) <= 1 and math.abs(m.Z - 5) <= 1, false, "outside the core") end
+	eq(BossRT.Spawn(armedState(), "Enrage", "Titan", grid(function() return nil end), bctx, 1, firstThen(0.99, 4), BossCfg), nil, "nothing to corrupt")
+end)
+
+test("bossrt: enough pops on a slam line cut it, and it stays cut", function()
+	local st = armedState()
+	local t = BossRT.Spawn(st, "Attack", "Titan", fullGrid(), bctx, 1, lcg(3), BossCfg)
+	local few, enough = {}, {}
+	for i = 1, TitanDef.CutPops - 1 do few[i] = { X = t.Cells[i].X, Z = t.Cells[i].Z, Kind = "Glimmerstone" } end
+	for i = 1, TitanDef.CutPops do enough[i] = { X = t.Cells[i].X, Z = t.Cells[i].Z, Kind = "Glimmerstone" } end
+	eq(BossRT.Counter(st, few, bctx, "Titan", BossCfg).Cut, 0, "one short")
+	eq(t.Cancelled, false, "still live")
+	eq(BossRT.Counter(st, { { X = 99, Z = 99, Kind = "Glimmerstone" } }, bctx, "Titan", BossCfg).Cut, 0, "pops elsewhere")
+	eq(BossRT.Counter(st, enough, bctx, "Titan", BossCfg).Cut, 1, "cut")
+	eq(t.Cancelled, true, "cancelled")
+	eq(BossRT.Counter(st, enough, bctx, "Titan", BossCfg).Cut, 0, "not counted twice, even if the same pops are reported again")
+	eq(t.Cancelled, true, "and stays cancelled")
+end)
+
+test("bossrt: each prism (Lensglass) pop deflects one meteor zone; other crystals do not", function()
+	local st = armedState()
+	local t = BossRT.Spawn(st, "Weak", "Titan", fullGrid(), bctx, 1, firstThen(0.9, 8), BossCfg)
+	local zones = #t.Zones
+	eq(BossRT.Counter(st, { { X = 1, Z = 1, Kind = "Kindlequartz" }, { X = 2, Z = 1, Kind = "Glimmerstone" } }, bctx, "Titan", BossCfg).Deflected, 0, "no prism, no deflection")
+	local r = BossRT.Counter(st, { { X = 1, Z = 1, Kind = "Lensglass" } }, bctx, "Titan", BossCfg)
+	eq(r.Deflected, 1, "one pop, one zone")
+	local cancelled = 0
+	for _, z in t.Zones do if z.Cancelled then cancelled += 1 end end
+	eq(cancelled, 1, "exactly one zone cancelled")
+	local many = {}
+	for i = 1, 6 do many[i] = { X = i, Z = 1, Kind = "Lensglass" } end
+	BossRT.Counter(st, many, bctx, "Titan", BossCfg)
+	cancelled = 0
+	for _, z in t.Zones do if z.Cancelled then cancelled += 1 end end
+	eq(cancelled, zones, "extra prisms cannot cancel more zones than exist")
+end)
+
+test("bossrt: popping marked crystals purifies them, unmarked ones stay marked", function()
+	local st = armedState()
+	local t = BossRT.Spawn(st, "Enrage", "Titan", fullGrid(), bctx, 1, firstThen(0.99, 4), BossCfg)
+	local first = { X = t.Marks[1].X, Z = t.Marks[1].Z }
+	local r = BossRT.Counter(st, { { X = first.X, Z = first.Z, Kind = "Glimmerstone" } }, bctx, "Titan", BossCfg)
+	eq(r.Purified, 1, "one purified")
+	eq(#t.Marks, RT.Corruption.Marks - 1, "one fewer mark")
+	for _, m in t.Marks do eq(m.X == first.X and m.Z == first.Z, false, "the purified one is gone") end
+end)
+
+test("bossrt: threats land exactly at their time (inclusive) and are removed from the state", function()
+	local st = armedState()
+	local t = BossRT.Spawn(st, "Attack", "Titan", fullGrid(), bctx, 10, lcg(2), BossCfg)
+	eq(#BossRT.Due(st, t.LandsAt - 0.001), 0, "not yet")
+	eq(#st.Threats, 1, "still waiting")
+	local due = BossRT.Due(st, t.LandsAt)
+	eq(#due, 1, "due at the exact time")
+	eq(#st.Threats, 0, "removed")
+	eq(#BossRT.Due(st, t.LandsAt + 5), 0, "gone for good")
+end)
+
+test("bossrt: dodge is a timed shield with a cooldown, ready again exactly when it expires", function()
+	local st = BossRT.New(0, "Titan", BossCfg)
+	eq(BossRT.Shield(st, 10, "Titan", BossCfg), true, "starts")
+	eq(BossRT.IsShielded(st, 10 + RT.ShieldSeconds - 0.01), true, "inside the window")
+	eq(BossRT.IsShielded(st, 10 + RT.ShieldSeconds), false, "over at the boundary")
+	eq(BossRT.Shield(st, 10 + RT.DodgeCooldown - 0.01, "Titan", BossCfg), false, "still cooling down")
+	eq(BossRT.Shield(st, 10 + RT.DodgeCooldown, "Titan", BossCfg), true, "ready at the boundary")
+end)
+
+test("bossrt: a landing slam wrecks its line and costs a heart, unless shielded (crystals still fall) or cut", function()
+	local function slam()
+		local g = fullGrid()
+		local st = armedState()
+		local t = BossRT.Spawn(st, "Attack", "Titan", g, bctx, 1, lcg(5), BossCfg)
+		return g, t
+	end
+	local g, t = slam()
+	local r = BossRT.Resolve(t, g, bctx, false, BossCfg)
+	eq(r.HeartsLost, 1, "a heart")
+	eq(#r.Destroyed, N, "the whole line")
+	for _, c in t.Cells do eq(g.Cells[ChainSim.Key(N, c.X, c.Z)], nil, "destroyed") end
+	local g2, t2 = slam()
+	local blocked = BossRT.Resolve(t2, g2, bctx, true, BossCfg)
+	eq(blocked.HeartsLost == 0 and blocked.Blocked == true, true, "the shield blocks the heart")
+	eq(#blocked.Destroyed, N, "but not the crystal damage")
+	local g3, t3 = slam()
+	t3.Cancelled = true
+	local cut = BossRT.Resolve(t3, g3, bctx, false, BossCfg)
+	eq(cut.HeartsLost == 0 and #cut.Destroyed == 0 and cut.Cancelled == true, true, "a cut slam does nothing")
+end)
+
+test("bossrt: meteors wreck only live zones (clipped at the edge), cost one heart in total, and do nothing if all are deflected", function()
+	local g = fullGrid()
+	local t = { Id = 1, Type = "Meteor", LandsAt = 0, Cancelled = false, Cells = {}, Marks = {}, Zones = { { X = 1, Z = 1, Cancelled = false }, { X = 9, Z = 9, Cancelled = true }, { X = 5, Z = 2, Cancelled = false } } }
+	local r = BossRT.Resolve(t, g, bctx, false, BossCfg)
+	eq(r.HeartsLost, 1, "one heart even with two live zones")
+	eq(#r.Destroyed, 4 + 9, "a corner zone (4 cells) plus a full zone (9)")
+	eq(g.Cells[ChainSim.Key(N, 9, 9)] ~= nil, true, "the deflected zone is untouched")
+	local all = { Id = 2, Type = "Meteor", LandsAt = 0, Cancelled = false, Cells = {}, Marks = {}, Zones = { { X = 4, Z = 4, Cancelled = true } } }
+	local none = BossRT.Resolve(all, fullGrid(), bctx, false, BossCfg)
+	eq(none.HeartsLost == 0 and #none.Destroyed == 0 and none.Cancelled == true, true, "fully deflected")
+end)
+
+test("bossrt: corruption turns surviving marks into Dreadgeodes for free of hearts, skips missing crystals, and cancels when purified", function()
+	local g = fullGrid()
+	g.Cells[ChainSim.Key(N, 2, 2)] = nil
+	local t = { Id = 1, Type = "Corruption", LandsAt = 0, Cancelled = false, Cells = {}, Zones = {}, Marks = { { X = 1, Z = 1 }, { X = 2, Z = 2 }, { X = 8, Z = 8 } } }
+	local r = BossRT.Resolve(t, g, bctx, false, BossCfg)
+	eq(r.HeartsLost, 0, "no heart")
+	eq(#r.Corrupted, 2, "the two crystals that still exist")
+	eq(g.Cells[ChainSim.Key(N, 1, 1)].Kind, "Dreadgeode", "corrupted")
+	eq(g.Cells[ChainSim.Key(N, 2, 2)], nil, "an empty cell is not filled")
+	local pure = BossRT.Resolve({ Id = 2, Type = "Corruption", LandsAt = 0, Cancelled = false, Cells = {}, Zones = {}, Marks = {} }, fullGrid(), bctx, false, BossCfg)
+	eq(pure.Cancelled and #pure.Corrupted == 0, true, "all purified")
+end)
+
+test("bossrt: the view reports time left (never negative), shield and dodge state", function()
+	local st = armedState()
+	local t = BossRT.Spawn(st, "Attack", "Titan", fullGrid(), bctx, 10, lcg(2), BossCfg)
+	local v = BossRT.View(st, 10, BossCfg, "Titan")
+	eq(math.abs(v.Threats[1].LandsIn - RT.Slam.Delay) < 1e-9, true, "full delay at the start")
+	eq(BossRT.View(st, 10 + 99, BossCfg, "Titan").Threats[1].LandsIn, 0, "clamped at zero")
+	eq(v.DodgeReady, true, "dodge ready")
+	BossRT.Shield(st, 10, "Titan", BossCfg)
+	local v2 = BossRT.View(st, 10.5, BossCfg, "Titan")
+	eq(v2.Shielded == true and v2.DodgeReady == false, true, "shielded, cooling down")
+	eq(math.abs(v2.DodgeLeft - (RT.DodgeCooldown - 0.5)) < 1e-9, true, "cooldown left")
+end)
+
+test("bossrt: config is sane (known attack types, fair telegraph windows, shield shorter than its cooldown)", function()
+	local KNOWN = { Slam = true, Meteor = true, Corruption = true }
+	for phase, list in RT.Attacks do
+		eq(RT.Interval[phase] ~= nil and RT.MaxThreats[phase] ~= nil, true, phase .. " has an interval and a limit")
+		for _, a in list do eq(KNOWN[a] and RT[a] ~= nil, true, phase .. " lists a real attack " .. a) end
+	end
+	for name in KNOWN do eq(RT[name].Delay >= 2, true, name .. " gives at least 2 seconds to react") end
+	eq(RT.ShieldSeconds < RT.DodgeCooldown, true, "the shield is shorter than its cooldown")
+	eq(RT.Corruption.Marks >= 1 and RT.Meteor.Zones >= 1, true, "positive counts")
+	eq(RT.Interval.Enrage < RT.Interval.Attack, true, "enrage attacks faster")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end
