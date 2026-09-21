@@ -2,7 +2,7 @@
 
 Adding content is a data change:
 - **New crystal:** add an entry in `Config/Crystals.luau` (+ `Order`), pick an existing `Behavior` or add one in `ChainSim.Run` and a silhouette builder in `CavernView.luau`. Add a test.
-- **New charge:** `Config/Charges.luau`; add a shape in `ChainSim.blast` if needed.
+- **New charge:** `Config/Charges.luau`; add a shape in `ChainSim.BlastCells` if needed (Radius, Column, Row and Cross exist), with tests.
 - **New stratum:** append to `Config/Strata.luau` and set crystals' `Stratum`.
 - **New live event:** one table in `Config/Events.luau` (weekdays 0=Monday to 6=Sunday, an hour window, and effects MutationMult / ShardMult / ChargeBonus).
 - **New goal:** one `goal(...)` line in `Config/Achievements.luau`; keep targets and rewards rising within a stat (a test enforces it, and that the target is reachable).

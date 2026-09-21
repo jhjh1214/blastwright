@@ -3,7 +3,7 @@
 export type ChargeDef = {
 	Name: string,
 	Description: string,
-	Shape: string, -- Radius | Column
+	Shape: string, -- Radius | Column | Cross
 	Radius: number?,
 	Range: number?,
 	UnlockCost: number?, -- nil = owned from the start
@@ -23,9 +23,16 @@ local Defs: { [string]: ChargeDef } = {
 		Range = 4,
 		UnlockCost = 2000,
 	},
+	Cross = {
+		Name = "Cross Charge",
+		Description = "Blasts the whole row and column through it, 3 cells each way.",
+		Shape = "Cross",
+		Range = 3,
+		UnlockCost = 15000,
+	},
 }
 
 return {
 	Defs = Defs,
-	Order = { "Basic", "Shaft" },
+	Order = { "Basic", "Shaft", "Cross" },
 }

@@ -46,7 +46,7 @@ function ChainSim.Key(size: number, x: number, z: number): number
 end
 
 -- The cells a blast covers, clipped to the grid, with each cell's distance in cells from the origin (used for timing).
--- Shapes: Radius (round), Column (up and down the z axis), Row (along the x axis). Shared by the sim and the preview.
+-- Shapes: Radius (round), Column (up and down the z axis), Row (along the x axis), Cross (row and column together). Shared by the sim and the preview.
 function ChainSim.BlastCells(shape: string, ox: number, oz: number, radius: number, range: number, size: number): { { X: number, Z: number, D: number } }
 	local cells = {}
 	local function add(x: number, z: number, d: number)
@@ -71,6 +71,13 @@ function ChainSim.BlastCells(shape: string, ox: number, oz: number, radius: numb
 	elseif shape == "Row" then
 		for dx = -range, range do
 			add(ox + dx, oz, math.abs(dx))
+		end
+	elseif shape == "Cross" then
+		for d = -range, range do
+			add(ox + d, oz, math.abs(d))
+			if d ~= 0 then
+				add(ox, oz + d, math.abs(d)) -- the center is already covered by the row arm
+			end
 		end
 	end
 	return cells

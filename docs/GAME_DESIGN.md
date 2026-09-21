@@ -57,6 +57,7 @@ The multiplier is applied in pop order, so hitting Resonite *before* the valuabl
 ## Charges (`Config/Charges.luau`)
 - **Blasting Cap:** radius blast (1.5 cells; Fat Fuse upgrade widens it).
 - **Shaft Charge:** whole column, 4 cells each way. Unlocked for 2,000 shards.
+- **Cross Charge:** the whole row and column through it, 3 cells each way (13 cells). Unlocked for 15,000 shards. Combines well with Lensglass beams and Echostone relays.
 
 ## Chain tiers
 Rumble (5 pops, +10%), Cascade (10, +25%), Avalanche (20, +50%), Cataclysm (35, +100%).

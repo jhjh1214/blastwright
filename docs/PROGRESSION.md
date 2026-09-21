@@ -8,6 +8,7 @@ Every tier introduces a change in how you play, not only a bigger number.
 | Fat Fuse 1-3 | 1,200 / 4,000 / 12,000 | Wider Blasting Cap reach (+0.5 cells per level) |
 | Momentum Coil 1-2 | 3,000 / 10,000 | Refund threshold 10 > 8 > 6 |
 | Shaft Charge | 2,000 | New blast shape (column); combos with Lensglass (row) |
+| Cross Charge | 15,000 | New blast shape (row and column together) |
 | Seismograph | 4,500 | Full-chain preview |
 | Stratum 2: Prism Veins | 6,000 | Lensglass beams and Dreadgeode hazards |
 | Stratum 3: Ember Hollows | 20,000 | Slowburn delayed-fuse crystals (timing becomes part of planning) |
