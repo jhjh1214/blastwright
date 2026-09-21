@@ -367,7 +367,7 @@ test("objectives: affordable first upgrade highlights the Forge", function()
 end)
 
 test("objectives: earning toward the next area points at a pad and names the area", function()
-	local o = Objectives.Roam(snap({ Shards = 300, Upgrades = { ExtraCharge = 1 }, Stats = { TotalPops = 50 } }), 0, 0, ocfg)
+	local o = Objectives.Roam(snap({ Shards = 300, Upgrades = { ExtraCharge = 1 }, Stats = { TotalPops = 50, BestDepth = 4, BossesSlain = 1 } }), 0, 0, ocfg)
 	eq(o.Id, "Earn", "id")
 	eq(o.Target ~= nil, true, "target")
 	eq(o.Text:find("Prism Veins", 1, true) ~= nil, true, "names next area")
@@ -382,7 +382,7 @@ test("objectives: enough shards to unlock the next area highlights the Forge", f
 end)
 
 test("objectives: everything unlocked falls back to exploring for caches", function()
-	local o = Objectives.Roam(snap({ Shards = 9999, Upgrades = { ExtraCharge = 3 }, StrataUnlocked = #Strata, Caches = { S1 = true, P2 = true }, Stats = { TotalPops = 999 } }), 0, 0, ocfg)
+	local o = Objectives.Roam(snap({ Shards = 9999, Upgrades = { ExtraCharge = 3 }, StrataUnlocked = #Strata, Caches = { S1 = true, P2 = true }, Stats = { TotalPops = 999, BestDepth = 4, BossesSlain = 1 } }), 0, 0, ocfg)
 	eq(o.Id, "Explore", "id")
 	eq(o.Text:find(("2/%d"):format(#WorldCfg.Caches), 1, true) ~= nil, true, "cache progress")
 	eq(o.Target, nil, "no arrow: caches are meant to be found")
@@ -3355,6 +3355,54 @@ test("bosses: every defined boss has complete real-time config and can be fought
 	eq(n >= 2, true, "at least two bosses exist")
 	for f, kind in BossCfg.BossFloors do eq(BossCfg.Defs[kind] ~= nil, true, "floor " .. f .. " names a real boss") end
 	eq(BossCfg.BossFloors[4] ~= BossCfg.BossFloors[8], true, "the two boss floors are different fights")
+end)
+
+test("objectives: once the basics are known the player is pointed at Expeditions, then at the first boss, then released", function()
+	local base = { Shards = 0, Stats = { TotalPops = 60 } }
+	eq(Objectives.Roam(snap({ Stats = { TotalPops = 29 } }), 0, 0, ocfg).Id, "Earn", "too new for the suggestion")
+	local intro = Objectives.Roam(snap(base), 0, 0, ocfg)
+	eq(intro.Id, "TryExpedition", "the Expedition hint")
+	eq(intro.Target ~= nil, true, "points at a pad")
+	local shallow = Objectives.Roam(snap({ Stats = { TotalPops = 60, BestDepth = 2 } }), 0, 0, ocfg)
+	eq(shallow.Id, "FaceTitan", "dive to floor 4")
+	eq(string.find(shallow.Text, "2", 1, true) ~= nil, true, "shows how deep you got")
+	local ready = Objectives.Roam(snap({ Stats = { TotalPops = 60, BestDepth = 4 } }), 0, 0, ocfg)
+	eq(ready.Id, "FaceTitan", "still the boss quest")
+	eq(ready.Text ~= shallow.Text, true, "different text once you have reached it")
+	eq(Objectives.Roam(snap({ Stats = { TotalPops = 60, BestDepth = 4, BossesSlain = 1 } }), 0, 0, ocfg).Id, "Earn", "quest done: back to the normal path")
+end)
+
+test("objectives: an affordable area unlock and pending claims still outrank the Expedition suggestion", function()
+	eq(Objectives.Roam(snap({ Shards = AREA2_COST, Upgrades = { ExtraCharge = 1 }, Stats = { TotalPops = 60 } }), 0, 0, ocfg).Id, "UnlockArea", "unlock first")
+	eq(Objectives.Roam(snap({ Goals = { { Complete = true, Claimed = false } }, Stats = { TotalPops = 60 } }), 0, 0, ocfg).Id, "ClaimGoal", "claim first")
+end)
+
+test("objectives: a Lurker on the grid turns the in-blast hint into a fight hint, even for veterans", function()
+	local hint = Objectives.Blast({ Stats = { TotalPops = 5000 }, Monster = { Name = "Gnasher" } }, 0)
+	eq(hint.Id, "Fight", "fight hint")
+	eq(string.find(hint.Text, "Gnasher", 1, true) ~= nil, true, "names it")
+	eq(Objectives.Blast({ Stats = { TotalPops = 5000 } }, 0), nil, "veterans get no hint otherwise")
+end)
+
+test("lurker: before the first kill a player who knows the basics gets a pity spawn chance, never lower than normal", function()
+	local base = Lurker.SpawnChance(1, 0, LurkerCfg)
+	eq(Lurker.SpawnChance(1, 0, LurkerCfg, true), math.max(base, LurkerCfg.Spawn.FirstFightChance), "pity chance")
+	eq(Lurker.SpawnChance(1, 0, LurkerCfg, false), base, "no pity otherwise")
+	eq(Lurker.SpawnChance(4, 6, LurkerCfg, true) >= Lurker.SpawnChance(4, 6, LurkerCfg), true, "never lowers a high chance")
+	eq(LurkerCfg.Spawn.FirstFightChance > base and LurkerCfg.Spawn.FirstFightChance <= 1, true, "config sanity")
+end)
+
+test("objectives: the Expedition hint starts at exactly 30 pops and the boss text switches exactly at floor 4", function()
+	eq(Objectives.Roam(snap({ Stats = { TotalPops = 30 } }), 0, 0, ocfg).Id, "TryExpedition", "at 30 pops")
+	local three = Objectives.Roam(snap({ Stats = { TotalPops = 60, BestDepth = 3 } }), 0, 0, ocfg)
+	eq(string.find(three.Text, "best so far", 1, true) ~= nil, true, "floor 3 still says to dive deeper")
+	local four = Objectives.Roam(snap({ Stats = { TotalPops = 60, BestDepth = 4 } }), 0, 0, ocfg)
+	eq(string.find(four.Text, "best so far", 1, true) == nil, true, "floor 4 says you have arrived")
+end)
+
+test("lurker: the pity chance never lowers a chance that is already higher", function()
+	local cfg = { Spawn = { BaseChance = 0.9, PerStratum = 0, PerFloor = 0, Cap = 1, FirstFightChance = 0.6 } }
+	eq(Lurker.SpawnChance(1, 0, cfg, true), 0.9, "keeps the higher chance")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

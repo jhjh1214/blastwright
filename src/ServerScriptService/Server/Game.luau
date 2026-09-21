@@ -468,7 +468,7 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 				notify(player, ("A %s is awake! %s"):format(LurkerConfig.Defs[m.Kind].Name, LurkerConfig.Defs[m.Kind].Description), "Error")
 			end)
 		end
-	elseif not noLurker and runRandom:NextNumber() < Lurker.SpawnChance(stratum, run and run.Floor or 0, LurkerConfig) * fx.LurkerMult then
+	elseif not noLurker and runRandom:NextNumber() < Lurker.SpawnChance(stratum, run and run.Floor or 0, LurkerConfig, data.Stats.LurkersSlain == 0 and data.Stats.TotalPops >= 40) * fx.LurkerMult then
 		seam.Hidden = Lurker.Hide(grid, { Crystals = Config.Context.Crystals }, Lurker.PickKind(stratum, runRandom:NextNumber(), LurkerConfig), runRandom:NextNumber())
 	end
 	seams[player] = seam

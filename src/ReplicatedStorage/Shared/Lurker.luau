@@ -10,9 +10,15 @@ local function key(size: number, x: number, z: number): number
 	return (z - 1) * size + x
 end
 
-function Lurker.SpawnChance(stratum: number, floor: number, cfg: any): number
+-- `firstFight` = the player has never slain a Lurker but knows the basics: a high pity chance so the combat side of the game
+-- is met early instead of maybe never.
+function Lurker.SpawnChance(stratum: number, floor: number, cfg: any, firstFight: boolean?): number
 	local s = cfg.Spawn
-	return math.min(s.Cap, s.BaseChance + s.PerStratum * (stratum - 1) + s.PerFloor * floor)
+	local chance = math.min(s.Cap, s.BaseChance + s.PerStratum * (stratum - 1) + s.PerFloor * floor)
+	if firstFight then
+		chance = math.max(chance, s.FirstFightChance)
+	end
+	return chance
 end
 
 -- Uniform pick among the kinds that appear in this area.
