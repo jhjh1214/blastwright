@@ -1487,5 +1487,303 @@ test("cross charge: the simulation uses it, sources point at the charge cell, an
 	eq(#Charges.Order, (function() local n = 0 for _ in Charges.Defs do n += 1 end return n end)(), "Order lists every charge")
 end)
 
+local function withMods(mods)
+	return { Crystals = ctx.Crystals, Charges = ctx.Charges, Tuning = ctx.Tuning, Modifiers = mods }
+end
+
+test("modifiers: AmplifierMult scales what each Resonite adds to the multiplier", function()
+	local g = grid(function(x, z)
+		if x == 5 and z == 5 then return "Resonite" end
+		if x == 6 and z == 5 then return "Glimmerstone" end
+	end)
+	local plain = ChainSim.Run(g, { cap(5, 5) }, ctx)
+	eq(findEvent(plain, 6, 5).Mult, 1.5, "normal: +0.5")
+	local boosted = ChainSim.Run(g, { cap(5, 5) }, withMods({ AmplifierMult = 2 }))
+	eq(findEvent(boosted, 6, 5).Mult, 2, "doubled: +1.0")
+	eq(findEvent(boosted, 6, 5).Value, 10, "5 x 2.0")
+end)
+
+test("modifiers: UnstableShield stops Dreadgeodes halving the multiplier", function()
+	local g = grid(function(x, z)
+		if x == 5 and z == 5 then return "Resonite" end
+		if x == 6 and z == 5 then return "Dreadgeode" end
+		if x == 4 and z == 5 then return "Glimmerstone" end
+	end)
+	local plain = ChainSim.Run(g, { cap(5, 5) }, ctx)
+	local shielded = ChainSim.Run(g, { cap(5, 5) }, withMods({ UnstableShield = true }))
+	eq(findEvent(plain, 6, 5).Mult, 1, "normal: 1.5 halved and floored to 1")
+	eq(findEvent(shielded, 6, 5).Mult, 1.5, "shielded: multiplier survives")
+end)
+
+test("modifiers: VolatileRadiusBonus widens Kindlequartz blasts only", function()
+	local g = grid(function(x, z)
+		if x == 5 and z == 5 then return "Kindlequartz" end
+		if x == 7 and z == 5 then return "Glimmerstone" end
+	end)
+	eq(ChainSim.Run(g, { cap(5, 5) }, ctx).Pops, 1, "normal radius 1.5 never reaches two cells away")
+	eq(ChainSim.Run(g, { cap(5, 5) }, withMods({ VolatileRadiusBonus = 0.5 })).Pops, 2, "radius 2 reaches it")
+	local slow = grid(function(x, z)
+		if x == 5 and z == 5 then return "Slowburn" end
+		if x == 8 and z == 5 then return "Glimmerstone" end
+	end)
+	eq(ChainSim.Run(slow, { cap(5, 5) }, withMods({ VolatileRadiusBonus = 5 })).Pops, 1, "the bonus does not apply to Slowburn")
+end)
+
+test("modifiers: RelayValueMult and ValueMult scale payouts", function()
+	local g = grid(function(x, z) if x == 5 and z == 5 then return "Echostone" end end)
+	eq(ChainSim.Run(g, { cap(5, 5) }, ctx).Raw, 12, "echostone base value")
+	eq(ChainSim.Run(g, { cap(5, 5) }, withMods({ RelayValueMult = 3 })).Raw, 36, "relay value x3")
+	local inert = grid(function(x, z) if x == 5 and z == 5 then return "Glimmerstone" end end)
+	eq(ChainSim.Run(inert, { cap(5, 5) }, withMods({ RelayValueMult = 3 })).Raw, 5, "relay bonus leaves other crystals alone")
+	eq(ChainSim.Run(inert, { cap(5, 5) }, withMods({ ValueMult = 2 })).Raw, 10, "global value x2")
+end)
+
+test("modifiers: no modifiers, or an empty table, change nothing", function()
+	local g = Seam.Generate(Crystals, Tuning, 4, 777)
+	local a = ChainSim.Run(g, { cap(3, 3), cap(7, 7) }, ctx)
+	local b = ChainSim.Run(g, { cap(3, 3), cap(7, 7) }, withMods({}))
+	eq(a.Total, b.Total, "same payout")
+	eq(#a.Events, #b.Events, "same events")
+	eq(a.PeakMult, b.PeakMult, "same multiplier")
+end)
+
+local Expedition = require("../../src/ReplicatedStorage/Shared/Expedition")
+local ExpCfg = require("../../src/ReplicatedStorage/Shared/Config/Expedition")
+
+local function lcg(seed)
+	local s = seed
+	return function() s = s * 48271 % 2147483647 return s / 2147483647 end
+end
+
+local function startRun(charges)
+	return Expedition.New(ExpCfg, charges or 4)
+end
+
+test("expedition: a new run starts on floor 1 with the given charges and nothing banked", function()
+	local run = startRun(5)
+	eq(run.Floor, 1, "floor")
+	eq(run.Floors, ExpCfg.Floors, "floor count from config")
+	eq(run.Charges, 5, "charges")
+	eq(run.StartCharges, 5, "start charges remembered")
+	eq(run.Haul, 0, "no haul")
+	eq(#run.Relics, 0, "no relics")
+	eq(run.Phase, "Blasting", "phase")
+	eq(run.Cleared, 0, "nothing cleared")
+end)
+
+test("expedition: floors get harder with depth but never beyond the areas you have unlocked", function()
+	eq(Expedition.FloorStratum(1, 4, ExpCfg), 1, "floor 1")
+	eq(Expedition.FloorStratum(2, 4, ExpCfg), 1, "floor 2")
+	eq(Expedition.FloorStratum(3, 4, ExpCfg), 2, "floor 3")
+	eq(Expedition.FloorStratum(5, 4, ExpCfg), 3, "floor 5")
+	eq(Expedition.FloorStratum(8, 4, ExpCfg), 4, "floor 8")
+	eq(Expedition.FloorStratum(8, 2, ExpCfg), 2, "capped by unlocked areas")
+	eq(Expedition.FloorStratum(8, 1, ExpCfg), 1, "an area-1 player stays in area 1")
+	eq(Expedition.FloorStratum(1, 0, ExpCfg), 1, "never below 1")
+	local last = 0
+	for f = 1, ExpCfg.Floors do
+		local s = Expedition.FloorStratum(f, 4, ExpCfg)
+		eq(s >= last, true, "never gets easier as you descend")
+		last = s
+	end
+end)
+
+test("expedition: each descent offers three cards with all three routes and distinct, unowned relics", function()
+	local run = startRun()
+	local cards = Expedition.Choices(run, lcg(11), ExpCfg)
+	eq(#cards, 3, "three cards")
+	local routes, relics = {}, {}
+	for _, c in cards do
+		routes[c.Route] = (routes[c.Route] or 0) + 1
+		if c.Relic then
+			if relics[c.Relic] then error("relic offered twice: " .. c.Relic) end
+			relics[c.Relic] = true
+			if ExpCfg.Relics[c.Relic] == nil then error("unknown relic " .. c.Relic) end
+		end
+	end
+	for name in ExpCfg.Routes do eq(routes[name], 1, "route " .. name .. " offered exactly once") end
+	run.Relics = { "ResonantCore", "SteadyHands" }
+	for seed = 1, 60 do
+		for _, c in Expedition.Choices(run, lcg(seed), ExpCfg) do
+			if c.Relic == "ResonantCore" or c.Relic == "SteadyHands" then error("an owned relic was offered again") end
+		end
+	end
+	local a, b = Expedition.Choices(startRun(), lcg(5), ExpCfg), Expedition.Choices(startRun(), lcg(5), ExpCfg)
+	for i = 1, 3 do
+		eq(a[i].Route, b[i].Route, "deterministic route")
+		eq(a[i].Relic, b[i].Relic, "deterministic relic")
+	end
+end)
+
+test("expedition: when almost every relic is owned, cards simply carry fewer relics", function()
+	local run = startRun()
+	local all = {}
+	for id in ExpCfg.Relics do table.insert(all, id) end
+	table.sort(all)
+	for i = 1, #all - 1 do table.insert(run.Relics, all[i]) end
+	local cards = Expedition.Choices(run, lcg(3), ExpCfg)
+	eq(#cards, 3, "still three cards")
+	local withRelic = 0
+	for _, c in cards do if c.Relic then withRelic += 1 end end
+	eq(withRelic, 1, "only the one remaining relic is on offer")
+end)
+
+test("expedition: finishing a floor adds the haul, and collapse needs BOTH too little cleared AND no charges", function()
+	local run = startRun()
+	eq(Expedition.FloorEnded(run, 1000, 0.8, 2, lcg(1), ExpCfg), "Choose", "cleared enough with charges left")
+	eq(run.Haul, 1000, "haul added")
+	eq(run.Charges, 2, "leftover charges carry over")
+	eq(run.Phase, "Choosing", "waiting for a choice")
+	eq(#run.Choices, 3, "cards ready")
+	eq(run.Cleared, 1, "one floor cleared")
+
+	local weak = startRun()
+	eq(Expedition.FloorEnded(weak, 400, 0.2, 3, lcg(1), ExpCfg), "Choose", "little cleared but charges remain: the run continues")
+	local out = startRun()
+	eq(Expedition.FloorEnded(out, 400, 0.2, 0, lcg(1), ExpCfg), "Collapse", "little cleared and no charges: collapse")
+	eq(out.Phase, "Ended", "run over")
+	local edge = startRun()
+	eq(Expedition.FloorEnded(edge, 400, ExpCfg.ClearToAdvance, 0, lcg(1), ExpCfg), "Choose", "exactly the clear threshold survives")
+	local justUnder = startRun()
+	eq(Expedition.FloorEnded(justUnder, 400, ExpCfg.ClearToAdvance - 0.001, 0, lcg(1), ExpCfg), "Collapse", "just under collapses")
+end)
+
+test("expedition: the last floor ends in victory and a finished run cannot continue", function()
+	local run = startRun()
+	run.Floor = run.Floors
+	eq(Expedition.FloorEnded(run, 500, 0.9, 1, lcg(1), ExpCfg), "Victory", "cleared the final floor")
+	eq(run.Phase, "Ended", "over")
+	eq(Expedition.Pick(run, 1, ExpCfg), false, "cannot pick after the run ended")
+	local mid = startRun()
+	mid.Phase = "Blasting"
+	eq(Expedition.Pick(mid, 1, ExpCfg), false, "cannot pick while still blasting")
+end)
+
+test("expedition: picking a card applies its route and relic and descends", function()
+	local function findCard(run, route) for i, c in run.Choices do if c.Route == route then return i end end end
+	local run = startRun(4)
+	Expedition.FloorEnded(run, 100, 0.9, 2, lcg(7), ExpCfg)
+	local steady = findCard(run, "Steady")
+	local relic = run.Choices[steady].Relic
+	eq(Expedition.Pick(run, steady, ExpCfg), true, "valid pick")
+	eq(run.Floor, 2, "descended")
+	eq(run.Phase, "Blasting", "blasting again")
+	eq(run.Charges, 2 + ExpCfg.Routes.Steady.ChargeDelta, "steady route gives its charge")
+	eq(run.ValueMult, ExpCfg.Routes.Steady.ValueMult, "route value multiplier")
+	if relic then eq(run.Relics[#run.Relics], relic, "relic added") end
+	eq(Expedition.Pick(run, 1, ExpCfg), false, "cannot pick twice")
+
+	local rich = startRun(4)
+	Expedition.FloorEnded(rich, 100, 0.9, 2, lcg(7), ExpCfg)
+	Expedition.Pick(rich, findCard(rich, "Rich"), ExpCfg)
+	eq(rich.ValueMult, ExpCfg.Routes.Rich.ValueMult, "rich vein doubles payouts")
+	eq(rich.Charges, math.max(1, 2 + ExpCfg.Routes.Rich.ChargeDelta), "rich vein costs a charge")
+
+	local rest = startRun(4)
+	Expedition.FloorEnded(rest, 100, 0.9, 1, lcg(7), ExpCfg)
+	Expedition.Pick(rest, findCard(rest, "Rest"), ExpCfg)
+	eq(rest.Charges, rest.StartCharges, "rest stop refills to full")
+end)
+
+test("expedition: a route can never leave you with zero charges, and bad picks are refused", function()
+	local run = startRun(4)
+	Expedition.FloorEnded(run, 0, 0.9, 0, lcg(9), ExpCfg)
+	for i, c in run.Choices do
+		if c.Route == "Rich" then
+			Expedition.Pick(run, i, ExpCfg)
+			eq(run.Charges >= 1, true, "at least one charge always remains")
+		end
+	end
+	local r2 = startRun(4)
+	Expedition.FloorEnded(r2, 0, 0.9, 2, lcg(9), ExpCfg)
+	for _, bad in { 0, 4, -1, 1.5, "1", true, 0 / 0 } do
+		eq(Expedition.Pick(r2, bad, ExpCfg), false, "rejected " .. tostring(bad))
+	end
+	eq(Expedition.Pick(r2, nil, ExpCfg), false, "rejected nil")
+	eq(r2.Floor, 1, "nothing changed after bad picks")
+end)
+
+test("expedition: relic modifiers combine correctly (multiply rates, add radii, any shield, add momentum)", function()
+	local run = startRun()
+	local none = Expedition.Modifiers(run, ExpCfg)
+	eq(none.AmplifierMult, 1, "neutral amplifier")
+	eq(none.ValueMult, 1, "neutral value")
+	eq(none.VolatileRadiusBonus, 0, "neutral radius")
+	eq(none.UnstableShield, false, "no shield")
+	eq(none.MomentumPopsDelta, 0, "neutral momentum")
+	eq(none.MutationChanceMult, 1, "neutral luck")
+	run.Relics = { "ResonantCore", "SteadyHands", "WideBursts", "Prospector", "MomentumCharm", "LuckyPrisms" }
+	run.ValueMult = 2 -- a rich vein this floor
+	local m = Expedition.Modifiers(run, ExpCfg)
+	eq(m.AmplifierMult, ExpCfg.Relics.ResonantCore.Modifiers.AmplifierMult, "amplifier")
+	eq(m.UnstableShield, true, "shield")
+	eq(m.VolatileRadiusBonus, ExpCfg.Relics.WideBursts.Modifiers.VolatileRadiusBonus, "radius")
+	eq(math.abs(m.ValueMult - 2 * ExpCfg.Relics.Prospector.Modifiers.ValueMult) < 1e-9, true, "relic value multiplies with the route value")
+	eq(m.MomentumPopsDelta, ExpCfg.Relics.MomentumCharm.Modifiers.MomentumPopsDelta, "momentum")
+	eq(m.MutationChanceMult, ExpCfg.Relics.LuckyPrisms.Modifiers.MutationChanceMult, "luck")
+end)
+
+test("expedition: banking pays the haul with a depth bonus and a victory bonus; salvage is a fraction; nothing negative", function()
+	local run = startRun()
+	run.Haul, run.Cleared = 10000, 0
+	eq(Expedition.Bank(run, ExpCfg, false), 10000, "no floors cleared: haul as is")
+	run.Cleared = 4
+	eq(Expedition.Bank(run, ExpCfg, false), math.floor(10000 * (1 + ExpCfg.DepthBonusPerFloor * 4) + 0.5), "depth bonus")
+	eq(Expedition.Bank(run, ExpCfg, true), math.floor(10000 * (1 + ExpCfg.DepthBonusPerFloor * 4) * ExpCfg.VictoryBonus + 0.5), "victory bonus on top")
+	eq(Expedition.Salvage(run, ExpCfg), math.floor(10000 * ExpCfg.SalvageFraction), "salvage")
+	eq(Expedition.Salvage(run, ExpCfg) < Expedition.Bank(run, ExpCfg, false), true, "collapsing always pays less than banking")
+	run.Haul = 0
+	eq(Expedition.Bank(run, ExpCfg, true), 0, "nothing to bank")
+	eq(Expedition.Salvage(run, ExpCfg), 0, "nothing to salvage")
+end)
+
+test("expedition: the client view carries what the HUD, the cards and the preview need", function()
+	local run = startRun(4)
+	Expedition.FloorEnded(run, 2500, 0.8, 3, lcg(2), ExpCfg)
+	local v = Expedition.View(run, ExpCfg)
+	eq(v.Floor, 1, "floor")
+	eq(v.Floors, ExpCfg.Floors, "floors")
+	eq(v.Haul, 2500, "haul")
+	eq(v.Charges, 3, "charges")
+	eq(v.Phase, "Choosing", "phase")
+	eq(#v.Choices, 3, "cards")
+	for _, c in v.Choices do
+		eq(type(c.RouteName), "string", "route name")
+		eq(type(c.RouteDescription), "string", "route description")
+	end
+	eq(v.BankNow, Expedition.Bank(run, ExpCfg, false), "what banking would pay right now")
+	eq(type(v.Modifiers), "table", "modifiers for the preview")
+end)
+
+test("expedition: config is valid (routes, relics, rewards)", function()
+	local KNOWN = { AmplifierMult = true, UnstableShield = true, VolatileRadiusBonus = true, RelayValueMult = true, ValueMult = true, MomentumPopsDelta = true, MutationChanceMult = true, ExtraCharges = true }
+	eq(ExpCfg.Floors >= 4 and ExpCfg.Floors <= 12, true, "a run of sensible length")
+	eq(ExpCfg.SalvageFraction > 0 and ExpCfg.SalvageFraction < 1, true, "salvage is a fraction")
+	eq(ExpCfg.ClearToAdvance > 0 and ExpCfg.ClearToAdvance < 1, true, "clear threshold")
+	eq(ExpCfg.VictoryBonus > 1, true, "victory pays extra")
+	eq(ExpCfg.DepthBonusPerFloor > 0, true, "depth pays extra")
+	local routes = 0
+	for name, r in ExpCfg.Routes do
+		routes += 1
+		eq(type(r.Name) == "string" and type(r.Description) == "string", true, name .. " text")
+		eq(r.ValueMult == nil or r.ValueMult > 0, true, name .. " value multiplier")
+	end
+	eq(routes, 3, "exactly three routes so every descent can offer each once")
+	local relics = 0
+	for id, relic in ExpCfg.Relics do
+		relics += 1
+		eq(type(relic.Name) == "string" and relic.Name ~= "" and type(relic.Description) == "string", true, id .. " text")
+		local any = false
+		for k, v in relic.Modifiers do
+			any = true
+			if not KNOWN[k] then error(id .. " has unknown modifier " .. k) end
+			if type(v) ~= "boolean" and type(v) ~= "number" then error(id .. " modifier " .. k .. " must be a number or boolean") end
+			if k == "ValueMult" and v > 2 then error(id .. " value multiplier is too generous") end
+		end
+		eq(any, true, id .. " does something")
+	end
+	eq(relics >= 6, true, "enough relics that runs differ")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

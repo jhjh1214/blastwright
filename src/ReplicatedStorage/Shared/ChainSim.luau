@@ -24,6 +24,8 @@ export type Context = {
 	Tuning: any,
 	RadiusBonus: number?,
 	MomentumPops: number?,
+	-- Optional rule tweaks (Expedition relics): AmplifierMult, UnstableShield, VolatileRadiusBonus, RelayValueMult, ValueMult.
+	Modifiers: { [string]: any }?,
 }
 export type Result = {
 	Events: { Event },
@@ -146,6 +148,7 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 	local mult = 1
 	local peak = 1
 	local raw = 0
+	local mods: { [string]: any } = ctx.Modifiers or {}
 
 	while #queue > 0 do
 		local item = table.remove(queue, 1) :: QueueItem
@@ -159,16 +162,24 @@ function ChainSim.Run(grid: Grid, charges: { Charge }, ctx: Context): Result
 			local mutMult = cell.Mutated and tuning.MutationValueMult or 1
 
 			if behavior == "Unstable" then
-				mult = math.max(1, mult * def.Params.MultScale)
+				if not mods.UnstableShield then
+					mult = math.max(1, mult * def.Params.MultScale)
+				end
 			elseif behavior == "Amplifier" then
-				mult += def.Params.MultAdd
+				mult += def.Params.MultAdd * (mods.AmplifierMult or 1)
 				value = def.Value * mutMult * mult
 			else
 				value = def.Value * mutMult * mult
 			end
+			if behavior == "Relay" then
+				value *= mods.RelayValueMult or 1
+			end
+			value *= mods.ValueMult or 1
 			peak = math.max(peak, mult)
 
-			if behavior == "Volatile" or behavior == "Delayed" then
+			if behavior == "Volatile" then
+				blast(item.X, item.Z, item.T + tuning.VolatileDelay, "Radius", def.Params.Radius + (mods.VolatileRadiusBonus or 0), 0, "Chain")
+			elseif behavior == "Delayed" then
 				blast(item.X, item.Z, item.T + tuning.VolatileDelay, "Radius", def.Params.Radius, 0, "Chain")
 			elseif behavior == "Relay" then
 				blast(item.X, item.Z, item.T + tuning.VolatileDelay, "Radius", def.Params.Radius, 0, "Chain")
