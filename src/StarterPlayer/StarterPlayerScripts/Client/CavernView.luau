@@ -363,6 +363,20 @@ function CavernView.SetMonster(view, monster)
 	gui.Back.Fill.Size = UDim2.fromScale(math.clamp(monster.HP / monster.MaxHP, 0, 1), 1)
 end
 
+-- A floating diamond above a cell: unlike a flat tile it is never hidden by the rock and crystal on the cell, so armor nodes
+-- and weak points can always be seen from the tilted camera.
+local function gemMarker(view, cell, color, height)
+	local p = Instance.new("Part")
+	p.Anchored, p.CanCollide, p.CanQuery, p.CastShadow = true, false, false, false
+	p.Material = Enum.Material.Neon
+	p.Color = color
+	p.Transparency = 0.05
+	p.Size = Vector3.new(1.9, 1.9, 1.9)
+	p.CFrame = CFrame.new(Geometry.CellPosition(view.Origin, cell.X, cell.Z) + Vector3.new(0, height, 0)) * CFrame.Angles(math.rad(45), math.rad(45), 0)
+	p.Parent = view.BossFx
+	return p
+end
+
 -- The boss on the grid: the Titan model over the middle 3x3, plus marker parts: gold armor nodes, magenta weak points and
 -- red flat tiles on the cells its next attack will hit. The model persists between updates; only the markers are rebuilt.
 local function marker(view, cell, color, height, size, transparency)
@@ -453,10 +467,12 @@ function CavernView.SetBoss(view, boss)
 		-- armor node: break these (a flat tile plus a thin marker beam, never a wide pillar that hides the crystals behind it)
 		marker(view, cell, Color3.fromRGB(255, 200, 60), 0.3, CellSize * 0.9, 0.35)
 		marker(view, cell, Color3.fromRGB(255, 200, 60), 5, 0.5, 0.45)
+		gemMarker(view, cell, Color3.fromRGB(255, 200, 60), 5.6)
 	end
 	for _, cell in boss.Weak do
 		marker(view, cell, Color3.fromRGB(255, 70, 230), 0.3, CellSize * 0.9, 0.3) -- weak point: chain through BOTH
 		marker(view, cell, Color3.fromRGB(255, 70, 230), 6, 0.5, 0.4)
+		gemMarker(view, cell, Color3.fromRGB(255, 70, 230), 6.6)
 	end
 	-- real-time threats: every wound-up attack is drawn on the grid with a live countdown
 	view.ThreatLabels = {}
@@ -505,6 +521,7 @@ function CavernView.SetBoss(view, boss)
 			for _, cell in threat.Marks do
 				pulse(marker(view, cell, Color3.fromRGB(190, 70, 255), 0.3, CellSize * 0.9, 0.4), speed)
 				marker(view, cell, Color3.fromRGB(190, 70, 255), 7, 0.5, 0.5)
+				gemMarker(view, cell, Color3.fromRGB(190, 70, 255), 7.6)
 			end
 			if threat.Marks[1] then
 				countdown(Geometry.CellPosition(view.Origin, threat.Marks[1].X, threat.Marks[1].Z), "CORRUPTION", Color3.fromRGB(215, 130, 255), landsAt)

@@ -226,8 +226,19 @@ function UI.Init()
 	rigLabel = card(3, Color3.fromRGB(255, 150, 150))
 	rigLabel.Visible = true
 
+	-- Top stack: everything that explains the fight sits in ONE column at the top (boss header, threat cards, what this volley
+	-- would do, the crystal under the cursor), so the rig and the grid below stay clear. The camera fits the grid under it.
+	local topStack = mk("Frame", { Name = "TopStack", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 46), Size = UDim2.new(1, -370, 0, 0), AutomaticSize = Enum.AutomaticSize.Y }, blastGroup)
+	mk("UIListLayout", { Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, topStack)
+	mk("UISizeConstraint", { MaxSize = Vector2.new(500, 9999) }, topStack)
+	local function reportReserve()
+		local bottom = topStack.AbsolutePosition.Y - gui.AbsolutePosition.Y + topStack.AbsoluteSize.Y
+		CameraFeedback.SetTopReserve(topStack.AbsoluteSize.Y > 0 and bottom + 8 or 0)
+	end
+	topStack:GetPropertyChangedSignal("AbsoluteSize"):Connect(reportReserve)
+
 	-- Boss HUD: a header plate (health, the five phases, the one thing to do) and a row of threat cards.
-	bossHud = BossHud.Build(blastGroup, Config.Bosses)
+	bossHud = BossHud.Build(topStack, Config.Bosses)
 
 	dodgeButton = proxy(Kit.Button(blastGroup, { Name = "Dodge", Size = UDim2.fromOffset(190, 76), AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -118), Color = Theme.Colors.Codex, Icon = "Bolt", Text = "DODGE (Q)", TextSize = 24, Layout = "Horizontal", Visible = false, OnClick = function() Remotes.Dodge:FireServer() end }))
 	-- The Dodge button counts down between server updates (the server only sends a snapshot when something happens).
@@ -269,18 +280,18 @@ function UI.Init()
 		Remotes.RunRevive:FireServer(false)
 	end)
 
-	-- Bottom centre: the crystal info line and the combat read (what this volley does to the Lurker / boss / its attacks) stack.
-	readPanel = mk("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.new(1, -440, 0, 0), AutomaticSize = Enum.AutomaticSize.Y }, blastGroup)
-	mk("UIListLayout", { Padding = UDim.new(0, 6), VerticalAlignment = Enum.VerticalAlignment.Bottom, SortOrder = Enum.SortOrder.LayoutOrder }, readPanel)
-	mk("UISizeConstraint", { MaxSize = Vector2.new(520, 9999) }, readPanel)
+	-- The combat read (what this volley does to the Lurker / boss / its attacks) and the crystal info line are the last entries
+	-- of the top stack, under the boss header and threat cards.
+	readPanel = mk("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3 }, topStack)
+	mk("UIListLayout", { Padding = UDim.new(0, 4), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, readPanel)
 	local function readCard(order, color, fill)
 		local l = label(readPanel, "", 14, color, { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, BackgroundColor3 = fill, BackgroundTransparency = 0.1, LayoutOrder = order, Visible = false, Font = Enum.Font.BuilderSansMedium })
 		corner(l, 10)
 		mk("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, l)
 		return l
 	end
-	infoLabel = readCard(1, Color3.fromRGB(190, 198, 220), Color3.fromRGB(18, 20, 33))
-	combatLabel = readCard(2, Color3.fromRGB(255, 226, 200), Color3.fromRGB(56, 26, 28))
+	combatLabel = readCard(1, Color3.fromRGB(255, 226, 200), Color3.fromRGB(56, 26, 28))
+	infoLabel = readCard(2, Color3.fromRGB(190, 198, 220), Color3.fromRGB(18, 20, 33))
 	mk("UIStroke", { Color = Color3.fromRGB(226, 96, 84), Thickness = 1.5, Transparency = 0.35 }, combatLabel)
 
 	-- Between-floor choice: three cards and "Bank & leave". Covers the screen while choosing (blasting is paused anyway).

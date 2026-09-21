@@ -55,13 +55,12 @@ end
 
 BossHud.Objective = objective
 
--- parent: the blast HUD group. config: Config.Bosses.
+-- parent: the top stack (a vertical list at the top of the blast HUD; the plate and the threat row are its first two entries). config: Config.Bosses.
 function BossHud.Build(parent, config)
-	local plate = make("Frame", { Name = "BossHeader", BackgroundColor3 = Theme.Colors.Panel, BackgroundTransparency = 0, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 64), Size = UDim2.fromOffset(480, 136), Visible = false, BorderSizePixel = 0, ZIndex = 8 }, parent)
+	local plate = make("Frame", { Name = "BossHeader", BackgroundColor3 = Theme.Colors.Panel, BackgroundTransparency = 0, Size = UDim2.new(1, 0, 0, 132), LayoutOrder = 1, Visible = false, BorderSizePixel = 0, ZIndex = 8 }, parent)
 	make("UICorner", { CornerRadius = UDim.new(0, 14) }, plate)
 	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 5, LineJoinMode = Enum.LineJoinMode.Round }, plate)
 	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(Theme.Colors.Panel, 0.12), Theme.Shade(Theme.Colors.Panel, 0.3)), Rotation = 90 }, plate)
-	local scale = make("UIScale", { Scale = 1 }, plate)
 	local rule = make("Frame", { BackgroundColor3 = PHASE_COLOR.Attack, Size = UDim2.new(1, 0, 0, 12), BorderSizePixel = 0, ZIndex = 9 }, plate)
 	make("UICorner", { CornerRadius = UDim.new(0, 14) }, rule)
 
@@ -87,17 +86,8 @@ function BossHud.Build(parent, config)
 	Kit.Outline(goal, 2)
 	goal.Visible = false
 
-	local row = make("Frame", { Name = "Threats", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 184), Size = UDim2.new(0, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.XY, Visible = false, ZIndex = 8 }, parent)
-	make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, row)
-
-	local function fit()
-		local width = parent.AbsoluteSize.X
-		if width > 0 then
-			scale.Scale = math.clamp((width - 24) / 460, 0.6, 1)
-		end
-	end
-	parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
-	fit()
+	local row = make("Frame", { Name = "Threats", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Visible = false, ZIndex = 8 }, parent)
+	make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Wraps = true, Padding = UDim.new(0, 6), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, row)
 
 	local cards = {} -- [threatId] = { Frame, Count, Bar, LandsAt, Total, Cancelled }
 	local hud = {}
