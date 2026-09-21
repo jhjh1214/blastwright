@@ -3,7 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local NAMES = { "Sync", "SeamStart", "SeamRemove", "Engage", "Detonate", "VolleyResult", "Buy", "Claim", "ClaimWeekly", "ClaimGoal", "Equip", "Setting", "Community", "RunState", "RunPick", "PuzzleStart", "FarmAction", "MonsterTurn", "Dodge", "EquipTitle", "UseCharge", "RunRevive", "EquipFinisher", "ClubClaim", "ContractAccept", "ContractClaim", "WorldBoss", "AssayClaim", "TraitAction", "Notify" }
+local NAMES = { "Sync", "SeamStart", "SeamRemove", "Engage", "Detonate", "VolleyResult", "Buy", "Claim", "ClaimWeekly", "ClaimGoal", "Equip", "Setting", "Community", "RunState", "RunPick", "PuzzleStart", "FarmAction", "MonsterTurn", "Dodge", "EquipTitle", "UseCharge", "RunRevive", "EquipFinisher", "ClubClaim", "ContractAccept", "ContractClaim", "WorldBoss", "AssayClaim", "TraitAction", "TrackClaim", "StreakClaim", "Specimen", "Notify" }
 
 local Remotes: { [string]: RemoteEvent } = {}
 

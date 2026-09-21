@@ -22,6 +22,9 @@ local WorldBoss = require(Shared.WorldBoss)
 local Plus = require(Shared.Plus)
 local Assay = require(Shared.Assay)
 local Loadout = require(Shared.Loadout)
+local Specimens = require(Shared.Specimens)
+local Track = require(Shared.Track)
+local Streak = require(Shared.Streak)
 local Farm = require(Shared.Farm)
 local Lurker = require(Shared.Lurker)
 local Power = require(Shared.Power)
@@ -56,6 +59,9 @@ local WorldBossConfig = Config.WorldBoss
 local PlusConfig = Config.Plus
 local AssayConfig = Config.Assay
 local TraitsConfig = Config.Traits
+local SpecimensConfig = Config.Specimens
+local TrackConfig = Config.Track
+local StreakConfig = Config.Streak
 local FarmConfig = Config.Farm
 local LurkerConfig = Config.Lurkers
 local BossConfig = Config.Bosses
@@ -143,6 +149,15 @@ local function chargesFor(data: any): { [string]: any }
 	return Loadout.Charges(Config.Charges.Defs, data.Traits, TraitsConfig, upgradeLevel(data, "BlastRadius") * Upgrades.Defs.BlastRadius.PerLevel)
 end
 
+-- Blastwright Track XP: everything the player does feeds the permanent reward track. Announces level-ups.
+local notify: (Player, string, string) -> ()
+local function addTrackXp(player: Player, data: any, amount: number)
+	local before, after = Track.Add(data.Track, amount, TrackConfig)
+	if after > before then
+		notify(player, ("Track level %d reached! Open Goals > Track to claim your reward."):format(after), "Achievement")
+	end
+end
+
 -- What the calendar currently changes for everyone (see Config/Events.luau).
 local function activeEvents()
 	return Events.Active(os.time(), EventsConfig)
@@ -183,7 +198,7 @@ local function recordDaily(data: any, kind: string, amount: number)
 	Dailies.Record(data.Weekly, weeklyDefs(), kind, amount)
 end
 
-local function notify(player: Player, text: string, kind: string)
+function notify(player: Player, text: string, kind: string)
 	Remotes.Notify:FireClient(player, text, kind)
 end
 
@@ -308,6 +323,9 @@ local function snapshot(player: Player): { [string]: any }?
 		AwaitRevive = seam ~= nil and seam.AwaitRevive == true,
 		Assay = Assay.View(data.Assay, Crystals.Order, AssayConfig),
 		Traits = data.Traits.Owned,
+		Specimens = { Found = data.Specimens.Found, Total = data.Specimens.Total },
+		Track = { Xp = data.Track.Xp, Claimed = data.Track.Claimed },
+		Streak = Streak.View(data.Streak, Dailies.DayNumber(os.time()), Purchases.Owns(player, PlusConfig.Pass), StreakConfig),
 		Collection = Mastery.CollectionView(data.Collection, LurkerConfig, BossConfig, ExpeditionConfig),
 		Mastery = { Objectives = Mastery.View(data.Mastery, MasteryConfig), Titles = Mastery.Titles(data.Mastery, MasteryConfig), Title = data.Mastery.Title },
 		Critical = seam and seam.Critical or 0,
@@ -401,6 +419,7 @@ local function settleWorldBoss()
 		local data = player and Data.Get(player)
 		if player and data then
 			Grants.Apply(data, pay.Grants, os.time(), data.Progress.StrataUnlocked)
+			addTrackXp(player, data, TrackConfig.Xp.WorldBoss)
 			notify(player, won and ("The %s fell! You ranked #%d with %d damage. Rewards collected."):format(WorldBossConfig.Name, pay.Rank, pay.Damage) or ("The %s escaped. Thanks for fighting it (%d damage): a small reward."):format(WorldBossConfig.Name, pay.Damage), "Reward")
 			sync(player)
 		end
@@ -701,6 +720,7 @@ local function endFloor(player: Player, seam: SeamState)
 
 	if outcome == "Choose" or outcome == "Victory" then
 		recordContract(data, "Floor", nil, run.Floor)
+		addTrackXp(player, data, TrackConfig.Xp.Floor)
 	end
 	if outcome == "Choose" then
 		notify(player, ("Floor %d cleared! Choose your next step, or bank your haul."):format(run.Floor), "Reward")
@@ -709,6 +729,7 @@ local function endFloor(player: Player, seam: SeamState)
 		local amount = Expedition.Bank(run, ExpeditionConfig, true)
 		award(data, amount)
 		data.Stats.ExpeditionsWon += 1
+		addTrackXp(player, data, TrackConfig.Xp.ExpeditionWin)
 		notify(player, ("EXPEDITION COMPLETE! +%d shards"):format(amount), "Reward")
 		finishRun(player, seam)
 	else
@@ -788,6 +809,7 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 			end
 			data.Stats.LurkersSlain += 1
 			recordContract(data, "Slay", m.Kind, 1)
+			addTrackXp(player, data, TrackConfig.Xp.Lurker)
 			recordDaily(data, "Slays", 1)
 			if Community.Contribute(goal, player.UserId, 5) then -- monsters are a shared threat: kills count toward the Server Goal
 				finishGoal()
@@ -883,6 +905,7 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 		seam.Boss = nil
 		data.Stats.BossesSlain += 1
 		recordContract(data, "Boss", nil, 1)
+		addTrackXp(player, data, TrackConfig.Xp.Boss)
 		if Community.Contribute(goal, player.UserId, 40) then -- a boss kill is worth 40 pops toward the Server Goal
 			finishGoal()
 		end
@@ -1099,6 +1122,33 @@ local function onDetonate(player: Player, payload: any)
 	recordDaily(data, "Chain", result.Pops)
 	recordDaily(data, "Volleys", 1)
 	recordContract(data, "Chain", nil, result.Pops)
+	if not seam.Puzzle then
+		addTrackXp(player, data, Track.VolleyXp(result.Pops, TrackConfig))
+		-- a chance to cut a specimen from one of the crystals that just popped (bigger chains, better grades)
+		local kinds = {}
+		for _, ev in result.Events do
+			table.insert(kinds, ev.Kind)
+		end
+		local luck = (1 + upgradeLevel(data, "Lens") * Upgrades.Defs.Lens.PerLevel) * Events.Combine(activeEvents()).MutationMult * Grants.BoostMult(data.Boosts, "Luck", os.time())
+		local drop = Specimens.Roll(function() return runRandom:NextNumber() end, kinds, result.Pops, luck, data.Specimens, SpecimensConfig)
+		if drop then
+			local rec = Specimens.Record(data.Specimens, drop, SpecimensConfig)
+			if rec.Dust > 0 then
+				award(data, rec.Dust)
+			end
+			local gradeIndex = 1
+			for i, r in SpecimensConfig.Rarities do
+				if r.Id == drop.Rarity then gradeIndex = i end
+			end
+			addTrackXp(player, data, TrackConfig.Xp.Specimen[gradeIndex])
+			Remotes.Specimen:FireClient(player, { Id = drop.Id, Kind = drop.Kind, Rarity = drop.Rarity, New = rec.New, Count = rec.Count, Dust = rec.Dust })
+			for _, m in Specimens.NewMilestones(data.Specimens, SpecimensConfig) do
+				award(data, m.Shards)
+				Grants.Apply(data, { { Kind = "Title", Title = m.Title } }, os.time(), data.Progress.StrataUnlocked)
+				notify(player, ("CABINET MILESTONE: %d specimens! Title unlocked: %s (+%d shards)"):format(m.Found, m.Title, m.Shards), "Achievement")
+			end
+		end
+	end
 	if not seam.Puzzle then
 		hitWorldBoss(player, result.Pops)
 	end
@@ -1436,6 +1486,7 @@ local function onContractClaim(player: Player)
 		return notify(player, "That contract is not finished yet.", "Error")
 	end
 	Grants.Apply(data, ContractsConfig.Rewards[tier], os.time(), data.Progress.StrataUnlocked)
+	addTrackXp(player, data, TrackConfig.Xp.Contract)
 	notify(player, "Contract complete! Reward collected.", "Reward")
 	announceGoals(player)
 	sync(player)
@@ -1472,6 +1523,38 @@ local function onTraitAction(player: Player, action: any, id: any)
 		return
 	end
 	announceGoals(player)
+	sync(player)
+end
+
+-- Claim a Blastwright Track reward. `premium` must be the boolean true (premium track) or false (free track).
+local function onTrackClaim(player: Player, level: any, premium: any)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	local grants = Track.Claim(data.Track, level, premium, Purchases.Owns(player, "TrackPremium"), TrackConfig)
+	if not grants then
+		return
+	end
+	Grants.Apply(data, grants, os.time(), data.Progress.StrataUnlocked)
+	notify(player, ("Track reward collected: %s"):format(Grants.Describe(grants)), "Reward")
+	announceGoals(player)
+	sync(player)
+end
+
+-- The free daily reward (streak). Once per UTC day; Blastwright Plus keeps the streak through one missed day.
+local function onStreakClaim(player: Player)
+	local data = Data.Get(player)
+	if not data then
+		return
+	end
+	local grants = Streak.Claim(data.Streak, Dailies.DayNumber(os.time()), Purchases.Owns(player, PlusConfig.Pass), StreakConfig)
+	if not grants then
+		return
+	end
+	Grants.Apply(data, grants, os.time(), data.Progress.StrataUnlocked)
+	addTrackXp(player, data, TrackConfig.Xp.Streak)
+	notify(player, ("Daily reward, day %d of your streak: %s"):format(data.Streak.Count, Grants.Describe(grants)), "Reward")
 	sync(player)
 end
 
@@ -1841,6 +1924,8 @@ function Game.Init()
 	Remotes.UseCharge.OnServerEvent:Connect(guarded("UseCharge", 3, 5, onUseCharge))
 	Remotes.EquipFinisher.OnServerEvent:Connect(guarded("EquipFinisher", 3, 5, onEquipFinisher))
 	Remotes.ContractAccept.OnServerEvent:Connect(guarded("ContractAccept", 4, 6, onContractAccept))
+	Remotes.TrackClaim.OnServerEvent:Connect(guarded("TrackClaim", 5, 8, onTrackClaim))
+	Remotes.StreakClaim.OnServerEvent:Connect(guarded("StreakClaim", 2, 3, onStreakClaim))
 	Remotes.TraitAction.OnServerEvent:Connect(guarded("TraitAction", 5, 8, onTraitAction))
 	Remotes.AssayClaim.OnServerEvent:Connect(guarded("AssayClaim", 5, 8, onAssayClaim))
 	Remotes.ContractClaim.OnServerEvent:Connect(guarded("ContractClaim", 3, 5, onContractClaim))

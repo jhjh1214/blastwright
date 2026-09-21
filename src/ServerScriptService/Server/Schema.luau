@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 17
+Schema.CURRENT_VERSION = 18
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -21,6 +21,9 @@ function Schema.Default(): { [string]: any }
 		Achievements = { Claimed = {} }, -- [goalId] = true once the reward was taken (see Shared/Achievements.luau)
 		Puzzle = { Day = 0, Score = 0, Par = 0, Medal = "", Streak = 0, LastDay = 0, BestStreak = 0 }, -- see Shared/Puzzle.luau
 		Contract = { Day = 0, Active = 0, Progress = 0, Done = {} }, -- Notice Board, see Shared/Contracts.luau
+		Specimens = { Found = {}, Pity = { Epic = 0, Legendary = 0 }, Total = 0, Awarded = {} }, -- see Shared/Specimens.luau
+		Track = { Xp = 0, Claimed = {} }, -- see Shared/Track.luau
+		Streak = { LastDay = 0, Count = 0 }, -- see Shared/Streak.luau
 		Traits = { Owned = {} }, -- charge trait tree, see Shared/Loadout.luau
 		Assay = { Pops = {}, Claimed = {} }, -- Assay Office, see Shared/Assay.luau
 		Plus = { LastDay = 0 }, -- Blastwright Plus daily gift, see Shared/Plus.luau

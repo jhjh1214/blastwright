@@ -72,6 +72,29 @@ function Grants.Valid(g: any): boolean
 	return false
 end
 
+-- Short player-facing text for a list of grants, e.g. "2,500 shards, 2 revive tokens, 2x shards 15m".
+-- Scaled shards say "x areas" because the amount grows with what the player has unlocked.
+function Grants.Describe(grants: { Grant }): string
+	local parts = {}
+	for _, g in grants do
+		if g.Kind == "Shards" then
+			local n = tostring(math.floor(g.Amount)):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+			table.insert(parts, n .. " shards" .. (g.Scaled and " per area" or ""))
+		elseif g.Kind == "Boost" then
+			table.insert(parts, ("%dx %s %dm"):format(g.Mult, g.Boost == "Luck" and "luck" or "shards", math.floor(g.Seconds / 60)))
+		elseif g.Kind == "Tokens" then
+			table.insert(parts, ("%d %s token%s"):format(g.Count, g.Token == "Charge" and "charge" or "revive", g.Count > 1 and "s" or ""))
+		elseif g.Kind == "Finisher" then
+			table.insert(parts, g.Id .. " finisher")
+		elseif g.Kind == "Cosmetic" then
+			table.insert(parts, g.Id .. " blasts")
+		elseif g.Kind == "Title" then
+			table.insert(parts, "title " .. g.Title)
+		end
+	end
+	return table.concat(parts, ", ")
+end
+
 -- Apply grants to the save. `strata` = areas unlocked (for scaled shards). Returns short messages for a toast.
 function Grants.Apply(data: any, grants: { Grant }, now: number, strata: number): { string }
 	local messages = {}

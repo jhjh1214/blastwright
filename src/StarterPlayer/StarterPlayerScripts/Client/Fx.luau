@@ -147,6 +147,22 @@ end
 local gems = {}
 local loop = nil
 local elapsed = 0
+local lastVisibilityCheck = 0
+
+-- True when the gem and every GuiObject above it are visible (and its ScreenGui is enabled).
+local function gemIsShown(frame)
+	local node = frame.Parent
+	while node do
+		if node:IsA("GuiObject") and not node.Visible then
+			return false
+		end
+		if node:IsA("ScreenGui") then
+			return node.Enabled
+		end
+		node = node.Parent
+	end
+	return false
+end
 
 local function ensureLoop()
 	if loop then
@@ -154,14 +170,23 @@ local function ensureLoop()
 	end
 	loop = RunService.RenderStepped:Connect(function(dt)
 		elapsed += dt
+		local recheck = elapsed - lastVisibilityCheck >= 0.5
+		if recheck then
+			lastVisibilityCheck = elapsed
+		end
 		for i = #gems, 1, -1 do
 			local g = gems[i]
 			if not g.Frame.Parent then
 				table.remove(gems, i)
-			elseif g.Frame.AbsoluteSize.X > 0 then
-				local cf = CFrame.Angles(math.rad(18), elapsed * 1.3 + g.Phase, math.rad(10))
-				for _, part in g.Parts do
-					part.CFrame = cf -- every piece is centred on the origin, so one rotation spins the whole crystal
+			else
+				if recheck then
+					g.Shown = gemIsShown(g.Frame) -- gems in closed menus are not spun (a closed panel keeps its objects alive)
+				end
+				if g.Shown ~= false and g.Frame.AbsoluteSize.X > 0 then
+					local cf = CFrame.Angles(math.rad(18), elapsed * 1.3 + g.Phase, math.rad(10))
+					for _, part in g.Parts do
+						part.CFrame = cf -- every piece is centred on the origin, so one rotation spins the whole crystal
+					end
 				end
 			end
 		end

@@ -24,6 +24,10 @@ local Feed = require(script.Parent.Feed)
 local BossHud = require(script.Parent.BossHud)
 local Theme = require(script.Parent.Theme)
 local Loadout = require(Shared.Loadout)
+local TrackLogic = require(Shared.Track)
+local Grants = require(Shared.Grants)
+local SpecimensLogic = require(Shared.Specimens)
+local Reveal = require(script.Parent.Reveal)
 local ChainSim = require(Shared.ChainSim)
 local Kit = require(script.Parent.Kit)
 local Icons = require(script.Parent.Icons)
@@ -161,6 +165,7 @@ function UI.Init()
 	shardLabel = shardCur.Label
 
 	Feed.Init(gui) -- messages live in their own column on the right; big moments use the banner
+	Reveal.Init(gui)
 
 	----------------------------------------------------------- roaming HUD
 	roamGroup = fullGroup("Roam")
@@ -846,6 +851,15 @@ local function rebuildPanel()
 	elseif activeTab == "Daily" then
 		titleLabel.Text = "Daily objectives"
 		local secs = math.max(0, math.floor((State.DailyResetAt or 0) - os.clock()))
+		-- Free daily reward: claim once a day; consecutive days build a 7-day streak.
+		if d.Streak then
+			local sv = d.Streak
+			local dayNo = sv.CycleDay > 0 and sv.CycleDay or 1
+			header(-10, ("Daily reward  -  streak %d day%s"):format(sv.Count, sv.Count == 1 and "" or "s"))
+			row(-9, ("Day %d of 7"):format(dayNo), Grants.Describe(Config.Streak.Days[dayNo]) .. (sv.CanClaim and "" or "   (tomorrow: " .. Grants.Describe(Config.Streak.Days[dayNo % 7 + 1]) .. ")"), sv.CanClaim and "Claim FREE" or "Claimed", sv.CanClaim, function()
+				Remotes.StreakClaim:FireServer()
+			end, nil, { Icon = "★", Accent = Color3.fromRGB(110, 230, 150), Dim = not sv.CanClaim, Progress = dayNo / 7 })
+		end
 		header(0, ("Resets in %dh %02dm (unclaimed rewards are lost)"):format(secs // 3600, (secs % 3600) // 60))
 		for _, item in d.Dailies or {} do
 			local done = item.Progress >= item.Target
@@ -946,6 +960,37 @@ local function rebuildPanel()
 		end
 		titleLabel.Text = ("Goals  %d/%d"):format(claimedCount, #goals)
 		local order = 0
+		-- Blastwright Track: permanent 30-level reward track. FREE reward on every level, PREMIUM reward with the pass.
+		if d.Track then
+			local premium = d.Passes and d.Passes.TrackPremium == true
+			local level, into, need = TrackLogic.Progress(d.Track.Xp, Config.Track)
+			local reached = level - 1
+			header(-40, ("Blastwright Track  -  level %d / %d  (no timer, nothing expires)"):format(math.min(reached, Config.Track.MaxLevel), Config.Track.MaxLevel))
+			row(-39, ("Next level: %d / %d XP"):format(into, need), "Everything you do earns Track XP: blasting, Lurkers, bosses, Expedition floors, contracts, specimens.", nil, false, nil, nil, { Icon = "▲", Accent = Color3.fromRGB(255, 205, 90), Progress = into / math.max(1, need) })
+			local state = { Xp = d.Track.Xp, Claimed = d.Track.Claimed }
+			local first = 1
+			while first <= reached + 50 and not (TrackLogic.CanClaim(state, first, false, premium, Config.Track) or (premium and TrackLogic.CanClaim(state, first, true, premium, Config.Track))) and first <= reached do
+				first += 1
+			end
+			if first > reached then first = reached + 1 end
+			local passDef = Products.Gamepasses.TrackPremium
+			for i, entry in TrackLogic.View(state, premium, Config.Track, first, 4) do
+				local freeText = entry.FreeClaimed and "Claimed" or (entry.CanFree and "Claim FREE" or "Level " .. entry.Level)
+				row(-38 + i * 2, ("Level %d  FREE"):format(entry.Level), Grants.Describe(entry.Free), freeText, entry.CanFree, function()
+					Remotes.TrackClaim:FireServer(entry.Level, false)
+				end, nil, { Icon = tostring(entry.Level), Accent = Color3.fromRGB(110, 230, 150), Dim = entry.FreeClaimed })
+				if entry.Premium then
+					local premiumText = entry.PremiumClaimed and "Claimed" or (entry.CanPremium and "Claim" or (premium and ("Level " .. entry.Level) or (passDef.Id and "Get Premium" or "Premium")))
+					row(-37 + i * 2, ("Level %d  PREMIUM"):format(entry.Level), Grants.Describe(entry.Premium), premiumText, entry.CanPremium or (not premium and passDef.Id ~= nil and not entry.PremiumClaimed), function()
+						if entry.CanPremium then
+							Remotes.TrackClaim:FireServer(entry.Level, true)
+						elseif not premium and passDef.Id then
+							MarketplaceService:PromptGamePassPurchase(Players.LocalPlayer, passDef.Id)
+						end
+					end, THEME.Gold, { Icon = "★", Accent = Color3.fromRGB(255, 205, 90), Dim = entry.PremiumClaimed or not premium })
+				end
+			end
+		end
 		-- Ready to claim first, then in progress, then already claimed.
 		local function addRows(filter)
 			for _, g in goals do
@@ -1038,9 +1083,9 @@ local function rebuildPanel()
 
 		-- Permanent perks
 		local perks = section("Permanent perks")
-		local perkArt = { DoubleShards = ShopArt.Boost(2, "forever", Color3.fromRGB(255, 205, 90)), PrismaticLuck = ShopArt.Orb(Color3.fromRGB(255, 110, 230)) }
-		local perkTier = { DoubleShards = "Large", PrismaticLuck = "Medium", BlastwrightPlus = "Premium" }
-		local perkHint = { DoubleShards = 499, PrismaticLuck = 299, BlastwrightPlus = 399 }
+		local perkArt = { DoubleShards = ShopArt.Boost(2, "forever", Color3.fromRGB(255, 205, 90)), PrismaticLuck = ShopArt.Orb(Color3.fromRGB(255, 110, 230)), TrackPremium = ShopArt.Crown() }
+		local perkTier = { DoubleShards = "Large", PrismaticLuck = "Medium", BlastwrightPlus = "Premium", TrackPremium = "Premium" }
+		local perkHint = { DoubleShards = 499, PrismaticLuck = 299, BlastwrightPlus = 399, TrackPremium = 599 }
 		for i, key in Products.GamepassOrder do
 			local def = Products.Gamepasses[key]
 			local owned = d.Passes and d.Passes[key]
@@ -1102,6 +1147,26 @@ local function rebuildPanel()
 		end
 		-- Blast colors: owned styles can be equipped; locked ones say how to get them.
 		local order = #Config.Crystals.Order + 1
+		-- Specimen Cabinet: every crystal kind in six grades; big chains find better grades.
+		if d.Specimens then
+			local have = 0
+			for _, count in d.Specimens.Found do
+				if count > 0 then have += 1 end
+			end
+			local totalSlots = #Config.Crystals.Order * #Config.Specimens.Rarities
+			header(order, ("Specimen Cabinet  %d/%d  (find them by blasting; big chains find rarer grades)"):format(have, totalSlots))
+			for _, entry in SpecimensLogic.View({ Found = d.Specimens.Found }, Config.Crystals.Order, Config.Specimens) do
+				order += 1
+				local def = Config.Crystals.Defs[entry.Kind]
+				local parts = {}
+				for _, g in entry.Grades do
+					table.insert(parts, g.Count > 0 and ("%s x%d"):format(g.Name, g.Count) or "?")
+				end
+				local c = def and Color3.fromRGB(def.Color[1], def.Color[2], def.Color[3]) or THEME.Accent
+				row(order, (def and def.Name or entry.Kind) .. ("   %d/%d"):format(entry.Have, entry.Of), table.concat(parts, "  |  "), nil, false, nil, entry.Have >= entry.Of and THEME.Gold or nil, { Gem = c, Accent = c, Progress = entry.Have / entry.Of, Dim = entry.Have == 0 })
+			end
+			order += 1
+		end
 		-- Assay Office: pop each crystal kind to reach milestones; claim the rewards here.
 		if d.Assay and #d.Assay > 0 then
 			header(order, "Assay Office: every crystal kind has its own pop milestones")
@@ -1314,6 +1379,8 @@ function UI.Refresh()
 		for _, g in d.Goals or {} do
 			if g.Complete and not g.Claimed then goalReady = true end
 		end
+		if d.Streak and d.Streak.CanClaim then dailyReady = true end
+		if d.Track and TrackLogic.ClaimableCount({ Xp = d.Track.Xp, Claimed = d.Track.Claimed }, d.Passes and d.Passes.TrackPremium == true, Config.Track) > 0 then goalReady = true end
 		dock.SetBadge("Daily", dailyReady)
 		dock.SetBadge("Goals", goalReady)
 		dock.SetBadge("Farm", d.Farm ~= nil and d.Farm.Pending >= math.max(1, d.Farm.PerHour) ) -- an hour of production is waiting

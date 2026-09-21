@@ -42,7 +42,7 @@ ShopArt.Images = {
 	["Starter Blast"] = "rbxassetid://3333333333",
 }
 ```
-All keys to make (22): Shard Pouch, Shard Satchel, Shard Chest, Shard Vault, Neon Pink Blasts, Void Blasts, Toxic Blasts, Golden Blasts, 2x Shards, Prismatic Luck, Blastwright Plus, Emergency Charges, 2x Shards (15 min), 2x Prismatic Luck (15 min), Expedition Revive, Starter Blast, Expedition Kit, Celestial Finish, Inferno Finish, Boss Hunter Pack, Ultimate Blastwright, Blastwright Club.
+All keys to make (23): Shard Pouch, Shard Satchel, Shard Chest, Shard Vault, Neon Pink Blasts, Void Blasts, Toxic Blasts, Golden Blasts, 2x Shards, Prismatic Luck, Blastwright Plus, Track Premium, Emergency Charges, 2x Shards (15 min), 2x Prismatic Luck (15 min), Expedition Revive, Starter Blast, Expedition Kit, Celestial Finish, Inferno Finish, Boss Hunter Pack, Ultimate Blastwright, Blastwright Club.
 
 Suggested subjects: shard packs = a pile, bag, chest and vault of blue crystals growing in size; blast colors = a glowing explosion in that colour; 2x Shards = gem with "x2" energy (no text needed); revive = a heart with a lightning bolt; finishers = the actual explosion colours (blue-white, red inferno, purple void); bundles = several of the items fanned together; Plus and Club = a golden crown.
 

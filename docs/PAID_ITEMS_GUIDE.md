@@ -2,7 +2,7 @@
 
 Everything you sell is defined in `src/ReplicatedStorage/Shared/Config/Products.luau`. Every `Id` is `nil` until you create the item on Roblox and paste its number in. **Until then the Shop shows "Not for sale yet" for that item and nothing else is affected**, so you can start with a few items and add the rest later. Never invent an id.
 
-Total: **18 Developer Products, 3 Gamepasses, 1 optional Subscription.**
+Total: **18 Developer Products, 4 Gamepasses, 1 optional Subscription.**
 
 ## 0. Before you start (once)
 1. Studio: File > Publish to Roblox. The experience must exist before products can.
@@ -41,6 +41,7 @@ What each one gives is defined in the config (`Amount`, `Cosmetic`, `Grants`), n
 |---|---|---|---|
 | `DoubleShards` | 2x Shards | Permanently doubles the shards you earn from blasting. | 499 |
 | `PrismaticLuck` | Prismatic Luck | Doubles the chance that crystals spawn Prismatic (worth 3x). | 299 |
+| `TrackPremium` | Track Premium | Unlocks the premium reward on every level of the Blastwright Track (boosts, tokens, finishers, blast colors and titles), including levels you already reached. | 599 |
 | `BlastwrightPlus` | Blastwright Plus | The Blastwright Plus title and a free supply drop every day (3 emergency charges and a revive token). Supports the game; no power, nothing locked. | 399 |
 
 A pass needs an icon before it can be put on sale, and "Item for sale" must be switched on. Copy each pass's numeric ID from its page (the number in the URL).

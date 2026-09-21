@@ -44,3 +44,5 @@ All handlers go through a per-player, per-remote token bucket (`Server/RateLimit
 3. Make one purchase per product in a private server and confirm it grants once and persists.
 
 Later additions: `AssayClaim` (5 / 8): kind must be a real crystal id and tier an integer for an existing tier, reached and unclaimed (`Assay.Claim`, hostile ids tested). The world boss and Plus have no client input: they run from the server clock and `Purchases.Owns`.
+
+Pass 3 additions: `TrackClaim` (5 / 8): level must be an integer, the track a boolean, the level must be reached, premium needs `Purchases.Owns(player, "TrackPremium")` checked on the server, each reward once (`Track.Claim`). `StreakClaim` (2 / 3): no argument, once per UTC day (`Streak.Claim`). `Specimen` is server-to-client only (the server rolls with its own `Random`; the client never sends or influences a drop). Track XP is only added by server code paths. Audit result: all 22 client-to-server remotes are wrapped in `guarded`.

@@ -15,6 +15,7 @@ local CacheView = require(script.CacheView)
 local Trophies = require(script.Trophies)
 local SiteLabels = require(script.SiteLabels)
 local WorldBossView = require(script.WorldBossView)
+local Reveal = require(script.Reveal)
 local CameraFeedback = require(script.CameraFeedback)
 local CavernView = require(script.CavernView)
 local Guide = require(script.Guide)
@@ -163,6 +164,10 @@ Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
 	if not ok then
 		warn("[Client] MonsterTurn failed: " .. tostring(err))
 	end
+end)
+
+Remotes.Specimen.OnClientEvent:Connect(function(drop)
+	pcall(Reveal.Show, drop)
 end)
 
 Remotes.WorldBoss.OnClientEvent:Connect(function(view)

@@ -3939,5 +3939,226 @@ test("upgrades: every rig upgrade has ascending prices; unlock prices rise acros
 	for i = 2, #Strata2 do eq(Strata2[i].Cost > Strata2[i - 1].Cost, true, "area price rises") end
 end)
 
+-- Specimens, Track and Streak ------------------------------------------------------------------------------------------
+local Specimens = require("../../src/ReplicatedStorage/Shared/Specimens")
+local SpecCfg = require("../../src/ReplicatedStorage/Shared/Config/Specimens")
+local Track = require("../../src/ReplicatedStorage/Shared/Track")
+local TrackCfg = require("../../src/ReplicatedStorage/Shared/Config/Track")
+local Streak = require("../../src/ReplicatedStorage/Shared/Streak")
+local StreakCfg = require("../../src/ReplicatedStorage/Shared/Config/Streak")
+local GrantsMod = require("../../src/ReplicatedStorage/Shared/Grants")
+
+local function seqRng(list)
+	local i = 0
+	return function() i += 1; return list[(i - 1) % #list + 1] end
+end
+local function lcgRng(seed)
+	local s = seed
+	return function() s = (s * 48271) % 2147483647; return s / 2147483647 end
+end
+
+test("specimens: config is coherent (rarities rise in value, milestones fit the cabinet and rise)", function()
+	for i = 2, #SpecCfg.Rarities do
+		eq(SpecCfg.Rarities[i].Weight < SpecCfg.Rarities[i - 1].Weight, true, "rarer grades have lower weight")
+		eq(SpecCfg.Rarities[i].Dust > SpecCfg.Rarities[i - 1].Dust, true, "rarer grades are worth more dust")
+	end
+	local total = #Crystals.Order * #SpecCfg.Rarities
+	local last = 0
+	for _, m in SpecCfg.Milestones do
+		eq(m.Found > last and m.Found <= total, true, m.Title .. " is reachable and rising")
+		eq(GrantsMod.Valid({ Kind = "Title", Title = m.Title }), true, m.Title .. " is a valid title")
+		last = m.Found
+	end
+	eq(SpecCfg.Milestones[#SpecCfg.Milestones].Found, total, "the last milestone is the complete cabinet")
+end)
+
+test("specimens: drop chance grows with the chain and is capped; empty volleys never drop", function()
+	eq(Specimens.DropChance(0, SpecCfg), 0, "no pops")
+	eq(Specimens.DropChance(-3, SpecCfg), 0, "negative")
+	eq(Specimens.DropChance(0 / 0, SpecCfg), 0, "NaN")
+	eq(Specimens.DropChance(30, SpecCfg) > Specimens.DropChance(10, SpecCfg), true, "bigger chain, better chance")
+	eq(Specimens.DropChance(9999, SpecCfg), SpecCfg.MaxChance, "capped")
+	local st = Specimens.Default()
+	eq(Specimens.Roll(seqRng({ 0 }), {}, 30, 1, st, SpecCfg), nil, "no popped kinds, no drop")
+	eq(Specimens.Roll(seqRng({ 0.99 }), { "Glimmerstone" }, 30, 1, st, SpecCfg), nil, "a high roll misses")
+	local drop = Specimens.Roll(seqRng({ 0, 0, 0 }), { "Glimmerstone", "Kindlequartz" }, 30, 1, st, SpecCfg)
+	eq(drop ~= nil and drop.Kind == "Glimmerstone" and drop.Rarity == "Common", true, "lowest rolls give the first kind and the lowest grade")
+	eq(drop.Id, "Glimmerstone:Common", "the id joins kind and grade")
+end)
+
+test("specimens: a big chain leans toward better grades, and luck helps (measured over many rolls)", function()
+	local function share(pops, luck)
+		local rng, hits, n = lcgRng(99), 0, 4000
+		local st = Specimens.Default()
+		for _ = 1, n do
+			local r = Specimens.RollRarity(rng, pops, luck, st.Pity, SpecCfg)
+			if r ~= "Common" and r ~= "Uncommon" then hits += 1 end
+		end
+		return hits / n
+	end
+	eq(share(40, 1) > share(5, 1) * 1.5, true, "a 40-pop chain finds Rare or better much more often than a 5-pop one")
+	eq(share(20, 3) > share(20, 1), true, "more luck, better grades")
+	eq(share(20, 0) > 0, true, "with no luck the top grades are still possible")
+end)
+
+test("specimens: pity forces at least Epic then Legendary, and is reset by a top grade", function()
+	local st = Specimens.Default()
+	st.Pity.Epic = SpecCfg.EpicPity
+	for seed = 1, 200 do
+		local r = Specimens.RollRarity(lcgRng(seed), 1, 0, st.Pity, SpecCfg)
+		eq(r == "Common" or r == "Uncommon" or r == "Rare", false, "epic pity: never below Epic")
+	end
+	st.Pity.Legendary = SpecCfg.LegendaryPity
+	for seed = 1, 200 do
+		local r = Specimens.RollRarity(lcgRng(seed), 1, 0, st.Pity, SpecCfg)
+		eq(r == "Legendary" or r == "Mythic", true, "legendary pity: at least Legendary")
+	end
+	local s2 = Specimens.Default()
+	Specimens.Record(s2, { Kind = "Glimmerstone", Rarity = "Common", Id = "Glimmerstone:Common" }, SpecCfg)
+	eq(s2.Pity.Epic, 1, "a common find advances the pity")
+	Specimens.Record(s2, { Kind = "Glimmerstone", Rarity = "Epic", Id = "Glimmerstone:Epic" }, SpecCfg)
+	eq(s2.Pity.Epic, 0, "an epic resets the epic pity")
+	eq(s2.Pity.Legendary, 2, "but not the legendary pity")
+	Specimens.Record(s2, { Kind = "Glimmerstone", Rarity = "Mythic", Id = "Glimmerstone:Mythic" }, SpecCfg)
+	eq(s2.Pity.Legendary, 0, "a mythic resets both")
+end)
+
+test("specimens: recording marks new finds, pays dust for duplicates, counts the cabinet, pays each milestone once", function()
+	local st = Specimens.Default()
+	local drop = { Kind = "Resonite", Rarity = "Rare", Id = "Resonite:Rare" }
+	local first = Specimens.Record(st, drop, SpecCfg)
+	eq(first.New and first.Dust == 0 and first.Count == 1, true, "a first find is new and pays no dust")
+	local dupe = Specimens.Record(st, drop, SpecCfg)
+	eq(dupe.New == false and dupe.Count == 2 and dupe.Dust == SpecCfg.Rarities[3].Dust, true, "a duplicate pays the grade's dust")
+	eq(Specimens.FoundCount(st), 1, "duplicates do not add slots")
+	eq(st.Total, 2, "the total counts every drop")
+	local m1 = SpecCfg.Milestones[1].Found
+	for i = 1, m1 - 1 do
+		Specimens.Record(st, { Kind = "K" .. i, Rarity = "Common", Id = "K" .. i .. ":Common" }, SpecCfg)
+	end
+	eq(#Specimens.NewMilestones(st, SpecCfg), 1, "the first milestone is reached")
+	eq(#Specimens.NewMilestones(st, SpecCfg), 0, "and only paid once")
+	local view = Specimens.View(st, { "Resonite" }, SpecCfg)
+	eq(view[1].Have, 1, "the view counts grades found")
+	eq(view[1].Grades[3].Count, 2, "and how many of each")
+end)
+
+test("track: levels need rising xp, xp is added safely, levels reached are reported", function()
+	eq(Track.XpForLevel(1, TrackCfg), TrackCfg.XpBase, "level 1")
+	eq(Track.XpForLevel(5, TrackCfg), TrackCfg.XpBase + 4 * TrackCfg.XpStep, "level 5")
+	local st = Track.Default()
+	local b, a = Track.Add(st, TrackCfg.XpBase - 1, TrackCfg)
+	eq(b == 0 and a == 0, true, "one xp short of the first level")
+	b, a = Track.Add(st, 1, TrackCfg)
+	eq(b == 0 and a == 1, true, "exactly at the first level")
+	for _, junk in { -50, 0, 0 / 0, math.huge, 1e12 } do
+		local xp = st.Xp
+		Track.Add(st, junk, TrackCfg)
+		eq(st.Xp, xp, "junk xp changes nothing")
+	end
+	local level, into, need = Track.Progress(st.Xp, TrackCfg)
+	eq(level == 2 and into == 0 and need == Track.XpForLevel(2, TrackCfg), true, "progress inside the level")
+	local x = TrackCfg.Xp
+	eq(Track.VolleyXp(0, TrackCfg), x.VolleyBase, "an empty volley still earns the base")
+	eq(Track.VolleyXp(10000, TrackCfg), x.VolleyBase + x.PopsCap, "volley xp is capped")
+end)
+
+test("track: rewards need the level, premium needs the pass, nothing is claimed twice", function()
+	local st = Track.Default()
+	eq(Track.Claim(st, 1, false, false, TrackCfg), nil, "level 1 not reached")
+	Track.Add(st, 100000, TrackCfg)
+	for _, junk in { 0, -1, 1.5, "1", true, {} } do
+		eq(Track.Claim(st, junk :: any, false, false, TrackCfg), nil, "junk level")
+	end
+	eq(Track.Claim(st, 1, "no" :: any, false, TrackCfg), nil, "junk track")
+	eq(Track.Claim(st, 1, true, false, TrackCfg), nil, "premium without the pass")
+	eq(Track.Claim(st, 1, true, true, TrackCfg) ~= nil, true, "premium with the pass")
+	eq(Track.Claim(st, 1, true, true, TrackCfg), nil, "premium only once")
+	eq(Track.Claim(st, 1, false, false, TrackCfg) ~= nil, true, "the free reward is independent")
+	eq(Track.Claim(st, 1, false, false, TrackCfg), nil, "free only once")
+	local reached = Track.LevelsReached(st.Xp, TrackCfg)
+	eq(reached > TrackCfg.MaxLevel, true, "enough xp to go past the end")
+	eq(Track.Claim(st, TrackCfg.MaxLevel + 1, true, true, TrackCfg), nil, "no premium reward beyond the last level")
+	eq(Track.Claim(st, TrackCfg.MaxLevel + 1, false, false, TrackCfg) ~= nil, true, "but a small free reward for every extra level")
+	local pass = Track.Default()
+	Track.Add(pass, Track.XpForLevel(1, TrackCfg) * 3 + TrackCfg.XpStep * 3, TrackCfg)
+	local before = Track.ClaimableCount(pass, false, TrackCfg)
+	eq(Track.ClaimableCount(pass, true, TrackCfg) > before, true, "owning the pass adds claimable premium rewards")
+end)
+
+test("track: config is coherent (every level has a free and premium reward, all grants valid, titles unique)", function()
+	eq(#TrackCfg.Levels, TrackCfg.MaxLevel, "a reward pair per level")
+	local titles = {}
+	for i, lvl in TrackCfg.Levels do
+		eq(#lvl.Free > 0 and #lvl.Premium > 0, true, "level " .. i .. " has both rewards")
+		for _, list in { lvl.Free, lvl.Premium } do
+			for _, g in list do
+				eq(GrantsMod.Valid(g), true, "level " .. i .. " grant valid")
+				if g.Kind == "Title" then
+					eq(titles[g.Title], nil, g.Title .. " is unique")
+					titles[g.Title] = true
+				end
+			end
+		end
+	end
+	for _, g in TrackCfg.BonusPerLevelAfterMax do eq(GrantsMod.Valid(g), true, "post-max grant valid") end
+	local total = 0
+	for l = 1, TrackCfg.MaxLevel do total += Track.XpForLevel(l, TrackCfg) end
+	eq(total > 5000 and total < 60000, true, "the whole track is a few hours of xp, not minutes or months")
+end)
+
+test("streak: consecutive days build the streak, a miss resets it, Plus forgives one miss, once per day", function()
+	local st = Streak.Default()
+	eq(Streak.Claim(st, 100, false, StreakCfg) ~= nil, true, "first claim")
+	eq(st.Count, 1, "day one")
+	eq(Streak.Claim(st, 100, false, StreakCfg), nil, "not twice in a day")
+	eq(Streak.Claim(st, 99, false, StreakCfg), nil, "not for an earlier day")
+	eq(Streak.Claim(st, 0 / 0, false, StreakCfg), nil, "NaN")
+	eq(Streak.Claim(st, "x" :: any, false, StreakCfg), nil, "junk")
+	Streak.Claim(st, 101, false, StreakCfg)
+	eq(st.Count, 2, "the next day continues")
+	Streak.Claim(st, 103, false, StreakCfg)
+	eq(st.Count, 1, "a missed day resets")
+	Streak.Claim(st, 105, true, StreakCfg)
+	eq(st.Count, 2, "Plus keeps the streak through one missed day")
+	Streak.Claim(st, 108, true, StreakCfg)
+	eq(st.Count, 1, "but not through two")
+end)
+
+test("streak: the cycle repeats every seven days, every reward is valid, the view says what to expect", function()
+	eq(#StreakCfg.Days, 7, "a week")
+	for i, day in StreakCfg.Days do
+		for _, g in day do eq(GrantsMod.Valid(g), true, "day " .. i .. " grant valid") end
+	end
+	eq(Streak.CycleDay(1, StreakCfg), 1, "first day")
+	eq(Streak.CycleDay(7, StreakCfg), 7, "seventh day")
+	eq(Streak.CycleDay(8, StreakCfg), 1, "then it starts over")
+	eq(Streak.CycleDay(15, StreakCfg), 1, "and again")
+	local st = Streak.Default()
+	local v = Streak.View(st, 50, false, StreakCfg)
+	eq(v.CanClaim and v.Count == 1 and v.CycleDay == 1, true, "a new player can claim day one")
+	Streak.Claim(st, 50, false, StreakCfg)
+	v = Streak.View(st, 50, false, StreakCfg)
+	eq(v.CanClaim == false and v.Count == 1, true, "claimed today")
+	v = Streak.View(st, 51, false, StreakCfg)
+	eq(v.CanClaim and v.Count == 2 and v.CycleDay == 2, true, "tomorrow is day two")
+	v = Streak.View(st, 55, false, StreakCfg)
+	eq(v.Count, 1, "after a long gap the next claim restarts at day one")
+end)
+
+test("grants: describe gives readable text for every kind", function()
+	local text = GrantsMod.Describe({ { Kind = "Shards", Amount = 12500, Scaled = true }, { Kind = "Tokens", Token = "Revive", Count = 2 }, { Kind = "Boost", Boost = "Luck", Mult = 2, Seconds = 900 }, { Kind = "Title", Title = "X" }, { Kind = "Finisher", Id = "Void" }, { Kind = "Cosmetic", Id = "Toxic" } })
+	eq(text, "12,500 shards per area, 2 revive tokens, 2x luck 15m, title X, Void finisher, Toxic blasts", "the whole line")
+end)
+
+test("schema: v17 saves migrate to v18 with specimens, track and streak records", function()
+	local d = Schema.Migrate({ SchemaVersion = 17, Shards = 6 })
+	eq(d.Specimens.Total, 0, "specimens")
+	eq(d.Track.Xp, 0, "track")
+	eq(d.Streak.LastDay, 0, "streak")
+	eq(Schema.CURRENT_VERSION >= 18, true, "v18 exists")
+	eq(d.Shards, 6, "kept")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

@@ -41,7 +41,7 @@ All ids are `nil` until you paste them into `src/ReplicatedStorage/Shared/Config
 
 (The shard packs and blast colors above are the 8 listed in `Config/Products.luau` under `DeveloperProducts` and `CosmeticProducts`; the 10 offers are `Offers`. That is 4 + 4 + 10 = 18.) Names and descriptions are in the config; copy them. Real prices are whatever you set in the dashboard.
 
-**Gamepasses (3):** "2x Shards" (`Gamepasses.DoubleShards`), "Prismatic Luck" (`Gamepasses.PrismaticLuck`) and "Blastwright Plus" (`Gamepasses.BlastwrightPlus`: title + a free daily supply drop of 3 emergency charges and a revive token; no power, nothing locked). Create all three in the dashboard.
+**Gamepasses (4):** (also "Track Premium", `Gamepasses.TrackPremium`, see `docs/PAID_ITEMS_GUIDE.md`) "2x Shards" (`Gamepasses.DoubleShards`), "Prismatic Luck" (`Gamepasses.PrismaticLuck`) and "Blastwright Plus" (`Gamepasses.BlastwrightPlus`: title + a free daily supply drop of 3 emergency charges and a revive token; no power, nothing locked). Create all four in the dashboard.
 **Subscription (optional):** "Blastwright Club", paste its id (a string) into `Club.SubscriptionId`.
 
 Then: copy each numeric id, paste over `Id = nil`, `rojo build`, republish. Test each purchase once in a published private server (grants once, persists after rejoining). Never paste an id you did not create.
