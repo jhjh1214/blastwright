@@ -409,6 +409,7 @@ end)
 
 local Dailies = require("../../src/ReplicatedStorage/Shared/Dailies")
 local DailiesCfg = require("../../src/ReplicatedStorage/Shared/Config/Dailies")
+local WeekCfg = require("../../src/ReplicatedStorage/Shared/Config/Weeklies")
 local Products = require("../../src/ReplicatedStorage/Shared/Config/Products")
 local Receipts = require("../../src/ServerScriptService/Server/Receipts")
 
@@ -457,6 +458,21 @@ test("dailies: record accumulates, chain takes the max, progress caps at target"
 	Dailies.Record(daily, defs, "Pops", 0)
 	Dailies.Record(daily, defs, "Nothing", 5)
 	eq(daily.Progress["1"], 50, "ignored")
+end)
+
+test("dailies: combat kinds (Slays, Critical) exist in daily and weekly pools and accumulate per event", function()
+	for _, cfg in { DailiesCfg, WeekCfg } do
+		for _, kind in { "Slays", "Critical" } do
+			local found = false
+			for _, tpl in cfg.Templates do if tpl.Kind == kind then found = true end end
+			eq(found, true, kind .. " template present")
+		end
+	end
+	local defs = { { Slot = 1, Id = "S", Kind = "Slays", Target = 3, Text = "", RewardBase = 1 } }
+	local daily = { Day = 5, Progress = {}, Claimed = {} }
+	Dailies.Record(daily, defs, "Slays", 1)
+	Dailies.Record(daily, defs, "Slays", 1)
+	eq(daily.Progress["1"], 2, "sums kills")
 end)
 
 test("dailies: claim only when complete, once, and only for a real slot", function()
@@ -1158,7 +1174,6 @@ test("board: a tied group is ordered alphabetically no matter how it arrives", f
 	end
 end)
 
-local WeekCfg = require("../../src/ReplicatedStorage/Shared/Config/Weeklies")
 
 test("weekly: weeks start on Monday 00:00 UTC and last exactly seven days", function()
 	local monday = 1704067200 -- 2024-01-01 00:00:00 UTC, a Monday

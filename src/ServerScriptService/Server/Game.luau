@@ -688,6 +688,7 @@ local function resolveMonster(player: Player, seam: SeamState, volley: any, resu
 				seam.Earned += bounty
 			end
 			data.Stats.LurkersSlain += 1
+			recordDaily(data, "Slays", 1)
 			if Community.Contribute(goal, player.UserId, 5) then -- monsters are a shared threat: kills count toward the Server Goal
 				finishGoal()
 			end
@@ -994,6 +995,9 @@ local function onDetonate(player: Player, payload: any)
 	recordDaily(data, "Pops", result.Pops)
 	recordDaily(data, "Chain", result.Pops)
 	recordDaily(data, "Volleys", 1)
+	if criticalStarted then
+		recordDaily(data, "Critical", 1)
+	end
 	recordDaily(data, "Shards", payout)
 	if result.Pops >= DailiesConfig.TierPops then
 		recordDaily(data, "Tiers", 1)

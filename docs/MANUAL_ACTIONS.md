@@ -54,3 +54,6 @@ Return to Claude and say "Done: products created" with the IDs.
 ```
 
 Also set the experience's max players to 16 or fewer (Game Settings > Basic Info) because there are 16 blast pads.
+
+## Painted icons (optional, later)
+The UI icons are drawn from Frames (`Client/Icons.luau`) so they always show and match the chunky style. To upgrade to painted art: make or commission one consistent icon set (same outline weight and palette), upload it in the Creator Dashboard under your own account, and paste the real image ids into `Icons.Assets` (name -> `rbxassetid://<id>`). Never guess an id. Icons without an entry keep the drawn version.
