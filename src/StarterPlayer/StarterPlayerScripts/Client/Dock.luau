@@ -25,7 +25,8 @@ local SIDE_W, SIDE_H, GAP = 84, 92, 8
 local SHOP_W, SHOP_H = 214, 88
 
 -- parent: the roaming HUD group. onPress(name) is called when a button is pressed.
-function Dock.Build(parent, onPress)
+-- getTopCard: returns the objective card above the stack (or nil); the stack shrinks to stay clear of it.
+function Dock.Build(parent, getTopCard, onPress)
 	local totalHeight = #SIDE * (SIDE_H + GAP) + SHOP_H
 	local holder = Kit.Make("Frame", { Name = "Dock", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -12), Size = UDim2.fromOffset(SHOP_W + 8, totalHeight), ZIndex = Theme.Z.Hud }, parent)
 	local scale = Kit.Make("UIScale", { Scale = 1 }, holder)
@@ -46,15 +47,26 @@ function Dock.Build(parent, onPress)
 	buttons.Shop = shop
 	addHighlight("Shop", shop)
 
-	-- fit: leave the top of the screen (shards, objective) free; shrink the stack on short screens
+	-- fit: stay below the shards, cave counter and objective card; shrink on short screens
 	local function fit()
 		local h = parent.AbsoluteSize.Y
-		if h > 0 then
-			local available = h - 190
-			scale.Scale = math.clamp(available / totalHeight, 0.42, 1)
+		if h <= 0 then
+			return
 		end
+		local top = 96 -- shards pill and cave counter
+		local card = getTopCard and getTopCard()
+		if card and card.Visible and card.AbsoluteSize.Y > 0 then
+			top = math.max(top, card.AbsolutePosition.Y - parent.AbsolutePosition.Y + card.AbsoluteSize.Y + 6)
+		end
+		local available = h - 12 - top
+		scale.Scale = math.clamp(available / totalHeight, 0.4, 1)
 	end
 	parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+	local card = getTopCard and getTopCard()
+	if card then
+		card:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+		card:GetPropertyChangedSignal("Visible"):Connect(fit)
+	end
 	fit()
 
 	local dock = { Holder = holder, Buttons = buttons }

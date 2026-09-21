@@ -20,7 +20,7 @@ local LOOK = {
 local FALLBACK = { Icon = "Star", Color = Theme.Colors.Boost }
 local GOAL_COLOR = Theme.Colors.Codex
 local MAX_EVENT_TILES = 3
-local WIDTH = 236
+local WIDTH = 184
 
 local function make(class, props, parent)
 	local inst = Instance.new(class)
@@ -50,17 +50,17 @@ local function buildTile(parent, order, look, name, description)
 	make("UICorner", { CornerRadius = UDim.new(0, 14) }, root)
 	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = Theme.Stroke.Small, LineJoinMode = Enum.LineJoinMode.Round }, root)
 	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(look.Color, 0.1), Theme.Shade(look.Color, 0.35)), Rotation = 90 }, root)
-	make("UIPadding", { PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 7), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 10) }, root)
-	make("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, root)
+	make("UIPadding", { PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 8) }, root)
+	make("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }, root)
 
-	local row = make("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 42), LayoutOrder = 1, ZIndex = Theme.Z.Hud + 1 }, root)
-	local disc = make("Frame", { BackgroundColor3 = look.Color, Size = UDim2.fromOffset(42, 42), ZIndex = Theme.Z.Hud + 1 }, row)
+	local row = make("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 34), LayoutOrder = 1, ZIndex = Theme.Z.Hud + 1 }, root)
+	local disc = make("Frame", { BackgroundColor3 = look.Color, Size = UDim2.fromOffset(34, 34), ZIndex = Theme.Z.Hud + 1 }, row)
 	make("UICorner", { CornerRadius = UDim.new(1, 0) }, disc)
 	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = Theme.Stroke.Small }, disc)
 	Icons.Draw(look.Icon, disc, nil, 0.86)
-	local title = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(50, 1), Size = UDim2.new(1, -50, 0, 16), Font = Theme.Font.Body, Text = name, TextSize = 14, TextColor3 = Theme.Tint(look.Color, 0.75), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = Theme.Z.Hud + 2 }, row)
+	local title = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(40, 0), Size = UDim2.new(1, -40, 0, 14), Font = Theme.Font.Body, Text = name, TextSize = 13, TextColor3 = Theme.Tint(look.Color, 0.75), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = Theme.Z.Hud + 2 }, row)
 	Kit.Outline(title, 2)
-	local value = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(50, 17), Size = UDim2.new(1, -50, 0, 24), Font = Theme.Font.Display, Text = "", TextSize = 21, TextColor3 = Theme.Colors.Ink, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = Theme.Z.Hud + 2 }, row)
+	local value = make("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(40, 13), Size = UDim2.new(1, -40, 0, 21), Font = Theme.Font.Display, Text = "", TextSize = 18, TextColor3 = Theme.Colors.Ink, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = Theme.Z.Hud + 2 }, row)
 	Kit.Outline(value, 2.5)
 
 	local tile = { Root = root, Value = value, Title = title, Color = look.Color }
@@ -77,7 +77,7 @@ local function buildTile(parent, order, look, name, description)
 end
 
 local function addBar(tile)
-	local track = make("Frame", { BackgroundColor3 = Theme.Colors.Outline, Size = UDim2.new(1, 0, 0, 12), LayoutOrder = 2, BorderSizePixel = 0, ZIndex = Theme.Z.Hud + 1 }, tile.Root)
+	local track = make("Frame", { BackgroundColor3 = Theme.Colors.Outline, Size = UDim2.new(1, 0, 0, 9), LayoutOrder = 2, BorderSizePixel = 0, ZIndex = Theme.Z.Hud + 1 }, tile.Root)
 	make("UICorner", { CornerRadius = UDim.new(1, 0) }, track)
 	local fill = make("Frame", { BackgroundColor3 = Theme.Tint(tile.Color, 0.25), Size = UDim2.fromScale(0, 1), BorderSizePixel = 0, ZIndex = Theme.Z.Hud + 2 }, track)
 	make("UICorner", { CornerRadius = UDim.new(1, 0) }, fill)
@@ -96,14 +96,14 @@ function StatusDock.Build(parent)
 	local function refresh()
 		local now = os.clock()
 		for _, e in eventTiles do
-			e.Tile.Value.Text = "ends in " .. StatusDock.FormatTime(e.EndsAt - now)
+			e.Tile.Value.Text = StatusDock.FormatTime(e.EndsAt - now)
 		end
 		if goalTile and goalView then
 			local v = goalView
 			local frenzy = math.max(0, v.FrenzyLeft - (now - goalAt))
 			if frenzy > 0 then
 				goalTile.Title.Text = "SERVER FRENZY"
-				goalTile.Value.Text = "boost " .. StatusDock.FormatTime(frenzy)
+				goalTile.Value.Text = StatusDock.FormatTime(frenzy) .. " left"
 				goalTile.Fill.Size = UDim2.fromScale(1, 1)
 			elseif v.Done then
 				goalTile.Title.Text = "SERVER GOAL"
