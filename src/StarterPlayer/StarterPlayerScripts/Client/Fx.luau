@@ -233,4 +233,104 @@ function Fx.Gem(parent, color, size, dim)
 	return frame
 end
 
+-- Per-frame animation ---------------------------------------------------------------------------------------------------
+
+local animated = {}
+local animConn = nil
+local animClock = 0
+
+-- Call fn(t, dt) every frame while `object` is alive (it stops by itself when the object is destroyed).
+function Fx.OnFrame(object, fn)
+	table.insert(animated, { Object = object, Fn = fn })
+	if animConn then
+		return
+	end
+	animConn = RunService.RenderStepped:Connect(function(dt)
+		animClock += dt
+		for i = #animated, 1, -1 do
+			local a = animated[i]
+			if not a.Object.Parent then
+				table.remove(animated, i)
+			else
+				pcall(a.Fn, animClock, dt)
+			end
+		end
+	end)
+end
+
+-- Tiny stars that twinkle at random spots (a background for cards and banners).
+function Fx.Sparkles(parent, count, color)
+	local rng = Random.new()
+	for _ = 1, count do
+		local size = rng:NextInteger(2, 5)
+		local star = make("Frame", {
+			BackgroundColor3 = color or Color3.new(1, 1, 1),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(size, size),
+			Position = UDim2.fromScale(rng:NextNumber(0.03, 0.97), rng:NextNumber(0.03, 0.97)),
+			Rotation = 45,
+			ZIndex = (parent.ZIndex or 1) + 1,
+		}, parent)
+		pcall(function()
+			TweenService:Create(star, TweenInfo.new(rng:NextNumber(0.7, 1.6), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true, rng:NextNumber(0, 1.5)), { BackgroundTransparency = 0.05 }):Play()
+		end)
+	end
+end
+
+-- Expanding rings (an "explosion preview" or a pulse), centred in `parent`.
+function Fx.Rings(parent, color, count, period, maxSize)
+	count = count or 3
+	period = period or 1.8
+	for i = 1, count do
+		local ring = make("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(6, 6),
+			BackgroundTransparency = 1,
+			ZIndex = (parent.ZIndex or 1) + 1,
+		}, parent)
+		make("UICorner", { CornerRadius = UDim.new(1, 0) }, ring)
+		local stroke = make("UIStroke", { Color = color, Thickness = 3, Transparency = 0.1 }, ring)
+		local delay = (i - 1) * period / count
+		pcall(function()
+			TweenService:Create(ring, TweenInfo.new(period, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1, false, delay), { Size = UDim2.fromOffset(maxSize or 90, maxSize or 90) }):Play()
+			TweenService:Create(stroke, TweenInfo.new(period, Enum.EasingStyle.Quad, Enum.EasingDirection.In, -1, false, delay), { Transparency = 1, Thickness = 0.5 }):Play()
+		end)
+	end
+end
+
+-- Dots orbiting the centre of `parent`.
+function Fx.Orbit(parent, color, count, radius, speed, dotSize)
+	local dots = {}
+	for i = 1, count do
+		local dot = make("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = color, BorderSizePixel = 0, Size = UDim2.fromOffset(dotSize or 8, dotSize or 8), ZIndex = (parent.ZIndex or 1) + 2 }, parent)
+		make("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
+		make("UIStroke", { Color = lighten(color, 0.5), Thickness = 1.5, Transparency = 0.3 }, dot)
+		dots[i] = dot
+	end
+	Fx.OnFrame(parent, function(t)
+		for i, dot in dots do
+			local a = t * (speed or 1.6) + (i / count) * math.pi * 2
+			dot.Position = UDim2.new(0.5, math.cos(a) * radius, 0.5, math.sin(a) * radius * 0.55)
+		end
+	end)
+end
+
+-- A gentle up-and-down float for an element.
+function Fx.Float(gui, amplitude, speed)
+	local base = gui.Position
+	Fx.OnFrame(gui, function(t)
+		gui.Position = base + UDim2.fromOffset(0, math.sin(t * (speed or 2)) * (amplitude or 4))
+	end)
+end
+
+-- A heartbeat pulse of size for an element.
+function Fx.Pulse(gui, amount, speed)
+	local scale = gui:FindFirstChildOfClass("UIScale") or make("UIScale", { Scale = 1 }, gui)
+	Fx.OnFrame(gui, function(t)
+		scale.Scale = 1 + math.max(0, math.sin(t * (speed or 3))) * (amount or 0.1)
+	end)
+end
+
 return Fx

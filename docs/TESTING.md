@@ -135,6 +135,11 @@ Everything below was written without being run in Studio (the automated tests co
 - Combat feedback: red "-N" floating numbers and a burst when you hit a Lurker or the boss, a gold burst/ring and "+bounty" when one dies, a red screen flash when a heart is lost or the Leech steals, pulsing red attack tiles, and during CRITICAL MASS the whole screen warms up (gold tint, more saturation) then relaxes.
 - Watch for: gems flickering or not spinning (ViewportFrames inside the scroll list), performance while the Codex is open (about 12 gems), text overflowing the toast pills or headers on a phone, the shimmer overlay covering button text, hover scaling on touch devices.
 
+### E13. Shop cards with artwork (unseen in Studio)
+- Menu > Shop is now a grid of product cards (two columns, one on narrow screens), each with animated procedural art on a tier-coloured banner: spinning gem piles for shard packs (more gems for bigger packs), ringed "x2" for boosts, a beating heart for Revive, three pulsing orbs for emergency charges, an exploding-rings-and-orbiting-sparks preview in the finisher's own colour, glowing orbiting orbs for blast colors, a gold title ribbon, and a fanned stack of icon tiles for every bundle. Cards have a tier ribbon, badges (BEST VALUE, HOT, ULTIMATE, BUNDLE, OWNED), a price hint chip and a buy button that shimmers when for sale.
+- A "Featured" section at the top shows the Ultimate Blastwright, Boss Hunter and Starter Blast bundles. Prices shown are my hints (about R$) and are NOT read from Roblox; the real price appears in the Roblox prompt.
+- Watch for: hitches when the Shop tab opens (many animations at once), text overflow inside cards on a phone, gems not rendering inside cards, the card border animation looking too busy.
+
 ### F. Multi-player and phones (Test > 2 players, and the Device emulator)
 23. Two players use different pads and see each other's grids and blasts (distant grids appear only when you are near: level of detail). A pad in use is labelled "In use". Walking 130+ studs away for a minute releases it.
 24. Phone-size window (for example 390 x 844): top bar (shards, Menu, ?) does not overlap; the Menu panel's 5 tabs fit; the grid is fully visible in the free band; buttons are tappable; text readable.
