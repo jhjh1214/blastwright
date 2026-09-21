@@ -232,6 +232,12 @@ function ShopArt.Crown()
 	return { Kind = "Crown" }
 end
 
+-- Painted shop art: put a REAL image asset id here, keyed by the product's exact Name from Config/Products.luau (the
+-- name shown on the card). Cards without an entry keep the drawn art. Never invent an id. See docs/SHOP_ART_GUIDE.md.
+ShopArt.Images = {
+	-- ["Starter Blast"] = "rbxassetid://123456789",
+}
+
 -- A product card in a grid: art on top, big name, description, a price chip and a chunky buy button.
 -- spec = { Name, Description, Art, Tier, Badge, Hint = "≈ R$ 49", Button, Enabled, OnClick, Order }
 function ShopArt.Card(parent, spec)
@@ -247,7 +253,12 @@ function ShopArt.Card(parent, spec)
 	make("UICorner", { CornerRadius = UDim.new(0, 12) }, art)
 	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3.5, LineJoinMode = Enum.LineJoinMode.Round }, art)
 	local build = BUILD[spec.Art.Kind]
-	if build then
+	local image = ShopArt.Images[spec.Name]
+	if image then
+		-- painted art supplied by the developer replaces the drawn art (see docs/SHOP_ART_GUIDE.md)
+		local picture = make("ImageLabel", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Image = image, ScaleType = Enum.ScaleType.Crop, ZIndex = 13 }, art)
+		make("UICorner", { CornerRadius = UDim.new(0, 12) }, picture)
+	elseif build then
 		pcall(build, art, spec.Art)
 	end
 

@@ -18,6 +18,8 @@ The game is unbalanced by design until it has been played. Placeholders are list
 4. Complete the maturity questionnaire.
 
 ## 4. Create products (optional but that is the business)
+**Step by step with every name, description and price: `docs/PAID_ITEMS_GUIDE.md`. Replacing the drawn shop graphics with painted art: `docs/SHOP_ART_GUIDE.md`.** The summary below is the short version.
+
 All ids are `nil` until you paste them into `src/ReplicatedStorage/Shared/Config/Products.luau`. Items with a nil id show "Not for sale yet"; nothing breaks. Create at create.roblox.com > your experience > Monetization.
 
 **Developer Products (18):**

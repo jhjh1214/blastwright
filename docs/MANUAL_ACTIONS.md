@@ -1,6 +1,6 @@
 # Manual Actions
 
-See `docs/PUBLISH_GUIDE.md` for the single ordered list. The blocks below are the detailed versions.
+See `docs/PUBLISH_GUIDE.md` for the single ordered list, `docs/PAID_ITEMS_GUIDE.md` for creating the paid items and `docs/SHOP_ART_GUIDE.md` for painted shop art. The blocks below are the detailed versions.
 
 ```
 ========================================
