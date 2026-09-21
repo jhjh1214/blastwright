@@ -17,6 +17,7 @@ local Events = require(Shared.Events)
 local Data = require(script.Parent.Data)
 local Leaderboard = require(script.Parent.Leaderboard)
 local Purchases = require(script.Parent.Purchases)
+local RateLimiter = require(script.Parent.RateLimiter)
 local Seam = require(script.Parent.Seam)
 local Validate = require(script.Parent.Validate)
 local World = require(script.Parent.World)
@@ -62,6 +63,17 @@ local awaySince: { [Player]: number } = {}
 local lastAction: { [Player]: { Buy: number, Detonate: number } } = {}
 local seenGoals: { [Player]: { [string]: boolean } } = {}
 local seamCounter = 0
+local limiter = RateLimiter.new()
+
+-- Every remote and prompt handler goes through here: a per-player, per-remote token bucket drops floods (an exploiter
+-- spamming a remote) before any work is done. Legitimate play stays far below these limits.
+local function guarded(name: string, rate: number, burst: number, handler: (Player, ...any) -> ())
+	return function(player: Player, ...: any)
+		if limiter:Allow(player.UserId, name, os.clock(), rate, burst) then
+			handler(player, ...)
+		end
+	end
+end
 
 local cachesById: { [string]: any } = {}
 for _, cache in WorldConfig.Caches do
@@ -609,6 +621,7 @@ end
 
 local function onPlayerRemoving(player: Player)
 	releaseSite(player)
+	limiter:Forget(player.UserId)
 	Leaderboard.Flush(player.UserId)
 	Purchases.Forget(player)
 	seenGoals[player] = nil
@@ -645,13 +658,13 @@ local function optional(name: string, start: () -> ())
 end
 
 function Game.Init()
-	Remotes.Detonate.OnServerEvent:Connect(onDetonate)
-	Remotes.Buy.OnServerEvent:Connect(onBuy)
-	Remotes.Claim.OnServerEvent:Connect(onClaim)
-	Remotes.ClaimWeekly.OnServerEvent:Connect(onClaimWeekly)
-	Remotes.ClaimGoal.OnServerEvent:Connect(onClaimGoal)
-	Remotes.Equip.OnServerEvent:Connect(onEquip)
-	Remotes.Setting.OnServerEvent:Connect(onSetting)
+	Remotes.Detonate.OnServerEvent:Connect(guarded("Detonate", 6, 10, onDetonate))
+	Remotes.Buy.OnServerEvent:Connect(guarded("Buy", 5, 8, onBuy))
+	Remotes.Claim.OnServerEvent:Connect(guarded("Claim", 5, 8, onClaim))
+	Remotes.ClaimWeekly.OnServerEvent:Connect(guarded("ClaimWeekly", 5, 8, onClaimWeekly))
+	Remotes.ClaimGoal.OnServerEvent:Connect(guarded("ClaimGoal", 5, 8, onClaimGoal))
+	Remotes.Equip.OnServerEvent:Connect(guarded("Equip", 5, 8, onEquip))
+	Remotes.Setting.OnServerEvent:Connect(guarded("Setting", 5, 8, onSetting))
 	optional("Purchases", function()
 		Purchases.Init({ Notify = notify, OnChanged = sync })
 	end)
@@ -660,14 +673,14 @@ function Game.Init()
 	end)
 
 	for siteId, entry in World.Registry.Sites do
-		entry.Prompt.Triggered:Connect(function(player)
+		entry.Prompt.Triggered:Connect(guarded("Site", 3, 5, function(player)
 			onSiteTriggered(player, siteId)
-		end)
+		end))
 	end
 	for cacheId, entry in World.Registry.Caches do
-		entry.Prompt.Triggered:Connect(function(player)
+		entry.Prompt.Triggered:Connect(guarded("Cache", 3, 5, function(player)
 			onCacheTriggered(player, cacheId)
-		end)
+		end))
 	end
 
 	Players.PlayerAdded:Connect(onPlayerAdded)

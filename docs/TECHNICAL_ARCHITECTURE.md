@@ -26,7 +26,7 @@ StarterPlayerScripts/Client  init.client (wiring), State, Blasting (enter/leave 
 
 ## Security
 - All remotes are validated server-side; extra fields are stripped, numbers must be finite integers in range, and charge kinds must be unlocked by the *server's* record.
-- Cooldowns: 0.15s Detonate, 0.2s Buy. Only one volley in flight per player. Detonate requires the character within 45 studs of the site station; site and cache prompts re-check proximity (30 / 25 studs). Caches pay once per player, tracked in the save (`Caches`, schema v2).
+- Every remote and prompt handler passes a per-player, per-remote token-bucket rate limiter first (`Server/RateLimiter.luau`); see `docs/SECURITY.md` for the full audit. Cooldowns: 0.15s Detonate, 0.2s Buy. Only one volley in flight per player. Detonate requires the character within 45 studs of the site station; site and cache prompts re-check proximity (30 / 25 studs). Caches pay once per player, tracked in the save (`Caches`, schema v2).
 - Nothing purchases yet (Phase 10).
 
 ## Performance notes (reasoned from the code; nothing profiled on a device)

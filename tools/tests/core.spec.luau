@@ -1325,5 +1325,48 @@ test("events: config is valid (unique ids, real weekdays and hours, known positi
 	end
 end)
 
+local RateLimiter = require("../../src/ServerScriptService/Server/RateLimiter")
+
+test("rate limiter: a burst is allowed, then calls are refused", function()
+	local rl = RateLimiter.new()
+	for i = 1, 5 do
+		eq(rl:Allow(1, "Buy", 100, 2, 5), true, "call " .. i .. " within the burst")
+	end
+	eq(rl:Allow(1, "Buy", 100, 2, 5), false, "the sixth instant call is refused")
+	eq(rl:Allow(1, "Buy", 100, 2, 5), false, "and stays refused")
+end)
+
+test("rate limiter: tokens refill at the configured rate and never exceed the burst", function()
+	local rl = RateLimiter.new()
+	for _ = 1, 5 do rl:Allow(1, "Buy", 0, 2, 5) end
+	eq(rl:Allow(1, "Buy", 0.4, 2, 5), false, "0.8 of a token is not enough")
+	eq(rl:Allow(1, "Buy", 0.5, 2, 5), true, "one full token after 0.5s at 2 per second")
+	eq(rl:Allow(1, "Buy", 0.5, 2, 5), false, "and only one")
+	for _ = 1, 5 do
+		eq(rl:Allow(1, "Buy", 1000, 2, 5), true, "after a long pause the full burst is back")
+	end
+	eq(rl:Allow(1, "Buy", 1000, 2, 5), false, "but never more than the burst")
+end)
+
+test("rate limiter: players and remotes are limited independently, and Forget resets a player", function()
+	local rl = RateLimiter.new()
+	for _ = 1, 3 do rl:Allow(1, "Buy", 0, 1, 3) end
+	eq(rl:Allow(1, "Buy", 0, 1, 3), false, "player 1 is out")
+	eq(rl:Allow(2, "Buy", 0, 1, 3), true, "player 2 is unaffected")
+	eq(rl:Allow(1, "Claim", 0, 1, 3), true, "another remote of player 1 is unaffected")
+	rl:Forget(1)
+	eq(rl:Allow(1, "Buy", 0, 1, 3), true, "a forgotten player starts fresh (no leak across sessions)")
+end)
+
+test("rate limiter: a clock that goes backwards or bad settings cannot grant free calls", function()
+	local rl = RateLimiter.new()
+	for _ = 1, 3 do rl:Allow(1, "Buy", 100, 1, 3) end
+	eq(rl:Allow(1, "Buy", 50, 1, 3), false, "time going backwards does not refill")
+	eq(rl:Allow(1, "Buy", 100, 0, 3), false, "a zero rate refuses")
+	eq(rl:Allow(1, "Buy", 100, 1, 0), false, "a zero burst refuses")
+	eq(rl:Allow(1, "Buy", 100, 0 / 0, 3), false, "NaN rate refuses")
+	eq(rl:Allow(1, "Buy", 100 + 0 / 0, 1, 3), false, "NaN time refuses")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then error("tests failed") end

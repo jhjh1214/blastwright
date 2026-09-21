@@ -17,9 +17,9 @@
 | 11 UI polish | Blast HUD moved to screen corners; roam HUD separate; further polish pending |
 | 12 Audio/VFX polish | SFX, ambience and a shuffled classical music playlist wired (unheard); music/effects switches saved |
 | 13 Mobile | Not tested |
-| 14 Security | Remote validation done and tested; full audit later |
+| 14 Security | Audited (docs/SECURITY.md); every remote validated and rate-limited; not tested against real exploits |
 | Social | Hub leaderboard of longest chains (needs a published game to test) |
-| 15-16 QA / Launch | Not started |
+| 15-16 QA / Launch | Launch checklist written (docs/LAUNCH_CHECKLIST.md); QA needs your playtest |
 
 ## Next
 1. Developer confirms audio (`[Audio] ... OK` in Output), listens, and gives feel feedback; fix what breaks.
