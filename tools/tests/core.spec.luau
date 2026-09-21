@@ -2885,10 +2885,194 @@ test("schema: v11 saves migrate to v12 with a collection log and mastery record 
 	eq(next(d.Collection.Relics), nil, "empty relic log")
 	eq(next(d.Mastery.Done), nil, "nothing mastered")
 	eq(d.Mastery.Title, "", "no title")
-	eq(Schema.CURRENT_VERSION, 12, "version")
+	eq(Schema.CURRENT_VERSION >= 12, true, "version")
 	local bad = Schema.Migrate({ SchemaVersion = 12, Mastery = "junk", Collection = 5 })
 	eq(type(bad.Mastery), "table", "junk mastery replaced")
 	eq(type(bad.Collection.Lurkers), "table", "junk collection replaced")
+end)
+
+local Grants = require("../../src/ReplicatedStorage/Shared/Grants")
+local FinCfg = require("../../src/ReplicatedStorage/Shared/Config/Finishers")
+local function freshSave() return Schema.Default() end
+
+test("grants: shards are added, scaled by areas unlocked only when marked Scaled", function()
+	local d = freshSave()
+	local msgs = Grants.Apply(d, { { Kind = "Shards", Amount = 1000 }, { Kind = "Shards", Amount = 1000, Scaled = true } }, 0, 3)
+	eq(d.Shards, 1000 + 3000, "flat plus scaled")
+	eq(#msgs, 2, "a message each")
+	local low = freshSave()
+	Grants.Apply(low, { { Kind = "Shards", Amount = 500, Scaled = true } }, 0, 0)
+	eq(low.Shards, 500, "never scaled below one area")
+end)
+
+test("grants: boosts start, extend by adding time (capped), keep the stronger multiplier, and expire", function()
+	local d = freshSave()
+	local now = 10000
+	Grants.Apply(d, { { Kind = "Boost", Boost = "Shards", Mult = 2, Seconds = 900 } }, now, 1)
+	eq(Grants.BoostMult(d.Boosts, "Shards", now + 899), 2, "active")
+	eq(Grants.BoostMult(d.Boosts, "Shards", now + 900), 1, "expired exactly at the end")
+	eq(Grants.BoostRemaining(d.Boosts, "Shards", now + 100), 800, "time left")
+	eq(Grants.BoostRemaining(d.Boosts, "Shards", now + 5000), 0, "none after expiry")
+	Grants.Apply(d, { { Kind = "Boost", Boost = "Shards", Mult = 3, Seconds = 900 } }, now + 100, 1)
+	eq(Grants.BoostRemaining(d.Boosts, "Shards", now + 100), 1700, "durations add while running")
+	eq(Grants.BoostMult(d.Boosts, "Shards", now + 100), 3, "the stronger multiplier wins")
+	for _ = 1, 20 do Grants.Apply(d, { { Kind = "Boost", Boost = "Shards", Mult = 2, Seconds = 3600 } }, now + 100, 1) end
+	eq(Grants.BoostRemaining(d.Boosts, "Shards", now + 100), Grants.BOOST_CAP_SECONDS, "capped at the stacking limit")
+	eq(Grants.BoostMult(d.Boosts, "Luck", now), 1, "another boost is untouched")
+	Grants.Apply(d, { { Kind = "Boost", Boost = "Shards", Mult = 2, Seconds = 5 } }, now + 999999, 1)
+	eq(Grants.BoostRemaining(d.Boosts, "Shards", now + 999999), 5, "a stale boost restarts from now")
+end)
+
+test("grants: junk or missing boost records give a multiplier of 1", function()
+	eq(Grants.BoostMult({}, "Shards", 5), 1, "no record")
+	eq(Grants.BoostMult({ Shards = { Until = "x", Mult = 2 } }, "Shards", 5), 1, "bad time")
+	eq(Grants.BoostMult({ Shards = { Until = 10, Mult = 0.1 } }, "Shards", 5), 1, "a boost can never slow you down")
+	eq(Grants.BoostMult({ Shards = { Until = 10, Mult = "big" } }, "Shards", 5), 1, "bad multiplier")
+end)
+
+test("grants: tokens add up to a cap, can be spent one at a time, and never go negative", function()
+	local d = freshSave()
+	Grants.Apply(d, { { Kind = "Tokens", Token = "Revive", Count = 3 } }, 0, 1)
+	eq(d.Inventory.Revive, 3, "added")
+	eq(Grants.Spend(d, "Revive"), true, "spent")
+	eq(d.Inventory.Revive, 2, "one fewer")
+	for _ = 1, 10 do Grants.Apply(d, { { Kind = "Tokens", Token = "Revive", Count = 50 } }, 0, 1) end
+	eq(d.Inventory.Revive, Grants.TOKEN_CAP, "capped")
+	local empty = freshSave()
+	eq(Grants.Spend(empty, "Charge"), false, "nothing to spend")
+	eq(empty.Inventory.Charge, 0, "still zero")
+	eq(Grants.Spend(empty, "Bogus"), false, "unknown token")
+end)
+
+test("grants: cosmetics, finishers and titles are recorded and are safe to grant twice", function()
+	local d = freshSave()
+	local g = { { Kind = "Cosmetic", Id = "Void" }, { Kind = "Finisher", Id = "Celestial" }, { Kind = "Title", Title = "Boss Hunter" } }
+	Grants.Apply(d, g, 0, 1)
+	Grants.Apply(d, g, 0, 1)
+	eq(d.Cosmetics.Owned.Void, true, "blast color")
+	eq(d.Finishers.Owned.Celestial, true, "finisher")
+	eq(d.Mastery.Extra["Boss Hunter"], true, "title")
+end)
+
+test("grants: invalid grants are ignored entirely (nothing half-applied)", function()
+	local d = freshSave()
+	local before = d.Shards
+	local bad = {
+		{ Kind = "Shards", Amount = -5 }, { Kind = "Shards", Amount = 0 / 0 }, { Kind = "Shards", Amount = math.huge },
+		{ Kind = "Boost", Boost = "Bogus", Mult = 2, Seconds = 60 }, { Kind = "Boost", Boost = "Shards", Mult = 1, Seconds = 60 }, { Kind = "Boost", Boost = "Shards", Mult = 2, Seconds = 0 },
+		{ Kind = "Tokens", Token = "Revive", Count = 1.5 }, { Kind = "Tokens", Token = "Gold", Count = 1 }, { Kind = "Tokens", Token = "Revive", Count = 0 },
+		{ Kind = "Cosmetic", Id = "" }, { Kind = "Finisher" }, { Kind = "Title", Title = "" }, { Kind = "Title", Title = string.rep("x", 25) },
+		{ Kind = "Teleport" }, {}, "junk",
+	}
+	local msgs = Grants.Apply(d, bad, 0, 1)
+	eq(#msgs, 0, "nothing applied")
+	eq(d.Shards, before, "shards unchanged")
+	eq(d.Inventory.Revive + d.Inventory.Charge, 0, "no tokens")
+	eq(next(d.Finishers.Owned), nil, "no finishers")
+	for _, g in bad do eq(Grants.Valid(g), false, "invalid") end
+end)
+
+test("grants: a finisher can be worn only if owned (the default always is) and known", function()
+	local d = freshSave()
+	eq(Grants.EquipFinisher(d, "Celestial", FinCfg), false, "not owned")
+	eq(d.Finishers.Equipped, "Gold", "unchanged")
+	Grants.Apply(d, { { Kind = "Finisher", Id = "Celestial" } }, 0, 1)
+	eq(Grants.EquipFinisher(d, "Celestial", FinCfg), true, "owned now")
+	eq(d.Finishers.Equipped, "Celestial", "worn")
+	eq(Grants.EquipFinisher(d, "Gold", FinCfg), true, "the default is always available")
+	eq(Grants.EquipFinisher(d, "Bogus", FinCfg), false, "unknown")
+	d.Finishers.Owned.Bogus = true
+	eq(Grants.EquipFinisher(d, "Bogus", FinCfg), false, "owned but not a real finisher")
+	eq(Grants.EquipFinisher(d, 7, FinCfg), false, "junk")
+	eq(Grants.EquipFinisher(d, nil, FinCfg), false, "nil")
+end)
+
+test("mastery: purchased titles can be worn like earned ones, and are listed after them in a stable order", function()
+	local m = { Done = {}, Title = "", Extra = { ["Zeta Title"] = true, ["Alpha Title"] = true } }
+	local titles = Mastery.Titles(m, MasteryCfg)
+	eq(titles[1], "Alpha Title", "sorted")
+	eq(titles[2], "Zeta Title", "sorted")
+	eq(Mastery.Equip(m, "Zeta Title", MasteryCfg), true, "a purchased title can be worn")
+	eq(m.Title, "Zeta Title", "worn")
+	eq(Mastery.Equip(m, "Not Owned", MasteryCfg), false, "an unowned one cannot")
+end)
+
+test("offers: config is valid (no invented ids, valid grants, real cosmetics and finishers, ordered tiers)", function()
+	local seen = {}
+	local tierRank = {}
+	for i, t in Products.TierOrder do tierRank[t] = i end
+	local CATEGORIES = { Boosts = true, Support = true, Finishers = true, Bundles = true }
+	local shopStyles, finisherIds = {}, {}
+	for _, d in CosCfg.Defs do shopStyles[d.Id] = true end
+	for _, d in FinCfg.Defs do finisherIds[d.Id] = true end
+	eq(#Products.OfferOrder, (function() local n = 0 for _ in Products.Offers do n += 1 end return n end)(), "order lists every offer")
+	local lastRank, lastPrice = 0, 0
+	for _, key in Products.OfferOrder do
+		local o = Products.Offers[key]
+		eq(o ~= nil, true, key .. " exists")
+		eq(seen[key], nil, "duplicate " .. key) seen[key] = true
+		eq(o.Id, nil, key .. " must not have an invented product id")
+		eq(type(o.Name) == "string" and type(o.Description) == "string", true, key .. " text")
+		eq(CATEGORIES[o.Category], true, key .. " category")
+		eq(tierRank[o.Tier] ~= nil, true, key .. " tier")
+		eq(tierRank[o.Tier] >= lastRank, true, key .. " is listed in ascending tier order")
+		eq(o.PriceHint >= lastPrice or tierRank[o.Tier] > lastRank, true, key .. " price hint does not go backwards inside a tier")
+		lastRank, lastPrice = tierRank[o.Tier], o.PriceHint
+		eq(#o.Grants > 0, true, key .. " gives something")
+		for _, g in o.Grants do
+			eq(Grants.Valid(g), true, key .. " has a valid grant")
+			if g.Kind == "Cosmetic" then eq(shopStyles[g.Id], true, key .. " grants a real blast color") end
+			if g.Kind == "Finisher" then eq(finisherIds[g.Id] and g.Id ~= FinCfg.DefaultId, true, key .. " grants a real, non-default finisher") end
+		end
+	end
+	local floors = { Tiny = 5, Small = 49, Medium = 149, Large = 399, Premium = 999 }
+	local ceilings = { Tiny = 25, Small = 99, Medium = 299, Large = 799, Premium = 1e9 }
+	for _, o in Products.Offers do
+		eq(o.PriceHint >= floors[o.Tier] and o.PriceHint <= ceilings[o.Tier], true, o.Name .. " price hint sits in its tier's range")
+	end
+	eq(Products.Club.SubscriptionId, nil, "the subscription id is not invented")
+	eq(Products.Club.MonthlyShards > 0 and #Products.Club.Title <= 24, true, "club config")
+end)
+
+test("offers: no offer id collides with a shard pack, cosmetic product or pass key, and shop finishers are all sold somewhere", function()
+	for key in Products.Offers do
+		eq(Products.DeveloperProducts[key], nil, key .. " also a shard pack")
+		eq(Products.CosmeticProducts[key], nil, key .. " also a cosmetic product")
+		eq(Products.Gamepasses[key], nil, key .. " also a pass")
+	end
+	local sold = {}
+	for _, o in Products.Offers do for _, g in o.Grants do if g.Kind == "Finisher" then sold[g.Id] = true end end end
+	for _, d in FinCfg.Defs do if d.Shop then eq(sold[d.Id], true, d.Id .. " finisher is for sale") end end
+end)
+
+test("schema: v12 saves migrate to v13 with boosts, tokens, finishers and club records", function()
+	local d = Schema.Migrate({ SchemaVersion = 12, Shards = 4, Mastery = { Done = { TitanSwift = true }, Title = "Speed Blaster" } })
+	eq(d.Shards, 4, "shards kept")
+	eq(d.Mastery.Done.TitanSwift, true, "mastery kept")
+	eq(d.Mastery.Title, "Speed Blaster", "title kept")
+	eq(type(d.Mastery.Extra), "table", "extra titles added")
+	eq(d.Boosts.Shards.Until, 0, "no boost")
+	eq(d.Inventory.Revive, 0, "no tokens")
+	eq(d.Finishers.Equipped, "Gold", "default finisher")
+	eq(d.Club.LastMonth, 0, "club unclaimed")
+	eq(Schema.CURRENT_VERSION, 13, "version")
+end)
+
+test("grants: adding a weaker boost never weakens a running one, and one huge purchase is capped from the start", function()
+	local d = freshSave()
+	Grants.Apply(d, { { Kind = "Boost", Boost = "Shards", Mult = 3, Seconds = 600 } }, 100, 1)
+	Grants.Apply(d, { { Kind = "Boost", Boost = "Shards", Mult = 2, Seconds = 600 } }, 100, 1)
+	eq(Grants.BoostMult(d.Boosts, "Shards", 100), 3, "still the stronger one")
+	local big = freshSave()
+	Grants.Apply(big, { { Kind = "Boost", Boost = "Luck", Mult = 2, Seconds = 999999 } }, 100, 1)
+	eq(Grants.BoostRemaining(big.Boosts, "Luck", 100), Grants.BOOST_CAP_SECONDS, "capped even when fresh")
+end)
+
+test("mastery: a title flagged false in the purchased list is not offered", function()
+	local m = { Done = {}, Title = "", Extra = { Gone = false, Kept = true } }
+	local titles = Mastery.Titles(m, MasteryCfg)
+	eq(#titles, 1, "only the owned one")
+	eq(titles[1], "Kept", "kept")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

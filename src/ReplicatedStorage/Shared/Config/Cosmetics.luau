@@ -15,5 +15,8 @@ return {
 		{ Id = "Royal", Name = "Royal", Color = { 190, 130, 255 }, UnlockGoal = "Chain2" },
 		{ Id = "Solar", Name = "Solar", Color = { 255, 230, 120 }, UnlockGoal = "Earn2" },
 		{ Id = "NeonPink", Name = "Neon Pink", Color = { 255, 80, 200 }, Shop = true },
+		{ Id = "Void", Name = "Void", Color = { 150, 80, 255 }, Shop = true },
+		{ Id = "Toxic", Name = "Toxic", Color = { 140, 255, 60 }, Shop = true },
+		{ Id = "Golden", Name = "Golden", Color = { 255, 215, 0 }, Shop = true },
 	} :: { Def },
 }

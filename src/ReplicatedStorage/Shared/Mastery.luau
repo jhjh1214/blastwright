@@ -50,6 +50,16 @@ function Mastery.Titles(mastery: any, cfg: any): { string }
 			table.insert(out, obj.Title)
 		end
 	end
+	local extra = {}
+	for title, owned in mastery.Extra or {} do -- titles from purchases
+		if owned == true then
+			table.insert(extra, title)
+		end
+	end
+	table.sort(extra)
+	for _, title in extra do
+		table.insert(out, title)
+	end
 	return out
 end
 

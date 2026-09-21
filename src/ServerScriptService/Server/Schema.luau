@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 12
+Schema.CURRENT_VERSION = 13
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -22,7 +22,11 @@ function Schema.Default(): { [string]: any }
 		Puzzle = { Day = 0, Score = 0, Par = 0, Medal = "", Streak = 0, LastDay = 0, BestStreak = 0 }, -- see Shared/Puzzle.luau
 		Farm = { Level = 1, LastCollect = 0 }, -- see Shared/Farm.luau (LastCollect 0 = stamped with the time on first load)
 		Collection = { Lurkers = {}, Bosses = {}, Relics = {} }, -- see Shared/Mastery.luau: kill counts and relics found
-		Mastery = { Done = {}, Title = "" }, -- boss mastery objectives done and the title worn
+		Mastery = { Done = {}, Title = "", Extra = {} }, -- boss mastery objectives done, the title worn, and titles from purchases
+		Boosts = { Shards = { Until = 0, Mult = 1 }, Luck = { Until = 0, Mult = 1 } }, -- timed boosts (Shared/Grants.luau)
+		Inventory = { Revive = 0, Charge = 0 }, -- consumable tokens
+		Finishers = { Owned = {}, Equipped = "Gold" }, -- boss-defeat effects
+		Club = { LastMonth = 0 }, -- last UTC month the subscription allotment was claimed
 		Purchases = {}, -- receipt ids, reserved for monetization
 	}
 end
@@ -101,6 +105,12 @@ local Migrations: { [number]: (data: { [string]: any }) -> () } = {
 		end
 		if type(data.Mastery) ~= "table" then
 			data.Mastery = { Done = {}, Title = "" }
+		end
+	end,
+	-- v13: monetization records (boosts, tokens, finishers, purchased titles, club claim). Filled from defaults by reconcile.
+	[13] = function(data)
+		if type(data.Mastery) == "table" and type(data.Mastery.Extra) ~= "table" then
+			data.Mastery.Extra = {}
 		end
 	end,
 }
