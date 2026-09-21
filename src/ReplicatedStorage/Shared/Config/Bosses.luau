@@ -24,7 +24,7 @@ return {
 			Name = "Prism Warden",
 			Description = "A tower of living prism. It calls down meteors and corrupts your crystals. Keep a Lensglass ready.",
 			MaxHP = 36,
-			Bounty = 12000,
+			Bounty = 4000,
 			Core = { X = 5, Z = 5 },
 			Nodes = 5,
 			ArmorBreakDamage = 6,
@@ -63,7 +63,7 @@ return {
 			Name = "Crystal Titan",
 			Description = "A colossus grown into the mine. Break its armor nodes, then out-chain it.",
 			MaxHP = 30,
-			Bounty = 6000, -- shards added to the haul when it falls
+			Bounty = 2000, -- shards added to the haul when it falls
 			Core = { X = 5, Z = 5 }, -- the 3x3 body in the middle of the grid; charges must reach it
 			Nodes = 4, -- armor nodes (crystals) that must be popped in phase 1
 			ArmorBreakDamage = 6,

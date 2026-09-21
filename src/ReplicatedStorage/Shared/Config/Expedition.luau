@@ -28,8 +28,8 @@ return {
 	Floors = 8,
 	ClearToAdvance = 0.5, -- fraction of valuable crystals cleared that lets you survive a floor with no charges left
 	SalvageFraction = 0.4, -- share of the haul kept after a collapse
-	DepthBonusPerFloor = 0.15, -- banking pays this much extra per floor cleared
-	VictoryBonus = 1.5, -- extra multiplier for clearing the final floor
+	DepthBonusPerFloor = 0.06, -- banking pays this much extra per floor cleared
+	VictoryBonus = 1.25, -- extra multiplier for clearing the final floor
 	BossFloors = { [4] = true, [8] = true }, -- must match Config/Bosses.BossFloors (a test checks it)
 
 	Routes = {

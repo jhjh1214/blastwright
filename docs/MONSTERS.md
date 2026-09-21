@@ -31,7 +31,7 @@ Pure phase machine in `Shared/Boss.luau`; numbers in `Config/Bosses.luau`. The 3
 3. **WEAK POINTS** (HP 65%): two magenta weak points appear on far-apart crystals. One hit is good, chaining through BOTH is massive (x3).
 4. **ENRAGE** (HP 35%): two lines marked every turn.
 5. **FINISHER** (HP 15%): one chain of 12+ pops, or any Critical-power volley, ends it. A failed try heals it a little.
-Each phase change refunds a charge. Defeat = the Expedition collapses; victory pays a 6,000 shard bounty into the haul, the "Titan Slayer" goals, and a FINAL BLAST (bursts, rings, camera punch).
+Each phase change refunds a charge. Defeat = the Expedition collapses; victory pays a 2,000 shard bounty (4,000 for the Warden) into the haul, the "Titan Slayer" goals, and a FINAL BLAST (bursts, rings, camera punch).
 Balance evidence (`tools/sim/boss.luau`, greedy one-charge bot, no planning): at 30 HP it wins about 33% with Basic charges only and about 68% with all charges; humans who plan multi-charge volleys should do better. At 60 HP it won 2-4%, so HP was cut.
 
 ## Real-time boss attacks (built; `Shared/BossRT.luau`)
