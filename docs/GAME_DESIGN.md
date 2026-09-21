@@ -27,6 +27,8 @@ Menu > Codex > Blast colors. Styles recolor your planting markers and your deton
 A "Longest Chains" board stands beside the hub spawn: the top 10 best chains across all players (names resolved from Roblox). Your best chain is queued after every volley and written at most every 30 seconds (only improvements are stored); the board refreshes every 90 seconds. It needs a published game with API access; otherwise it says it is unavailable and nothing else is affected. Ranking and text are pure, tested code (`Shared/Board.luau`); the DataStore part (`Server/Leaderboard.luau`) is best-effort and untested.
 
 ## Goals
+**Lurkers.** Hidden monsters make blasting risky: see docs/MONSTERS.md (turn-based fights on the grid, rig hearts, bounties, Expedition collapse on defeat; a real-time boss arena is planned).
+
 **Crystal Farm.** Menu > Farm: a passive income building (6 levels) that fills a store over real time, also while offline (capped at 8 hours) so there is a reason to come back. Upgrading collects first at the old rate. Logic in `Shared/Farm.luau`, save record `Farm` (schema v9); a new farm starts producing when the player first loads after the update.
 
 **Daily Puzzle.** Once per UTC day, Menu > Daily > "Today's puzzle" (stand at any free pad) gives everyone the same grid (`Puzzle.Seed(day)`), 3 Basic charges and exactly one volley. Upgrades, events and relics are ignored so it is fair. The score is compared with "par", the greedy solver's score on that grid (`Puzzle.Par`); medals Bronze/Silver/Gold/Perfect pay shards, with +10% per consecutive day up to 7. Save: `Puzzle` record (schema v8).

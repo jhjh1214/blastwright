@@ -91,7 +91,7 @@ local settingButtons = {}
 local tabButtons = {}
 local toastHolder, tierLabel, chargeColumn, panel, panelScroll, detonateButton
 local roamGroup, blastGroup
-local runLabel, runModal, runCards, runTitle, runBank
+local runLabel, runModal, runCards, runTitle, runBank, rigLabel
 local activeTab = "Forge"
 local displayShards = 0
 local chargeButtons = {}
@@ -173,6 +173,8 @@ function UI.Init()
 	end)
 
 	runLabel = label(blastGroup, "", 15, THEME.Gold, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.fromOffset(240, 54), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, Visible = false })
+
+	rigLabel = label(blastGroup, "", 16, Color3.fromRGB(255, 130, 130), { Position = UDim2.new(0, 14, 0, 112), Size = UDim2.fromOffset(280, 40), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top })
 
 	-- Between-floor choice: three cards and "Bank & leave". Covers the screen while choosing (blasting is paused anyway).
 	runModal = mk("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 20, Active = true }, gui)
@@ -720,6 +722,14 @@ function UI.Refresh()
 	if not gui or not State.Data then return end
 	local d = State.Data
 	seamLabel.Text = ("Charges %d / %d"):format(d.ChargesLeft - #State.Placed, d.ChargesMax)
+	local rig = "Rig " .. string.rep("♥", d.Hearts or 0) .. string.rep("♡", math.max(0, (d.HeartsMax or 0) - (d.Hearts or 0)))
+	if d.Monster then
+		local m = d.Monster
+		rig = ("%s\n%s  %d / %d HP%s"):format(rig, m.Name, m.HP, m.MaxHP, m.Warn and "  (smash next turn!)" or "")
+	elseif d.Tremor then
+		rig = rig .. "\nSomething stirs beneath the rocks..."
+	end
+	rigLabel.Text = rig
 	if d.Puzzle and d.Puzzle.Active then
 		runLabel.Text = "DAILY PUZZLE\nSame grid for everyone. Basic charges only, ONE volley: plant up to " .. Config.Puzzle.Charges .. ", then detonate."
 		runLabel.Size = UDim2.fromOffset(300, 70)

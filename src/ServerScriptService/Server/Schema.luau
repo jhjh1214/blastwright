@@ -2,7 +2,7 @@
 -- Save-data schema: defaults, migration and validation. Pure: no Roblox APIs.
 local Schema = {}
 
-Schema.CURRENT_VERSION = 9
+Schema.CURRENT_VERSION = 10
 
 function Schema.Default(): { [string]: any }
 	return {
@@ -12,7 +12,7 @@ function Schema.Default(): { [string]: any }
 		UnlockedCharges = { Basic = true },
 		Progress = { StrataUnlocked = 1, ActiveStratum = 1 },
 		Codex = { Discovered = {}, Mutated = {} }, -- [crystalId] = true
-		Stats = { SeamsCleared = 0, BestChain = 0, TotalPops = 0, TotalShards = 0, BestDepth = 0, ExpeditionsWon = 0 },
+		Stats = { SeamsCleared = 0, BestChain = 0, TotalPops = 0, TotalShards = 0, BestDepth = 0, ExpeditionsWon = 0, LurkersSlain = 0 },
 		Settings = { Music = true, Sfx = true, Shake = true },
 		Caches = {}, -- [cacheId] = true for geode caches this player has looted
 		Daily = { Day = 0, Progress = {}, Claimed = {} }, -- see Shared/Dailies.luau (string slot keys)
@@ -78,6 +78,12 @@ local Migrations: { [number]: (data: { [string]: any }) -> () } = {
 	[9] = function(data)
 		if type(data.Farm) ~= "table" then
 			data.Farm = { Level = 1, LastCollect = 0 }
+		end
+	end,
+	-- v10: hidden monsters. Adds the number of Lurkers slain to Stats (existing stats untouched).
+	[10] = function(data)
+		if type(data.Stats) == "table" and type(data.Stats.LurkersSlain) ~= "number" then
+			data.Stats.LurkersSlain = 0
 		end
 	end,
 }

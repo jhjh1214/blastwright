@@ -14,6 +14,7 @@ export type Run = {
 	Cleared: number,
 	ValueMult: number, -- the current floor's route multiplier (a Rich Vein makes it 2)
 	Choices: { Card },
+	Hearts: number?, -- rig hearts, owned by the server (Lurker fights); nil until set
 }
 
 local Expedition = {}
@@ -196,6 +197,7 @@ function Expedition.View(run: Run, cfg: any)
 		Charges = run.Charges,
 		Haul = run.Haul,
 		Phase = run.Phase,
+		Hearts = run.Hearts,
 		Relics = relics,
 		Choices = cards,
 		BankNow = Expedition.Bank(run, cfg, false),

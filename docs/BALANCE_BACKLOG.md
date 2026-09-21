@@ -28,3 +28,4 @@ Balancing is deliberately done LAST (developer's call, 2026-09-21). This file co
 
 - Daily Puzzle medal rewards (1.5k/3k/6k/12k, +10%/day streak) and Expedition rewards (depth +15%/floor, x1.5 win, 40% salvage) are unmeasured placeholders; also check whether greedy par is too easy/hard to beat on typical grids (run a sweep over many days).
 - Crystal Farm rates/costs (300-15,000/h, upgrades 4k-280k) are placeholders; compare with career pacing so offline income does not trivialise active play.
+- Lurkers: spawn chance (10%+5%/area+4%/floor), HP, damage values, 3 hearts, 15% repair fee and bounties (400/1000/3000) are placeholders; check that fights are a real decision (not always optimal to ignore, not always a forced loss) with a simulation.

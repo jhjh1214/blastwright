@@ -69,6 +69,20 @@ Remotes.RunState.OnClientEvent:Connect(function(view)
 	State.Changed:Fire("Placed") -- refreshes the preview with the run's modifiers
 end)
 
+Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
+	local view = CavernView.Get(localPlayer.UserId)
+	if not view then
+		return
+	end
+	for _, e in turn.Eaten do
+		CavernView.Eat(view, e.X, e.Z)
+	end
+	CavernView.SetMonster(view, turn.Monster)
+	if turn.Emerged or turn.Slain or turn.HeartsLost or #turn.Eaten > 0 then
+		CameraFeedback.Shake(turn.HeartsLost and 1.4 or 0.8)
+	end
+end)
+
 Remotes.Community.OnClientEvent:Connect(function(view)
 	State.Community, State.CommunityAt = view, os.clock()
 	UI.SetCommunity(view, State.CommunityAt)

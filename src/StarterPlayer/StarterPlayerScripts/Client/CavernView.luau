@@ -260,6 +260,70 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
+-- A Lurker on the grid: a dark body with a name and health bar, moved between cells. monster = nil removes it.
+function CavernView.SetMonster(view, monster)
+	if not monster then
+		if view.MonsterPart then
+			view.MonsterPart:Destroy()
+			view.MonsterPart = nil
+		end
+		return
+	end
+	if not view.MonsterPart then
+		local body = Instance.new("Part")
+		body.Name = "Lurker"
+		body.Shape = Enum.PartType.Ball
+		body.Size = Vector3.new(4.2, 4.2, 4.2)
+		body.Anchored = true
+		body.CanCollide = false
+		body.CanQuery = false
+		body.Material = Enum.Material.Slate
+		body.Color = Color3.fromRGB(70, 30, 40)
+		body.Parent = view.Folder
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "Tag"
+		gui.Size = UDim2.fromOffset(150, 46)
+		gui.StudsOffset = Vector3.new(0, 4, 0)
+		gui.AlwaysOnTop = true
+		gui.Parent = body
+		local name = Instance.new("TextLabel")
+		name.Name = "Name"
+		name.BackgroundTransparency = 1
+		name.Size = UDim2.new(1, 0, 0, 22)
+		name.Font = Enum.Font.GothamBold
+		name.TextSize = 16
+		name.TextColor3 = Color3.fromRGB(255, 120, 120)
+		name.TextStrokeTransparency = 0.4
+		name.Parent = gui
+		local back = Instance.new("Frame")
+		back.Name = "Back"
+		back.Position = UDim2.fromOffset(15, 26)
+		back.Size = UDim2.fromOffset(120, 10)
+		back.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+		back.BorderSizePixel = 0
+		back.Parent = gui
+		local fill = Instance.new("Frame")
+		fill.Name = "Fill"
+		fill.Size = UDim2.fromScale(1, 1)
+		fill.BackgroundColor3 = Color3.fromRGB(230, 70, 70)
+		fill.BorderSizePixel = 0
+		fill.Parent = back
+		view.MonsterPart = body
+	end
+	local body = view.MonsterPart
+	body.Position = Geometry.CellPosition(view.Origin, monster.X, monster.Z) + Vector3.new(0, 2.6, 0)
+	local gui = body:FindFirstChild("Tag")
+	gui.Name.Text = monster.Warn and (monster.Kind .. "  !! SMASH NEXT !!") or monster.Kind
+	gui.Back.Fill.Size = UDim2.fromScale(math.clamp(monster.HP / monster.MaxHP, 0, 1), 1)
+end
+
+-- An eaten crystal disappears without a chain.
+function CavernView.Eat(view, x, z)
+	local key = (z - 1) * view.Size + x
+	view.Grid.Cells[key] = nil
+	CavernView.Pop(view, key)
+end
+
 -- Visual pop only; grid removal is handled by the caller (Playback).
 function CavernView.Pop(view, key)
 	local model = view.Models[key]

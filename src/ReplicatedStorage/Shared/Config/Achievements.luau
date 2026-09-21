@@ -41,6 +41,9 @@ return {
 		goal("Dive2", "Abyss Walker", "Reach floor 6 of an Expedition.", "BestDepth", 6, 7500),
 		goal("Won1", "Expedition Complete", "Clear every floor of an Expedition.", "ExpeditionsWon", 1, 5000),
 		goal("Won2", "Veteran Explorer", "Complete 5 Expeditions.", "ExpeditionsWon", 5, 20000),
+		goal("Slay1", "Monster Hunter", "Slay 5 Lurkers.", "LurkersSlain", 5, 3000),
+		goal("Slay2", "Lurker Bane", "Slay 25 Lurkers.", "LurkersSlain", 25, 15000),
+		goal("Slay3", "Terror of the Deep", "Slay 100 Lurkers.", "LurkersSlain", 100, 60000),
 		goal("Won3", "Legend of the Deep", "Complete 25 Expeditions.", "ExpeditionsWon", 25, 75000),
 
 		goal("Area1", "Going Deeper", "Unlock the second mine area.", "Strata", 2, 2500),

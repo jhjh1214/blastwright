@@ -752,7 +752,7 @@ local function serverData(over)
 end
 
 test("goals: config is valid, unique, increasing within a stat, and reachable", function()
-	local KNOWN = { TotalPops = true, BestChain = true, SeamsCleared = true, TotalShards = true, Caches = true, Codex = true, Prismatic = true, Strata = true, BestDepth = true, ExpeditionsWon = true }
+	local KNOWN = { TotalPops = true, BestChain = true, SeamsCleared = true, TotalShards = true, Caches = true, Codex = true, Prismatic = true, Strata = true, BestDepth = true, ExpeditionsWon = true, LurkersSlain = true }
 	local valued = 0
 	for _, def in Crystals.Defs do if def.Value > 0 then valued += 1 end end
 	local limit = {
@@ -1972,7 +1972,7 @@ test("farm: schema v9 gives old saves a level-1 farm that starts now-ish", funct
 	eq(d.Shards, 7, "shards kept")
 	eq(d.Farm.Level, 1, "level")
 	eq(d.Farm.LastCollect, 0, "no backpay: server stamps the time on load")
-	eq(Schema.CURRENT_VERSION, 9, "version")
+	eq(Schema.CURRENT_VERSION >= 9, true, "version")
 end)
 
 local Lurker = require("../../src/ReplicatedStorage/Shared/Lurker")
@@ -2150,6 +2150,15 @@ test("lurker: a Gnasher heads for the NEAREST crystal, not the first one it find
 	Lurker.Act(m, g, lctx, LurkerCfg)
 	eq(m.X, 6, "east toward the near one")
 	eq(m.Z, 5, "same row")
+end)
+
+test("schema: v9 saves migrate to v10 with a slain counter and keep every other stat", function()
+	local d = Schema.Migrate({ SchemaVersion = 9, Stats = { TotalPops = 50, BestDepth = 4 } })
+	eq(d.Stats.LurkersSlain, 0, "slain defaults to 0")
+	eq(d.Stats.TotalPops, 50, "existing stat kept")
+	eq(d.Stats.BestDepth, 4, "existing stat kept")
+	eq(Schema.CURRENT_VERSION, 10, "version")
+	eq(Schema.Default().Stats.LurkersSlain, 0, "new profiles start at 0")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

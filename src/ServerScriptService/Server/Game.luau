@@ -18,6 +18,7 @@ local Events = require(Shared.Events)
 local Expedition = require(Shared.Expedition)
 local Puzzle = require(Shared.Puzzle)
 local Farm = require(Shared.Farm)
+local Lurker = require(Shared.Lurker)
 local Data = require(script.Parent.Data)
 local Leaderboard = require(script.Parent.Leaderboard)
 local Purchases = require(script.Parent.Purchases)
@@ -41,6 +42,7 @@ local CommunityConfig = Config.Community
 local ExpeditionConfig = Config.Expedition
 local PuzzleConfig = Config.Puzzle
 local FarmConfig = Config.Farm
+local LurkerConfig = Config.Lurkers
 
 local BUY_COOLDOWN = 0.2
 local DETONATE_COOLDOWN = 0.15
@@ -63,6 +65,10 @@ type SeamState = {
 	InFlight: boolean,
 	Run: Expedition.Run?, -- set while this seam is a floor of an Expedition
 	Puzzle: { Day: number, Par: number }?, -- set while this seam is the Daily Puzzle
+	Hearts: number, -- rig hearts left (an Expedition keeps them in Run.Hearts)
+	Hidden: { Kind: string, X: number, Z: number }?, -- a Lurker hiding under a crystal: SECRET, never sent to clients
+	Monster: Lurker.Monster?, -- an awake Lurker on the grid
+	Defeated: boolean?, -- the rig was knocked out
 }
 
 local Game = {}
@@ -191,6 +197,14 @@ local function snapshot(player: Player): { [string]: any }?
 		Stats = data.Stats,
 		ChargesLeft = seam and seam.Charges or 0,
 		ChargesMax = seam and seam.ChargesMax or 0,
+		Hearts = seam and seam.Hearts or 0,
+		HeartsMax = LurkerConfig.Hearts,
+		Monster = seam and seam.Monster and (function()
+			local m = seam.Monster
+			local def = LurkerConfig.Defs[m.Kind]
+			return { Kind = m.Kind, Name = def.Name, Description = def.Description, X = m.X, Z = m.Z, HP = m.HP, MaxHP = m.MaxHP, Warn = Lurker.Telegraph(m, LurkerConfig) }
+		end)() or nil,
+		Tremor = seam ~= nil and seam.Hidden ~= nil and upgradeLevel(data, "Seismograph") > 0, -- Seismograph owners feel that something stirs (not where)
 		Farm = (function()
 			local f = data.Farm
 			local now = os.time()
@@ -314,6 +328,17 @@ local function startSeam(player: Player, run: Expedition.Run?, puzzle: { Day: nu
 		Valuable = Seam.CountValuable(grid, Crystals),
 		InFlight = false,
 	}
+	if run then
+		run.Hearts = run.Hearts or LurkerConfig.Hearts
+		seam.Hearts = run.Hearts
+	elseif puzzle then
+		seam.Hearts = LurkerConfig.Hearts
+	else
+		seam.Hearts = LurkerConfig.Hearts
+	end
+	if not puzzle and runRandom:NextNumber() < Lurker.SpawnChance(stratum, run and run.Floor or 0, LurkerConfig) then
+		seam.Hidden = Lurker.Hide(grid, { Crystals = Config.Context.Crystals }, Lurker.PickKind(stratum, runRandom:NextNumber(), LurkerConfig), runRandom:NextNumber())
+	end
 	seams[player] = seam
 	Remotes.SeamStart:FireAllClients(seamPayload(player, seam))
 	sendRunState(player)
@@ -419,7 +444,11 @@ local function endFloor(player: Player, seam: SeamState)
 		return
 	end
 	local fraction = seam.Valuable > 0 and seam.Popped / seam.Valuable or 1
-	local outcome = Expedition.FloorEnded(run, seam.Earned, fraction, seam.Charges, runRng, ExpeditionConfig)
+	if seam.Defeated then
+		fraction = 0 -- a knocked-out rig collapses the run
+	end
+	run.Hearts = seam.Hearts
+	local outcome = Expedition.FloorEnded(run, seam.Earned, fraction, seam.Defeated and 0 or seam.Charges, runRng, ExpeditionConfig)
 	data.Stats.BestDepth = math.max(data.Stats.BestDepth, run.Floor)
 
 	if outcome == "Choose" then
@@ -450,7 +479,11 @@ local function endSeam(player: Player, seam: SeamState)
 		return endFloor(player, seam)
 	end
 	local fraction = seam.Valuable > 0 and seam.Popped / seam.Valuable or 1
-	if fraction >= Tuning.ClearBonusMinFraction then
+	if seam.Defeated then
+		local fee = math.min(data.Shards, Lurker.RepairFee(seam.Earned, LurkerConfig))
+		data.Shards -= fee
+		notify(player, ("Your rig was knocked out! Repairs cost %d shards. No clear bonus."):format(fee), "Error")
+	elseif fraction >= Tuning.ClearBonusMinFraction then
 		local bonus = math.floor(seam.Earned * Tuning.ClearBonusRate * fraction)
 		data.Shards += bonus
 		data.Stats.TotalShards += bonus
@@ -467,6 +500,68 @@ local function endSeam(player: Player, seam: SeamState)
 			startSeam(player)
 		end
 	end)
+end
+
+-- After a volley has played out: wake a hidden Lurker whose crystal popped, hurt the awake one, then let it act.
+-- Everything is decided here on the server; the client only receives the outcome (MonsterTurn).
+local function resolveMonster(player: Player, seam: SeamState, volley: any, result: any)
+	local data = Data.Get(player)
+	if not data or (not seam.Hidden and not seam.Monster) then
+		return
+	end
+	local mctx = { Crystals = Config.Context.Crystals, Charges = Config.Context.Charges, BlastCells = ChainSim.BlastCells, Size = seam.Grid.Size }
+	local turn = { UserId = player.UserId, Eaten = {}, Hearts = seam.Hearts }
+
+	if seam.Hidden and Lurker.Revealed(seam.Hidden, result.Events) then
+		-- Its crystal popped: it bursts out and stays put this turn (no free hit on the player).
+		seam.Monster = Lurker.New(seam.Hidden.Kind, seam.Hidden.X, seam.Hidden.Z, LurkerConfig)
+		seam.Hidden = nil
+		turn.Emerged = true
+		notify(player, ("A %s burst out of the rock! %s"):format(LurkerConfig.Defs[seam.Monster.Kind].Name, LurkerConfig.Defs[seam.Monster.Kind].Description), "Error")
+	elseif seam.Monster then
+		local m = seam.Monster
+		local damage = Lurker.Damage(m, volley, result, mctx, LurkerConfig)
+		turn.Damage = damage
+		if not Lurker.Hit(m, damage) then
+			local bounty = Lurker.Bounty(m.Kind, LurkerConfig)
+			if seam.Run then
+				seam.Earned += bounty -- on an Expedition the bounty joins the haul
+			else
+				award(data, bounty)
+				seam.Earned += bounty
+			end
+			data.Stats.LurkersSlain += 1
+			turn.Slain = { X = m.X, Z = m.Z, Bounty = bounty }
+			notify(player, ("%s slain! +%d shards"):format(LurkerConfig.Defs[m.Kind].Name, bounty), "Reward")
+			seam.Monster = nil
+			announceGoals(player)
+		else
+			local act = Lurker.Act(m, seam.Grid, mctx, LurkerConfig)
+			for _, e in act.Eaten do
+				table.insert(turn.Eaten, { X = e.X, Z = e.Z })
+			end
+			if act.ChargesDrained > 0 then
+				seam.Charges = math.max(0, seam.Charges - act.ChargesDrained)
+				turn.Drained = act.ChargesDrained
+			end
+			if act.HeartsLost > 0 then
+				seam.Hearts = math.max(0, seam.Hearts - act.HeartsLost)
+				turn.HeartsLost = act.HeartsLost
+				notify(player, ("The %s smashed your rig! Hearts left: %d"):format(LurkerConfig.Defs[m.Kind].Name, seam.Hearts), "Error")
+			end
+			if #act.Eaten > 0 then
+				notify(player, ("The %s ate %d crystal%s!"):format(LurkerConfig.Defs[m.Kind].Name, #act.Eaten, #act.Eaten > 1 and "s" or ""), "Error")
+			end
+			if seam.Hearts <= 0 then
+				seam.Defeated = true
+			end
+		end
+	end
+
+	turn.Hearts = seam.Hearts
+	turn.Monster = seam.Monster and { Kind = seam.Monster.Kind, X = seam.Monster.X, Z = seam.Monster.Z, HP = seam.Monster.HP, MaxHP = seam.Monster.MaxHP, Warn = Lurker.Telegraph(seam.Monster, LurkerConfig) } or nil
+	Remotes.MonsterTurn:FireClient(player, turn)
+	sync(player)
 end
 
 local function onDetonate(player: Player, payload: any)
@@ -585,10 +680,13 @@ local function onDetonate(player: Player, payload: any)
 		if seams[player] ~= seam then
 			return
 		end
+		resolveMonster(player, seam, volley, result)
 		seam.InFlight = false
 		local remaining = Seam.CountValuable(seam.Grid, Crystals)
-		if seam.Charges <= 0 or remaining == 0 then
+		if seam.Defeated or seam.Charges <= 0 or (remaining == 0 and not seam.Monster) then
 			endSeam(player, seam)
+		else
+			sync(player)
 		end
 	end)
 end
@@ -874,6 +972,7 @@ local function onRunPick(player: Player, choice: any)
 		return
 	end
 	if Expedition.Pick(run, choice, ExpeditionConfig) then
+		run.Hearts = math.min(LurkerConfig.Hearts, (run.Hearts or LurkerConfig.Hearts) + 1) -- a breather between floors
 		startSeam(player, run) -- descend: generates the next floor and tells everyone
 	end
 end
