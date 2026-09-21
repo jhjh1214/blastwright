@@ -1664,6 +1664,7 @@ test("expedition: picking a card applies its route and relic and descends", func
 	local function findCard(run, route) for i, c in run.Choices do if c.Route == route then return i end end end
 	local run = startRun(4)
 	Expedition.FloorEnded(run, 100, 0.9, 2, lcg(7), ExpCfg)
+	for _, c in run.Choices do c.Room = "Mining" end -- isolate the route: rooms are tested separately
 	local steady = findCard(run, "Steady")
 	local relic = run.Choices[steady].Relic
 	local extra = relic and ExpCfg.Relics[relic].Modifiers.ExtraCharges or 0 -- Deep Pockets adds a charge on top of the route
@@ -1677,6 +1678,7 @@ test("expedition: picking a card applies its route and relic and descends", func
 
 	local rich = startRun(4)
 	Expedition.FloorEnded(rich, 100, 0.9, 2, lcg(7), ExpCfg)
+	for _, c in rich.Choices do c.Room = "Mining" end -- isolate the route: rooms are tested separately
 	local richCard = findCard(rich, "Rich")
 	local richRelic = rich.Choices[richCard].Relic
 	local richExtra = richRelic and ExpCfg.Relics[richRelic].Modifiers.ExtraCharges or 0
@@ -1686,6 +1688,7 @@ test("expedition: picking a card applies its route and relic and descends", func
 
 	local rest = startRun(4)
 	Expedition.FloorEnded(rest, 100, 0.9, 1, lcg(7), ExpCfg)
+	for _, c in rest.Choices do c.Room = "Mining" end -- isolate the route: rooms are tested separately
 	Expedition.Pick(rest, findCard(rest, "Rest"), ExpCfg)
 	eq(rest.Charges, rest.StartCharges, "rest stop refills to full")
 end)
@@ -1761,7 +1764,7 @@ test("expedition: the client view carries what the HUD, the cards and the previe
 end)
 
 test("expedition: config is valid (routes, relics, rewards)", function()
-	local KNOWN = { AmplifierMult = true, UnstableShield = true, VolatileRadiusBonus = true, RelayValueMult = true, ValueMult = true, MomentumPopsDelta = true, MutationChanceMult = true, ExtraCharges = true }
+	local KNOWN = { AmplifierMult = true, UnstableShield = true, VolatileRadiusBonus = true, RelayValueMult = true, ValueMult = true, MomentumPopsDelta = true, MutationChanceMult = true, ExtraCharges = true, HeartsBonus = true, DamageMult = true, LastStandMult = true, KillRefund = true, CriticalPopsDelta = true, HeartOnCritical = true, BountyMult = true, MonsterHPMult = true }
 	eq(ExpCfg.Floors >= 4 and ExpCfg.Floors <= 12, true, "a run of sensible length")
 	eq(ExpCfg.SalvageFraction > 0 and ExpCfg.SalvageFraction < 1, true, "salvage is a fraction")
 	eq(ExpCfg.ClearToAdvance > 0 and ExpCfg.ClearToAdvance < 1, true, "clear threshold")
@@ -2524,6 +2527,199 @@ test("schema: v10 saves migrate to v11 with a bosses counter and keep every othe
 	eq(d.Stats.LurkersSlain, 7, "existing stat kept")
 	eq(d.Stats.TotalPops, 20, "existing stat kept")
 	eq(Schema.CURRENT_VERSION, 11, "version")
+end)
+
+local BossFloorsCfg = require("../../src/ReplicatedStorage/Shared/Config/Bosses").BossFloors
+
+test("expedition rooms: the boss floors in the expedition config match the boss config exactly", function()
+	for f in ExpCfg.BossFloors do eq(BossFloorsCfg[f] ~= nil, true, "floor " .. f .. " is a boss floor in both") end
+	for f in BossFloorsCfg do eq(ExpCfg.BossFloors[f], true, "floor " .. f .. " listed in the expedition config") end
+	for f in ExpCfg.BossFloors do eq(f <= ExpCfg.Floors, true, "boss floor inside the run") end
+end)
+
+test("expedition rooms: every card shows a room; the descent before a boss offers only the boss", function()
+	local run = startRun()
+	run.Floor = 3 -- next floor is 4, a boss floor
+	for _, c in Expedition.Choices(run, lcg(5), ExpCfg) do eq(c.Room, "Boss", "boss room") end
+	run.Floor = 1
+	for seed = 1, 30 do
+		for _, c in Expedition.Choices(run, lcg(seed), ExpCfg) do
+			eq(ExpCfg.Rooms[c.Room] ~= nil, true, "a real room: " .. tostring(c.Room))
+		end
+	end
+end)
+
+test("expedition rooms: rooms respect their first floor, and three different kinds are offered when enough exist", function()
+	local run = startRun()
+	run.Floor = 1 -- next floor 2: only rooms with MinFloor <= 2
+	for seed = 1, 60 do
+		for _, c in Expedition.Choices(run, lcg(seed), ExpCfg) do
+			eq(ExpCfg.Rooms[c.Room].MinFloor <= 2, true, c.Room .. " is not available on floor 2")
+		end
+	end
+	run.Floor = 5 -- next floor 6: everything is available
+	for seed = 1, 60 do
+		local seen, n = {}, 0
+		for _, c in Expedition.Choices(run, lcg(seed), ExpCfg) do
+			if not seen[c.Room] then seen[c.Room] = true n += 1 end
+		end
+		eq(n, 3, "three distinct rooms")
+	end
+end)
+
+test("expedition rooms: heavier rooms show up more often", function()
+	local run = startRun()
+	run.Floor = 5
+	local counts = {}
+	for seed = 1, 400 do
+		for _, c in Expedition.Choices(run, lcg(seed * 13), ExpCfg) do counts[c.Room] = (counts[c.Room] or 0) + 1 end
+	end
+	eq(counts.Mining > (counts.Chaos or 0) * 2, true, "Mining (weight 4) is far commoner than Chaos (weight 1)")
+	eq((counts.Chaos or 0) > 0, true, "but Chaos does appear")
+	eq(counts.Mining > counts.Treasure and counts.Treasure > counts.Chaos, true, "the ordering follows the weights (4 > 2 > 1)")
+end)
+
+test("expedition rooms: picking a Treasure Vault multiplies payouts and rare-crystal odds for that floor only", function()
+	local run = startRun()
+	Expedition.FloorEnded(run, 100, 0.9, 3, lcg(2), ExpCfg)
+	run.Choices = { { Route = "Steady", Room = "Treasure" } }
+	eq(Expedition.Pick(run, 1, ExpCfg), true, "picked")
+	eq(run.Room, "Treasure", "room recorded")
+	eq(run.ValueMult, 1 * ExpCfg.Rooms.Treasure.ValueMult, "value multiplier from the room")
+	local m = Expedition.Modifiers(run, ExpCfg)
+	eq(m.MutationChanceMult, ExpCfg.Rooms.Treasure.MutationMult, "rare crystals likelier")
+	local fx = Expedition.RoomEffects(run, ExpCfg)
+	eq(fx.NoLurker, true, "nothing hides in a vault")
+	Expedition.FloorEnded(run, 100, 0.9, 3, lcg(2), ExpCfg)
+	run.Choices = { { Route = "Steady", Room = "Mining" } }
+	Expedition.Pick(run, 1, ExpCfg)
+	eq(run.ValueMult, 1, "the bonus does not carry to the next floor")
+	eq(Expedition.Modifiers(run, ExpCfg).MutationChanceMult, 1, "neither does the luck")
+end)
+
+test("expedition rooms: combat and elite rooms wake a Lurker; elite scales it and promises a relic", function()
+	local run = startRun()
+	Expedition.FloorEnded(run, 0, 0.9, 3, lcg(2), ExpCfg)
+	run.Choices = { { Route = "Steady", Room = "Combat" } }
+	Expedition.Pick(run, 1, ExpCfg)
+	local c = Expedition.RoomEffects(run, ExpCfg)
+	eq(c.Awake, true, "awake")
+	eq(c.RelicReward, false, "no relic for a normal nest")
+	Expedition.FloorEnded(run, 0, 0.9, 3, lcg(2), ExpCfg)
+	run.Choices = { { Route = "Steady", Room = "Elite" } }
+	Expedition.Pick(run, 1, ExpCfg)
+	local e = Expedition.RoomEffects(run, ExpCfg)
+	eq(e.Awake, true, "awake")
+	eq(e.HPMult, ExpCfg.Rooms.Elite.HPMult, "tougher")
+	eq(e.BountyMult, ExpCfg.Rooms.Elite.BountyMult, "richer")
+	eq(e.RelicReward, true, "relic reward")
+	eq(Expedition.RoomEffects(startRun(), ExpCfg).Awake, false, "a fresh mining floor has no awake Lurker")
+end)
+
+test("expedition rooms: a Chaos Rift rolls one event by the rng, applies it, and forgets it on the next floor", function()
+	local ids = {}
+	for id in ExpCfg.ChaosEvents do ids[#ids + 1] = id end
+	table.sort(ids)
+	for i, id in ids do
+		local run = startRun(5)
+		Expedition.FloorEnded(run, 0, 0.9, 5, lcg(2), ExpCfg)
+		run.Choices = { { Route = "Steady", Room = "Chaos" } }
+		Expedition.Pick(run, 1, ExpCfg, function() return (i - 0.5) / #ids end)
+		eq(run.Chaos, id, "the rng picks event " .. id)
+		local ev = ExpCfg.ChaosEvents[id]
+		eq(run.ValueMult, (ev.ValueMult or 1), "event value multiplier")
+		eq(run.MutationMult, ev.MutationMult or 1, "event luck")
+		eq(run.Charges, math.max(1, 5 + 1 + (ev.ChargeDelta or 0)), "event charge change on top of the route's +1")
+		eq(Expedition.RoomEffects(run, ExpCfg).Awake, ev.Lurker == true, "event Lurker flag")
+		eq(Expedition.RoomEffects(run, ExpCfg).BountyMult, ev.BountyMult or 1, "event bounty")
+		eq(type(Expedition.View(run, ExpCfg).Chaos), "string", "the HUD gets its name")
+	end
+	local run = startRun(5)
+	Expedition.FloorEnded(run, 0, 0.9, 5, lcg(2), ExpCfg)
+	run.Choices = { { Route = "Steady", Room = "Chaos" } }
+	Expedition.Pick(run, 1, ExpCfg, lcg(9))
+	Expedition.FloorEnded(run, 0, 0.9, 5, lcg(2), ExpCfg)
+	run.Choices = { { Route = "Steady", Room = "Mining" } }
+	Expedition.Pick(run, 1, ExpCfg)
+	eq(run.Chaos, nil, "the event is gone")
+end)
+
+test("expedition rooms: chaos never leaves fewer than one charge", function()
+	local run = startRun(1)
+	Expedition.FloorEnded(run, 0, 0.9, 1, lcg(2), ExpCfg)
+	run.Choices = { { Route = "Rich", Room = "Chaos" } } -- Rich is -1, Frenzy is -2
+	Expedition.Pick(run, 1, ExpCfg, -- 0.5 selects Frenzy (-2 charges)
+		 function() return 0.5 end)
+	eq(run.Charges, 1, "clamped to one charge, not negative")
+end)
+
+test("expedition relics: taking one adds its one-off effects; an Elite reward gives an unowned one and stops when all are owned", function()
+	local run = startRun(4)
+	run.Hearts = 3
+	Expedition.AddRelic(run, "DeepPockets", ExpCfg)
+	eq(run.Charges, 5, "extra charge now")
+	eq(run.StartCharges, 5, "and kept")
+	Expedition.AddRelic(run, "IronRig", ExpCfg)
+	eq(run.Hearts, 4, "extra heart now")
+	eq(Expedition.HeartsBonus(run, ExpCfg), 1, "and remembered as a bonus")
+	local got = Expedition.GrantRelic(run, lcg(4), ExpCfg)
+	eq(got ~= "DeepPockets" and got ~= "IronRig" and ExpCfg.Relics[got] ~= nil, true, "a new relic")
+	eq(#run.Relics, 3, "owned")
+	local n = 0
+	for id in ExpCfg.Relics do n += 1 end
+	for _ = 1, n do Expedition.GrantRelic(run, lcg(4), ExpCfg) end
+	eq(#run.Relics, n, "every relic owned once, no duplicates")
+	eq(Expedition.GrantRelic(run, lcg(4), ExpCfg), nil, "nothing left to give")
+end)
+
+test("expedition relics: the combat relics combine (damage multiplies, last stand takes the best, refunds and bounties add up)", function()
+	local run = startRun()
+	run.Relics = { "ShockwaveCore", "LastStand", "SecondWind", "FocusedLens", "BountyHunter", "VampiricSparks" }
+	local m = Expedition.Modifiers(run, ExpCfg)
+	eq(m.DamageMult, ExpCfg.Relics.ShockwaveCore.Modifiers.DamageMult, "damage")
+	eq(m.LastStandMult, ExpCfg.Relics.LastStand.Modifiers.LastStandMult, "last stand")
+	eq(m.KillRefund, 1, "refund")
+	eq(m.CriticalPopsDelta, -4, "critical sooner")
+	eq(m.BountyMult, 2, "bounty")
+	eq(m.MonsterHPMult, 1.25, "the trade-off")
+	eq(m.HeartOnCritical, 1, "heal on critical")
+	run.Relics = { "ShockwaveCore", "ShockwaveCore" }
+	eq(math.abs(Expedition.Modifiers(run, ExpCfg).DamageMult - 1.3 * 1.3) < 1e-9, true, "stacked damage multiplies")
+	eq(Expedition.Modifiers(startRun(), ExpCfg).DamageMult, 1, "no relics, no bonus")
+end)
+
+test("expedition relics: every relic belongs to a known family and families are all represented", function()
+	local families = {}
+	for id, r in ExpCfg.Relics do families[r.Family] = true end
+	for _, f in { "Echo", "Explosion", "Combo", "Risk" } do eq(families[f], true, "family " .. f) end
+	for id, r in ExpCfg.Relics do eq(type(r.Family) == "string" and r.Family ~= "", true, id .. " has a family") end
+end)
+
+test("expedition rooms: config sanity (weights, first floors, at least one always-available room, chaos events valid)", function()
+	local any = false
+	for id, r in ExpCfg.Rooms do
+		eq(r.Weight > 0 and r.MinFloor >= 1, true, id .. " weight and floor")
+		if r.MinFloor == 1 then any = true end
+		eq(type(r.Name) == "string" and type(r.Description) == "string", true, id .. " text")
+	end
+	eq(any, true, "some room can appear on floor 2")
+	local avail2 = 0
+	for _, r in ExpCfg.Rooms do if r.MinFloor <= 2 then avail2 += 1 end end
+	eq(avail2 >= 3, true, "three kinds are available from floor 2, so the first choice is real")
+	for id, e in ExpCfg.ChaosEvents do
+		eq(type(e.Name) == "string" and type(e.Description) == "string", true, id .. " text")
+		eq(e.ValueMult == nil or e.ValueMult > 0, true, id .. " value")
+	end
+end)
+
+test("power: a relic can lower the Critical Mass threshold, never below one pop", function()
+	eq(Power.StartsCritical(PowerCfg.CriticalPops - 4, PowerCfg, -4), true, "sooner with the lens")
+	eq(Power.StartsCritical(PowerCfg.CriticalPops - 5, PowerCfg, -4), false, "but not sooner than that")
+	eq(Power.StartsCritical(0, PowerCfg, -999), false, "a chain of nothing is never critical")
+	eq(Power.StartsCritical(1, PowerCfg, -999), true, "one pop is the floor")
+	local left, started = Power.Advance(0, PowerCfg.CriticalPops - 2, PowerCfg, -2)
+	eq(left, PowerCfg.CriticalVolleys, "advance honours the shift")
+	eq(started, true, "and reports it")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))

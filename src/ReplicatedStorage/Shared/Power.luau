@@ -14,8 +14,8 @@ function Power.Tier(pops: number, cfg: any): (number, string?)
 	return mult, name
 end
 
-function Power.StartsCritical(pops: number, cfg: any): boolean
-	return pops >= cfg.CriticalPops
+function Power.StartsCritical(pops: number, cfg: any, popsDelta: number?): boolean
+	return pops >= math.max(1, cfg.CriticalPops + (popsDelta or 0))
 end
 
 -- Total damage multiplier for a volley: its own tier times Critical Mass if it is already running.
@@ -28,8 +28,8 @@ function Power.Multiplier(pops: number, criticalLeft: number, cfg: any): number
 end
 
 -- Advance Critical Mass after a volley resolved. Returns the new volleys-left and whether it just (re)started.
-function Power.Advance(criticalLeft: number, pops: number, cfg: any): (number, boolean)
-	if Power.StartsCritical(pops, cfg) then
+function Power.Advance(criticalLeft: number, pops: number, cfg: any, popsDelta: number?): (number, boolean)
+	if Power.StartsCritical(pops, cfg, popsDelta) then
 		return cfg.CriticalVolleys, criticalLeft <= 0
 	end
 	return math.max(0, criticalLeft - 1), false
