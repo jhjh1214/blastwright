@@ -13,7 +13,9 @@ local BASE_FOV = 60
 -- the charge and Detonate buttons. The grid is fitted into what is left, so the HUD never covers it.
 local TOP_RESERVE = 124
 local BOTTOM_RESERVE = 80
-local topReserve = TOP_RESERVE -- grows when the boss/info stack at the top of the screen is showing
+local topReserve = TOP_RESERVE -- eased toward targetTopReserve every frame, so the reserved band never jumps
+local targetTopReserve = TOP_RESERVE -- set instantly by SetTopReserve; the top of the screen can resize often (threat cards,
+-- the combat read text) and snapping the camera to match every time reads as sudden zooming, so only the TARGET snaps
 local PITCH = math.rad(55) -- lower tilt = camera nearer the floor and crystals look more three-dimensional
 local focus = nil -- { Center = Vector3, Extent = number }
 local shake = 0
@@ -61,7 +63,7 @@ end
 
 -- The HUD stack at the top of the screen reports how many pixels it covers, so the grid is fitted below it.
 function CameraFeedback.SetTopReserve(pixels)
-	topReserve = math.max(TOP_RESERVE, math.floor(pixels or 0))
+	targetTopReserve = math.max(TOP_RESERVE, math.floor(pixels or 0))
 end
 
 function CameraFeedback.Punch(degrees)
@@ -82,6 +84,7 @@ function CameraFeedback.Start()
 		end
 		camera.CameraType = Enum.CameraType.Scriptable
 		camera.FieldOfView = BASE_FOV + punch
+		topReserve += (targetTopReserve - topReserve) * math.min(dt * 6, 1) -- ease, never snap: stops the view suddenly zooming
 
 		-- Fit the whole grid on screen for any aspect ratio (portrait phones need more distance).
 		local view = camera.ViewportSize

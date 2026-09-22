@@ -390,8 +390,10 @@ function UI.Init()
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 6,
 		BorderSizePixel = 0,
+		ClipsDescendants = true, -- rows above/below the visible window must never show through; explicit, not just relied on
 		ZIndex = 11,
 	}, kitPanel.Body)
+	kitPanel.Body.ClipsDescendants = true
 	mk("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, panelScroll)
 
 	-- Welcome / how-to-play panel
@@ -649,9 +651,9 @@ local BANNER_COLORS = {
 	avalanche = Color3.fromRGB(238, 92, 72),
 	cataclysm = Color3.fromRGB(226, 84, 196),
 	["critical mass"] = Color3.fromRGB(255, 138, 40),
-	["boss defeated"] = Color3.fromRGB(240, 196, 70),
 }
 
+-- Chain tiers and Critical Mass: quick, frequent, passing banners (never a closable window, they would interrupt play).
 function UI.ShowTier(name, bonus, total)
 	AudioManager.Play("Tier")
 	local key = string.lower(name)
@@ -659,15 +661,21 @@ function UI.ShowTier(name, bonus, total)
 	local subtitle = (bonus and bonus > 0) and ("+%d%% chain bonus"):format(math.floor(bonus * 100 + 0.5)) or nil
 	if key == "critical mass" then
 		subtitle = "Damage and shards up for the next volleys"
-	elseif key == "boss defeated" then
-		subtitle = "Final blast!"
 	end
-	Feed.Banner(string.upper(name), subtitle, color, nil, key == "boss defeated")
+	Feed.Banner(string.upper(name), subtitle, color)
 end
 
 -- Messages go to the feed on the right. "Threat" messages (boss wind-ups) are shown by the boss panel instead, so they only make a sound.
 function UI.ShowReward(title, text, icon, color, sub)
 	Kit.Popup(gui, { Title = title, Text = text, Icon = icon, Color = color, Sub = sub })
+end
+
+-- A boss kill is a big moment: a full window, not a passing banner, so it never overlaps another card and is always
+-- closable at once (tap it or press CONTINUE) instead of waiting for it to fade. Queues with any Mastery reward popup
+-- landing at the same instant (Kit.Popup), so only one full-window card is ever on screen.
+function UI.ShowBossDefeated(bossName)
+	AudioManager.Play("Tier")
+	Kit.Popup(gui, { Title = "VICTORY!", Text = string.upper(bossName) .. " DEFEATED", Sub = "Final blast!", Icon = "Bomb", Color = Color3.fromRGB(240, 196, 70), CloseText = "CONTINUE", Hold = 6 })
 end
 
 function UI.Toast(text, kind)
@@ -781,8 +789,25 @@ local function rebuildPanel()
 	local build = TABS[activeTab] or TABS.Codex
 	build({ d = d, titleLabel = titleLabel, row = row, header = header, label = label, mk = mk, corner = corner, commas = commas, THEME = THEME, button = button, panel = panel, panelScroll = panelScroll })
 	lastRenderedTab = activeTab
-	task.defer(function()
-		panelScroll.CanvasPosition = keepScroll
+	-- Grids and lists finish sizing themselves a frame or two after their children appear (AutomaticSize/AutomaticCanvasSize),
+	-- so restoring the scroll position right away can land past the real content and expose a card from the wrong end. Wait
+	-- for the canvas to stop growing, then clamp to it, instead of trusting the canvas size on the very next frame.
+	local mine = lastRenderedTab
+	task.spawn(function()
+		local settled = panelScroll.AbsoluteCanvasSize.Y
+		for _ = 1, 6 do
+			task.wait()
+			if lastRenderedTab ~= mine or not panel.Visible then
+				return
+			end
+			local now = panelScroll.AbsoluteCanvasSize.Y
+			if now == settled then
+				break
+			end
+			settled = now
+		end
+		local maxY = math.max(0, panelScroll.AbsoluteCanvasSize.Y - panelScroll.AbsoluteWindowSize.Y)
+		panelScroll.CanvasPosition = Vector2.new(0, math.clamp(keepScroll.Y, 0, maxY))
 	end)
 end
 

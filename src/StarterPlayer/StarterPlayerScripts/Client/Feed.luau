@@ -213,7 +213,7 @@ local function playNext()
 end
 
 -- Queue a banner. Long backlogs are trimmed so a chain does not replay stale moments.
--- important = true for banners that must show even in calm mode (boss intro, phases, boss defeated). In calm mode (boss or
+-- important = true for banners that must show even in calm mode (boss intro, phases). In calm mode (boss or
 -- Expedition) other banners are dropped, and the ones that show are smaller and sit higher so the field stays readable.
 function Feed.Banner(title, subtitle, color, hold, important)
 	if not gui then

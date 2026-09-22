@@ -146,7 +146,7 @@ Remotes.MonsterTurn.OnClientEvent:Connect(function(turn)
 					VFX.Ring(view.Origin + Vector3.new(0, 0.4, 0), Color3.fromRGB(fin[1], fin[2], fin[3]), view.Extent * (0.6 + i * 0.25), 0.9)
 				end)
 			end
-			UI.ShowTier("Boss defeated")
+			UI.ShowBossDefeated(turn.BossDefeatedName or "The boss")
 			UI.Flash(Color3.fromRGB(255, 240, 200), 0.6)
 			CameraFeedback.Shake(2)
 			CameraFeedback.Punch(10)

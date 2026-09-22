@@ -405,14 +405,21 @@ end
 -- A reward popup: a chunky centred card with a title ribbon, a big icon, the amount / name, and a green button. It pops in with a
 -- bounce, plays the reward sound and closes itself after a few seconds (or on the button). One at a time.
 -- o: Title, Icon (Icons name), Text (what you got), Sub (small line), Color
+-- Reward popups queue instead of dropping: a Mastery reward and a boss-defeated moment landing in the same instant both get
+-- shown, one after the other, instead of one silently vanishing or the two overlapping on screen.
 local popupOpen = false
+local popupQueue = {}
 function Kit.Popup(parent, o)
 	if popupOpen then
+		if #popupQueue < 3 then
+			table.insert(popupQueue, { parent, o })
+		end
 		return
 	end
 	popupOpen = true
 	local color = o.Color or C.Goals
-	local dim = make("Frame", { Name = "PopupDim", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = Theme.Z.Popup, Active = true }, parent)
+	-- Tapping the dimmed backdrop also closes it (a big, obvious way to dismiss besides the button), never waits it out.
+	local dim = make("TextButton", { Name = "PopupDim", Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = Theme.Z.Popup, Active = true }, parent)
 	local card = make("Frame", { BackgroundColor3 = C.Panel, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(400, 320), ZIndex = Theme.Z.Popup + 1 }, dim)
 	make("UISizeConstraint", { MaxSize = Vector2.new(420, 340) }, card)
 	make("UICorner", { CornerRadius = UDim.new(0, 24) }, card)
@@ -444,13 +451,18 @@ function Kit.Popup(parent, o)
 		tween(dim, Theme.Anim.Close, { BackgroundTransparency = 1 })
 		task.delay(Theme.Anim.Close + 0.02, function()
 			dim:Destroy()
+			local nextCall = table.remove(popupQueue, 1)
+			if nextCall then
+				Kit.Popup(nextCall[1], nextCall[2])
+			end
 		end)
 	end
-	Kit.Button(card, { Size = UDim2.fromOffset(160, 58), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Color = C.Success, Text = "NICE!", TextSize = 28, Depth = 6, Sound = "Close", OnClick = close, ZIndex = Theme.Z.Popup + 4 })
+	dim.Activated:Connect(close)
+	Kit.Button(card, { Size = UDim2.fromOffset(160, 58), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Color = C.Success, Text = o.CloseText or "NICE!", TextSize = 28, Depth = 6, Sound = "Close", OnClick = close, ZIndex = Theme.Z.Popup + 4 })
 	tween(dim, Theme.Anim.Popup, { BackgroundTransparency = 0.45 })
 	tween(scale, Theme.Anim.Popup, { Scale = 1 }, Enum.EasingStyle.Back)
 	SOUNDS.Reward()
-	task.delay(5, close)
+	task.delay(o.Hold or 5, close)
 end
 
 -- A flat thick-outlined card frame (item cards, rows). Returns the frame.

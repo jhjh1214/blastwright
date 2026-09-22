@@ -938,6 +938,7 @@ local function resolveBoss(player: Player, seam: SeamState, volley: any, result:
 			end
 		end
 		turn.BossSlain = true
+		turn.BossDefeatedName = def.Name
 		notify(player, ("%s DEFEATED! +%d shards to the haul"):format(def.Name, reward), "Reward")
 		announceGoals(player)
 	else
