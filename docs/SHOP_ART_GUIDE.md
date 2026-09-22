@@ -1,6 +1,18 @@
 # Shop art guide: replacing the drawn graphics with real painted art
 
-(The complete asset list with a ready-to-paste prompt for every image is in `docs/MANUAL_TODO.md`, section 5.)
+**Update (2026-09-22): the Shop now shows your real product icons automatically.** Every card for a Developer Product or
+Gamepass with an id asks Roblox for that exact item's own icon (`Client/ProductIcons.luau`, via
+`MarketplaceService:GetProductInfo`) — the same image you already uploaded when you created it in the Creator Dashboard.
+You do not need to upload anything a second time or fill in `ShopArt.Images` for these. It fetches once per session,
+caches the result, and shows the drawn art until it arrives (or if the item has no icon yet).
+
+`ShopArt.Images` still exists as an **override**: use it only if you want a different picture in-game than the one on the
+product's dashboard listing. Leave it empty otherwise. It's still the only option for things that are not real
+marketplace items our code can query the same way: the Blastwright Club subscription, and the FREE daily-reward/Track
+cards in the Shop.
+
+(The complete asset list with a ready-to-paste prompt for every image — still useful for the dashboard icons themselves,
+and for the UI icons and thumbnails that have no product to pull from — is in `docs/MANUAL_TODO.md`, section 5.)
 
 The game draws its shop art and icons in code so it always works. You can replace any of them with painted images (from an artist, an AI image tool, or an asset pack) without touching game logic. There are two hooks, each a small table you fill with **real image asset ids**. Anything you leave empty keeps the drawn version, so you can replace things gradually. Never invent an id: only paste ids of images you uploaded yourself.
 

@@ -50,7 +50,13 @@ Read **`docs/SHOP_ART_GUIDE.md`** first for the workflow. This section is the co
 Rules: same tool, same settings and same style prompt for all images; generate 4 to 8 versions of each and pick the best; view at 25% size (it must still read on a phone); check that the tool's licence allows commercial use.
 Palette to stay inside: crystal blue #3A96FF, gold #FFCA28, red #EE3E4E, green #46C660, purple #AA5AFF, orange #FF9228, lime #8ECE3A, dark outline #1A1228.
 
-### 5.A Shop card pictures (23 images, 1024 x 512 PNG, 2:1)
+### 5.A Shop card pictures — now automatic for real products (2026-09-22)
+The Shop pulls each product/pass's own icon straight from its Creator Dashboard listing (see `docs/SHOP_ART_GUIDE.md`). If
+you already set an icon when creating each item, skip this table. Still needs its own art (no product to pull an icon
+from): the Blastwright Club subscription, and the FREE daily-reward/Track cards in the Shop. Everything else below is
+optional now, only for a card you want to look different in-game than its dashboard icon.
+
+### 5.A (reference) all 23 subjects, 1024 x 512 PNG, 2:1
 Paste the master style prompt, then the subject. File name = the product name. Keep the bottom 25% uncluttered (the price and BUY button sit on top).
 
 | # | Product name (exact key) | Subject to add to the prompt |
