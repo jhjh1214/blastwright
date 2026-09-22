@@ -34,7 +34,7 @@ return {
 		DoubleShards = { Id = 3714136283, Name = "2x Shards", Description = "Permanently doubles the shards you earn from blasting." },
 		PrismaticLuck = { Id = 3714136330, Name = "Prismatic Luck", Description = "Doubles the chance that crystals spawn Prismatic (worth 3x)." },
 		BlastwrightPlus = { Id = 3714137935, Name = "Blastwright Plus", Description = "The Blastwright Plus title and a free supply drop every day (3 emergency charges and a revive token). Supports the game; no power, nothing locked." },
-		TrackPremium = { Id = nil, Name = "Track Premium", Description = "Unlocks the premium reward on every level of the Blastwright Track (boosts, tokens, finishers, blast colors and titles), including levels you already reached." },
+		TrackPremium = { Id = 3714138011, Name = "Track Premium", Description = "Unlocks the premium reward on every level of the Blastwright Track (boosts, tokens, finishers, blast colors and titles), including levels you already reached." },
 	} :: { [string]: Gamepass },
 	GamepassOrder = { "DoubleShards", "PrismaticLuck", "BlastwrightPlus", "TrackPremium" },
 

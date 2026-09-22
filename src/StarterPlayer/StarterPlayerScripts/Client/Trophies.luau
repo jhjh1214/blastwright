@@ -14,6 +14,16 @@ local Trophies = {}
 local ORDER = { "Titan", "Warden" }
 local SPACING = 26
 local MODEL_SCALE = 0.55
+-- The hub plaza (Server/World.luau buildHub: a 0.6-thick disc centred at Y=0.15) has its walkable top at Y=0.45. Every
+-- part here is built relative to GROUND, stacked upward with real clearance, so nothing clips into or floats off the
+-- plaza regardless of small mismatches — the earlier version placed things by guesswork and both boards ended up
+-- partly buried.
+local GROUND = 0.45
+local PEDESTAL_H, RING_H = 0.8, 0.4
+local PEDESTAL_TOP = GROUND + PEDESTAL_H + RING_H -- where a statue's feet should land
+-- Creatures.Build makes a model centred on its own origin (see CavernView.luau's GROUND table): this is how far below
+-- that origin each kind's feet sit, so a statue's feet actually meet the pedestal instead of floating or sinking.
+local STATUE_LIFT = { Titan = 4, Warden = 8 }
 
 local stands = {}
 
@@ -81,11 +91,11 @@ function Trophies.Init()
 	local folder = Instance.new("Folder")
 	folder.Name = "TrophyHall"
 	folder.Parent = workspace
-	local center = Vector3.new(hub.X - 34, 0, hub.Z + 4)
+	local center = Vector3.new(hub.X - 34, GROUND, hub.Z + 4)
 	for i, kind in ORDER do
-		local at = center + Vector3.new(0, 0, (i - 1.5) * SPACING)
-		part(folder, Vector3.new(0.8, 14, 14), CFrame.new(at + Vector3.new(0, 0.4, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(70, 62, 96), Enum.Material.Slate, Enum.PartType.Cylinder)
-		part(folder, Vector3.new(0.4, 11, 11), CFrame.new(at + Vector3.new(0, 0.9, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(255, 202, 40), Enum.Material.Neon, Enum.PartType.Cylinder)
+		local at = center + Vector3.new(0, 0, (i - 1.5) * SPACING) -- at.Y = GROUND: every offset below is measured up from here
+		part(folder, Vector3.new(PEDESTAL_H, 14, 14), CFrame.new(at + Vector3.new(0, PEDESTAL_H / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(70, 62, 96), Enum.Material.Slate, Enum.PartType.Cylinder)
+		part(folder, Vector3.new(RING_H, 11, 11), CFrame.new(at + Vector3.new(0, PEDESTAL_H + RING_H / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(255, 202, 40), Enum.Material.Neon, Enum.PartType.Cylinder)
 		local model = Creatures.Build(kind)
 		for _, d in model:GetDescendants() do
 			if d:IsA("BasePart") then
@@ -95,9 +105,13 @@ function Trophies.Init()
 			end
 		end
 		model:ScaleTo(MODEL_SCALE)
-		model:PivotTo(CFrame.new(at + Vector3.new(0, 4.5, 0)) * CFrame.Angles(0, math.rad(90), 0))
+		model:PivotTo(CFrame.new(at + Vector3.new(0, (PEDESTAL_TOP - GROUND) + STATUE_LIFT[kind] * MODEL_SCALE, 0)) * CFrame.Angles(0, math.rad(90), 0))
 		model.Parent = folder
-		local signAt = at + Vector3.new(8, 1.8, 0)
+		-- The sign stands on its own small post so it never depends on guessing the model's height: post foot at GROUND,
+		-- board comfortably above it.
+		local postHeight = 2.4
+		part(folder, Vector3.new(0.5, postHeight, 0.5), CFrame.new(at + Vector3.new(8, postHeight / 2, 0)), Color3.fromRGB(40, 36, 54), Enum.Material.Metal)
+		local signAt = at + Vector3.new(8, postHeight + 1.6, 0)
 		local label = sign(folder, CFrame.lookAt(signAt, signAt + Vector3.new(1, 0, 0)))
 		stands[kind] = { Model = model, Label = label }
 		paint(stands[kind], false, 0, kind)

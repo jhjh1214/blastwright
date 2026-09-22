@@ -18,4 +18,12 @@ if not ok then
 	warn("[Server] World build failed: " .. tostring(err))
 end
 
-require(script.Game).Init()
+local gameOk, gameErr = pcall(function()
+	require(script.Game).Init()
+end)
+if not gameOk then
+	-- The whole server (Buy, Detonate, characters spawning — everything Game.luau wires up) depends on this succeeding.
+	-- A bad edit to a Config/* file (a typo, an unquoted value) throws here and used to take the server down silently,
+	-- with players left standing in a world that never responds to anything. Now it is at least a loud Output warning.
+	warn("[Server] Game.Init failed, nothing will work until this is fixed: " .. tostring(gameErr))
+end

@@ -236,3 +236,7 @@ Everything below was written without being run in Studio (the automated tests co
 - `Config/Products.luau` now has real ids for everything except the `TrackPremium` gamepass. Open the Shop in a **published, non-Studio** session (private server or live) and confirm every card that has an id shows a real **Buy** button, not "Not for sale yet" — only the Track Premium card should still say that.
 - Buy one of each category once (a shard pack, a blast color, a boost/offer, and the Club subscription) and confirm: the purchase prompt shows the right name/price, the reward grants exactly once, the Shop updates, and it survives leaving and rejoining.
 - `docs/PAID_ITEMS_GUIDE.md` section 5 has the full purchase checklist. Studio test purchases do not prove the live flow; use a published server.
+
+## E30. Trophy hall boards no longer sunk; a bad Config/* can't take the whole server down silently
+- The two hub trophy boards (west of the plaza) now stand on a small post, clearly above the plaza floor, with the statue's feet resting on the pedestal. Check both (Titan and Warden) at spawn: no clipping into the ground, "???" readable before a kill.
+- `Server/init.server.luau`: if `Game.Init()` throws (for example a bad edit to a `Config/*` file), the Output now shows a clear `[Server] Game.Init failed...` warning instead of the whole server silently doing nothing (remotes exist but nothing answers them, characters never load). This does not make gameplay work when config is broken — it only makes the failure visible instead of silent.
