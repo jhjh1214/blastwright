@@ -769,6 +769,9 @@ local TABS = {
 	Codex = require(script.Parent.Tabs.Codex),
 }
 
+-- Forward-declared so rebuildPanel (defined next) can pass it to tabs that need to ask for a refresh later (a product
+-- icon arriving from Roblox, for example): the real function is assigned further down, before anything can call it.
+local requestRebuild
 local lastRenderedTab = nil
 local function rebuildPanel()
 	if not panel.Visible or not State.Data then return end
@@ -787,7 +790,7 @@ local function rebuildPanel()
 	end
 
 	local build = TABS[activeTab] or TABS.Codex
-	build({ d = d, titleLabel = titleLabel, row = row, header = header, label = label, mk = mk, corner = corner, commas = commas, THEME = THEME, button = button, panel = panel, panelScroll = panelScroll })
+	build({ d = d, titleLabel = titleLabel, row = row, header = header, label = label, mk = mk, corner = corner, commas = commas, THEME = THEME, button = button, panel = panel, panelScroll = panelScroll, refresh = function() if lastRenderedTab == activeTab then requestRebuild() end end })
 	lastRenderedTab = activeTab
 	-- Grids and lists finish sizing themselves a frame or two after their children appear (AutomaticSize/AutomaticCanvasSize),
 	-- so restoring the scroll position right away can land past the real content and expose a card from the wrong end. Wait
@@ -814,7 +817,7 @@ end
 -- Snapshots can arrive in quick bursts (a volley, a claim, a purchase). Rebuilding the whole list for each one wastes work and
 -- flickers, so refreshes are coalesced to at most one every 0.3 s. Opening a tab (SetPanel) still rebuilds immediately.
 local lastRebuild, rebuildQueued = 0, false
-local function requestRebuild()
+function requestRebuild()
 	if not panel or not panel.Visible then
 		return
 	end

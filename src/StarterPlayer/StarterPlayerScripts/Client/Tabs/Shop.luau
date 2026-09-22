@@ -11,7 +11,7 @@ local ShopArt = require(script.Parent.Parent.ShopArt)
 local TrackLogic = require(Shared.Track)
 
 return function(c)
-	local d, titleLabel, header, mk, commas, panel, panelScroll = c.d, c.titleLabel, c.header, c.mk, c.commas, c.panel, c.panelScroll
+	local d, titleLabel, header, mk, commas, panel, panelScroll, refresh = c.d, c.titleLabel, c.header, c.mk, c.commas, c.panel, c.panelScroll, c.refresh
 	titleLabel.Text = "Shop"
 	local order = 0
 	local artCtx = { Cosmetics = Config.Cosmetics.Defs, Finishers = Config.Finishers.Defs }
@@ -23,7 +23,7 @@ return function(c)
 		header(order, title)
 		order += 1
 		local grid = mk("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = order, ZIndex = 11 }, panelScroll)
-		mk("UIGridLayout", { CellSize = UDim2.new(1 / cols, cols == 2 and -4 or 0, 0, 238), CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder }, grid)
+		mk("UIGridLayout", { CellSize = UDim2.new(1 / cols, cols == 2 and -4 or 0, 0, 250), CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder }, grid)
 		return grid
 	end
 	local function priceHint(n)
@@ -94,6 +94,7 @@ return function(c)
 				ShopArt.Card(grid, {
 					Name = def.Name, Description = def.Description, Art = ShopArt.FromGrants(def.Grants, artCtx), Tier = def.Tier, Badge = badge,
 					Hint = priceHint(def.PriceHint), Button = def.Id and "Buy" or "Not for sale yet", Enabled = def.Id ~= nil, Order = n, OnClick = buyPrompt(def),
+					ProductId = def.Id, ProductKind = Enum.InfoType.Product, Refresh = refresh,
 				})
 			end
 		end
@@ -106,6 +107,7 @@ return function(c)
 			ShopArt.Card(featured, {
 				Name = def.Name, Description = def.Description, Art = ShopArt.FromGrants(def.Grants, artCtx), Tier = def.Tier, Badge = i == 1 and "BEST VALUE" or "BUNDLE",
 				Hint = priceHint(def.PriceHint), Button = def.Id and "Buy" or "Not for sale yet", Enabled = def.Id ~= nil, Order = i, OnClick = buyPrompt(def),
+				ProductId = def.Id, ProductKind = Enum.InfoType.Product, Refresh = refresh,
 			})
 		end
 	end
@@ -125,6 +127,7 @@ return function(c)
 		ShopArt.Card(perks, {
 			Name = def.Name, Description = def.Description, Art = perkArt[key] or ShopArt.Crown(), Tier = perkTier[key] or "Large", Badge = owned and "OWNED" or "FOREVER",
 			Hint = priceHint(perkHint[key]), Button = owned and "Owned" or (def.Id and "Buy" or "Not for sale yet"), Enabled = (not owned) and def.Id ~= nil, Order = i,
+			ProductId = def.Id, ProductKind = Enum.InfoType.GamePass, Refresh = refresh,
 			OnClick = function()
 				if def.Id and not owned then MarketplaceService:PromptGamePassPurchase(Players.LocalPlayer, def.Id) end
 			end,
@@ -148,6 +151,7 @@ return function(c)
 		ShopArt.Card(colors, {
 			Name = def.Name, Description = def.Description, Art = ShopArt.Orb(swatch), Tier = colorTier[key] or "Small", Badge = owned and "OWNED" or nil,
 			Hint = priceHint(colorHint[key]), Button = owned and "Owned" or (def.Id and "Buy" or "Not for sale yet"), Enabled = (not owned) and def.Id ~= nil, Order = i,
+			ProductId = def.Id, ProductKind = Enum.InfoType.Product, Refresh = refresh,
 			OnClick = function()
 				if def.Id and not owned then MarketplaceService:PromptProductPurchase(Players.LocalPlayer, def.Id) end
 			end,
@@ -165,6 +169,7 @@ return function(c)
 			Name = ("%s  +%s"):format(def.Name, commas(def.Amount * math.max(1, d.StrataUnlocked))), Description = def.Description,
 			Art = ShopArt.Gems(packGems[key] or 2), Tier = packTier[key] or "Small", Badge = key == "ShardVault" and "BEST VALUE" or nil,
 			Hint = priceHint(packHint[key]), Button = def.Id and "Buy" or "Not for sale yet", Enabled = def.Id ~= nil, Order = i, OnClick = buyPrompt(def),
+			ProductId = def.Id, ProductKind = Enum.InfoType.Product, Refresh = refresh,
 		})
 	end
 end

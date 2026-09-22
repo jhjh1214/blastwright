@@ -5,6 +5,7 @@
 local Fx = require(script.Parent.Fx)
 local Kit = require(script.Parent.Kit)
 local Theme = require(script.Parent.Theme)
+local ProductIcons = require(script.Parent.ProductIcons)
 
 local ShopArt = {}
 
@@ -233,13 +234,16 @@ function ShopArt.Crown()
 end
 
 -- Painted shop art: put a REAL image asset id here, keyed by the product's exact Name from Config/Products.luau (the
--- name shown on the card). Cards without an entry keep the drawn art. Never invent an id. See docs/SHOP_ART_GUIDE.md.
+-- name shown on the card), to override what the product's own Roblox icon shows. Most cards do not need an entry any
+-- more: pass ProductId/ProductKind and the card fetches and shows the SAME icon the developer already set on that
+-- product or gamepass in the Creator Dashboard (ProductIcons.luau). See docs/SHOP_ART_GUIDE.md.
 ShopArt.Images = {
 	-- ["Starter Blast"] = "rbxassetid://123456789",
 }
 
 -- A product card in a grid: art on top, big name, description, a price chip and a chunky buy button.
--- spec = { Name, Description, Art, Tier, Badge, Hint = "≈ R$ 49", Button, Enabled, OnClick, Order }
+-- spec = { Name, Description, Art, Tier, Badge, Hint = "≈ R$ 49", Button, Enabled, OnClick, Order,
+--          ProductId, ProductKind = Enum.InfoType.Product | Enum.InfoType.GamePass, Refresh = c.refresh }
 function ShopArt.Card(parent, spec)
 	local color = ShopArt.TierColor[spec.Tier] or Color3.fromRGB(120, 200, 255)
 	local card = make("Frame", { BackgroundColor3 = Theme.Colors.Panel, LayoutOrder = spec.Order or 0, ClipsDescendants = false, ZIndex = 12 }, parent)
@@ -253,11 +257,20 @@ function ShopArt.Card(parent, spec)
 	make("UICorner", { CornerRadius = UDim.new(0, 12) }, art)
 	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3.5, LineJoinMode = Enum.LineJoinMode.Round }, art)
 	local build = BUILD[spec.Art.Kind]
-	local image = ShopArt.Images[spec.Name]
-	if image then
-		-- painted art supplied by the developer replaces the drawn art (see docs/SHOP_ART_GUIDE.md)
+	local function showPicture(image)
 		local picture = make("ImageLabel", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Image = image, ScaleType = Enum.ScaleType.Crop, ZIndex = 13 }, art)
 		make("UICorner", { CornerRadius = UDim.new(0, 12) }, picture)
+	end
+	local image = ShopArt.Images[spec.Name] or (spec.ProductId and ProductIcons.Get(spec.ProductId, spec.ProductKind, function(fetched)
+		-- arrives later, on a network round trip: if this exact card is still on screen, ask for a redraw so it appears
+		if art.Parent and spec.Refresh then
+			spec.Refresh()
+		elseif art.Parent then
+			showPicture(fetched)
+		end
+	end))
+	if image then
+		showPicture(image) -- either an override or already cached from an earlier card/visit
 	elseif build then
 		pcall(build, art, spec.Art)
 	end
@@ -278,18 +291,14 @@ function ShopArt.Card(parent, spec)
 	local desc = text(card, spec.Description, 13, Color3.fromRGB(226, 232, 250), { Font = Enum.Font.BuilderSansBold, Position = UDim2.fromOffset(12, 146), Size = UDim2.new(1, -24, 0, 34), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 14 })
 	desc:FindFirstChildOfClass("UIStroke").Enabled = false -- small body text: no outline, just bright text on the dark card
 
-	if spec.Hint then
-		local chip = make("Frame", { AnchorPoint = Vector2.new(0, 1), BackgroundColor3 = Theme.Colors.PanelDark, Position = UDim2.new(0, 10, 1, -12), Size = UDim2.fromOffset(86, 40), BorderSizePixel = 0, ZIndex = 14 }, card)
-		make("UICorner", { CornerRadius = UDim.new(0, 10) }, chip)
-		make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3, LineJoinMode = Enum.LineJoinMode.Round }, chip)
-		text(chip, spec.Hint, 16, Theme.Tint(color, 0.45), { Size = UDim2.new(0.92, 0, 0.8, 0), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 15, TextScaled = true })
-	end
-	local buy = Kit.Button(card, { Name = "Buy", Size = UDim2.new(1, spec.Hint and -112 or -20, 0, 50), AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -10, 1, -8), Color = spec.Enabled and Theme.Colors.Success or Theme.Colors.Neutral, Text = string.upper(spec.Button or ""), TextSize = 24, Depth = 6, Corner = 12, Sound = spec.Enabled and "Reward" or "Error", OnClick = function()
+	-- One full-width button, price folded into it as a sub-line (Kit.Button's own Sub slot) instead of a separate price
+	-- chip beside it: a single element, so the visible button and the thing that actually receives the click are always
+	-- exactly the same shape, with no separately-positioned piece nearby to misjudge.
+	local buy = Kit.Button(card, { Name = "Buy", Size = UDim2.new(1, -20, 0, spec.Hint and 58 or 50), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Color = spec.Enabled and Theme.Colors.Success or Theme.Colors.Neutral, Text = string.upper(spec.Button or ""), Sub = spec.Hint, TextSize = 22, Depth = 6, Corner = 12, ZIndex = 14, Sound = spec.Enabled and "Reward" or "Error", OnClick = function()
 		if spec.Enabled and spec.OnClick then
 			spec.OnClick()
 		end
 	end })
-	buy.Root.ZIndex = 16
 	return card
 end
 
