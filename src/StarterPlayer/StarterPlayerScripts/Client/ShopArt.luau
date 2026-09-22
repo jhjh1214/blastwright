@@ -291,14 +291,60 @@ function ShopArt.Card(parent, spec)
 	local desc = text(card, spec.Description, 13, Color3.fromRGB(226, 232, 250), { Font = Enum.Font.BuilderSansBold, Position = UDim2.fromOffset(12, 146), Size = UDim2.new(1, -24, 0, 34), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 14 })
 	desc:FindFirstChildOfClass("UIStroke").Enabled = false -- small body text: no outline, just bright text on the dark card
 
-	-- One full-width button, price folded into it as a sub-line (Kit.Button's own Sub slot) instead of a separate price
-	-- chip beside it: a single element, so the visible button and the thing that actually receives the click are always
-	-- exactly the same shape, with no separately-positioned piece nearby to misjudge.
-	local buy = Kit.Button(card, { Name = "Buy", Size = UDim2.new(1, -20, 0, spec.Hint and 58 or 50), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Color = spec.Enabled and Theme.Colors.Success or Theme.Colors.Neutral, Text = string.upper(spec.Button or ""), Sub = spec.Hint, TextSize = 22, Depth = 6, Corner = 12, ZIndex = 14, Sound = spec.Enabled and "Reward" or "Error", OnClick = function()
-		if spec.Enabled and spec.OnClick then
-			spec.OnClick()
+	-- One full-width, plainly-built button: the price is a second line INSIDE it (not a separate chip beside it), and
+	-- every piece — background, text, the click itself — is the same TextButton instance, at the highest ZIndex in the
+	-- card. Nothing else can end up drawn on top of it, and nothing about its hit area can drift from what is drawn.
+	local buyColor = spec.Enabled and Theme.Colors.Success or Theme.Colors.Neutral
+	local buyHeight = spec.Hint and 58 or 50
+	local buy = make("TextButton", {
+		Name = "Buy",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -10),
+		Size = UDim2.new(1, -20, 0, buyHeight),
+		BackgroundColor3 = buyColor,
+		AutoButtonColor = false,
+		Text = "",
+		BorderSizePixel = 0,
+		ZIndex = 25,
+	}, card)
+	make("UICorner", { CornerRadius = UDim.new(0, 12) }, buy)
+	make("UIStroke", { Color = Theme.Colors.Outline, Thickness = 3.5, LineJoinMode = Enum.LineJoinMode.Round }, buy)
+	make("UIGradient", { Color = ColorSequence.new(Theme.Tint(buyColor, 0.3), Theme.Shade(buyColor, 0.08)), Rotation = 90 }, buy)
+	text(buy, string.upper(spec.Button or ""), 20, Color3.new(1, 1, 1), {
+		Name = "Label", Position = UDim2.new(0.06, 0, 0, spec.Hint and 5 or 0), Size = UDim2.new(0.88, 0, 0, spec.Hint and 26 or buyHeight - 10),
+		TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center,
+	})
+	if spec.Hint then
+		text(buy, spec.Hint, 14, Color3.fromRGB(236, 240, 255), {
+			Name = "Hint", Position = UDim2.new(0.1, 0, 1, -22), Size = UDim2.new(0.8, 0, 0, 18), TextScaled = true,
+		})
+	end
+	local buyScale = make("UIScale", { Scale = 1 }, buy)
+	buy.MouseEnter:Connect(function()
+		if spec.Enabled then
+			Kit.Tween(buyScale, Theme.Anim.Hover, { Scale = 1.05 })
+			Kit.Sounds.Hover()
 		end
-	end })
+	end)
+	buy.MouseLeave:Connect(function()
+		Kit.Tween(buyScale, Theme.Anim.Release, { Scale = 1 }, Enum.EasingStyle.Back)
+	end)
+	buy.MouseButton1Down:Connect(function()
+		if spec.Enabled then
+			Kit.Tween(buyScale, Theme.Anim.Press, { Scale = 0.95 })
+		end
+	end)
+	buy.MouseButton1Up:Connect(function()
+		Kit.Tween(buyScale, Theme.Anim.Release, { Scale = 1 }, Enum.EasingStyle.Back)
+	end)
+	buy.Activated:Connect(function()
+		if spec.Enabled and spec.OnClick then
+			Kit.Sounds.Reward()
+			spec.OnClick()
+		else
+			Kit.Sounds.Error()
+		end
+	end)
 	return card
 end
 
