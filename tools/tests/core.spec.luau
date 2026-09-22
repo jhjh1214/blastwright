@@ -558,6 +558,8 @@ test("products: config is valid and never contains invented ids", function()
 	end
 	check(Products.DeveloperProducts, Products.DeveloperProductOrder, "products")
 	check(Products.Gamepasses, Products.GamepassOrder, "passes")
+	check(Products.CosmeticProducts, Products.CosmeticProductOrder, "cosmetic products")
+	check(Products.Offers, Products.OfferOrder, "offers")
 	for _, key in Products.DeveloperProductOrder do
 		if Products.DeveloperProducts[key].Amount <= 0 then error(key .. " grants nothing") end
 	end
@@ -3027,7 +3029,7 @@ test("mastery: purchased titles can be worn like earned ones, and are listed aft
 	eq(Mastery.Equip(m, "Not Owned", MasteryCfg), false, "an unowned one cannot")
 end)
 
-test("offers: config is valid (no invented ids, valid grants, real cosmetics and finishers, ordered tiers)", function()
+test("offers: config is valid (valid grants, real cosmetics and finishers, ordered tiers)", function()
 	local seen = {}
 	local tierRank = {}
 	for i, t in Products.TierOrder do tierRank[t] = i end
@@ -3041,7 +3043,8 @@ test("offers: config is valid (no invented ids, valid grants, real cosmetics and
 		local o = Products.Offers[key]
 		eq(o ~= nil, true, key .. " exists")
 		eq(seen[key], nil, "duplicate " .. key) seen[key] = true
-		eq(o.Id, nil, key .. " must not have an invented product id")
+		-- id well-formedness and no cross-category collisions: checked once, for every product group, in
+		-- "products: config is valid and never contains invented ids"
 		eq(type(o.Name) == "string" and type(o.Description) == "string", true, key .. " text")
 		eq(CATEGORIES[o.Category], true, key .. " category")
 		eq(tierRank[o.Tier] ~= nil, true, key .. " tier")
@@ -3060,7 +3063,9 @@ test("offers: config is valid (no invented ids, valid grants, real cosmetics and
 	for _, o in Products.Offers do
 		eq(o.PriceHint >= floors[o.Tier] and o.PriceHint <= ceilings[o.Tier], true, o.Name .. " price hint sits in its tier's range")
 	end
-	eq(Products.Club.SubscriptionId, nil, "the subscription id is not invented")
+	if Products.Club.SubscriptionId ~= nil then
+		eq(type(Products.Club.SubscriptionId) == "string" and Products.Club.SubscriptionId ~= "", true, "the subscription id, once set, is a real non-empty string")
+	end
 	eq(Products.Club.MonthlyShards > 0 and #Products.Club.Title <= 24, true, "club config")
 end)
 

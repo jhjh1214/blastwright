@@ -231,3 +231,8 @@ Everything below was written without being run in Studio (the automated tests co
 - **Camera:** during a boss fight, hover different cells and let threat cards appear/disappear. The camera should ease smoothly, never suddenly snap in or out, even as the top info column changes height.
 - **Boss defeated:** killing a boss now opens a full-window card ("VICTORY! ... DEFEATED") with a CONTINUE button; tapping anywhere on the dimmed background also closes it. If a Mastery title was earned on the same kill, its reward card shows either just before or just after (queued, never both on screen at once).
 - **Shop scroll:** open the Shop, scroll to the bottom, then buy something near the top (or wait for a Sync to arrive) and confirm the list still ends exactly at the last card, with nothing from the top peeking in, and nothing from below visible before you scroll to it. Do the same after scrolling partway and switching areas/claiming a daily reward while the panel is open.
+
+## E29. Real product ids are live (do this before any more Robux testing)
+- `Config/Products.luau` now has real ids for everything except the `TrackPremium` gamepass. Open the Shop in a **published, non-Studio** session (private server or live) and confirm every card that has an id shows a real **Buy** button, not "Not for sale yet" — only the Track Premium card should still say that.
+- Buy one of each category once (a shard pack, a blast color, a boost/offer, and the Club subscription) and confirm: the purchase prompt shows the right name/price, the reward grants exactly once, the Shop updates, and it survives leaving and rejoining.
+- `docs/PAID_ITEMS_GUIDE.md` section 5 has the full purchase checklist. Studio test purchases do not prove the live flow; use a published server.
